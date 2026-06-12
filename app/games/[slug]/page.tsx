@@ -1,0 +1,971 @@
+"use client"
+
+import { useEffect, useState, useRef, useCallback, useMemo } from "react"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import Image from "next/image"
+import { motion, AnimatePresence } from "framer-motion"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Loader2, Send, Gamepad2, Users, MessageSquare, BookOpen } from "lucide-react"
+import MonopolyBoard from "../monopoly/components/MonopolyBoard"
+import { initializeGame } from "../monopoly/lib/monopolyEngine"
+import CatanBoard from "../catan/components/CatanBoard"
+import { initializeGame as initializeCatan } from "../catan/lib/catanEngine"
+
+
+// Define types
+interface GameData {
+  id: string
+  name: string
+  description: string
+  image: string
+  minPlayers: number
+  maxPlayers: number
+  complexity: string
+  duration: string
+}
+
+interface PartyMember {
+  id: string
+  user_id: string
+  joined_at: string
+  is_host?: boolean
+  is_muted?: boolean
+  profile?: {
+    username: string
+    display_name?: string
+    avatar_url?: string
+  }
+}
+
+interface ChatMessage {
+  id: string
+  user_id: string
+  content: string
+  created_at: string
+  username?: string
+  display_name?: string
+}
+
+export default function GamePlayPage() {
+  const params = useParams()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const supabase = useMemo(() => createClientComponentClient(), [])
+  
+  const [loading, setLoading] = useState(true)
+  const [gameData, setGameData] = useState<GameData | null>(null)
+  const [partyMembers, setPartyMembers] = useState<PartyMember[]>([])
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [messageInput, setMessageInput] = useState("")
+  const [sendingMessage, setSendingMessage] = useState(false)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  
+  const urlPartyId = searchParams.get('partyId')
+  const [partyId, setPartyId] = useState<string | null>(urlPartyId)
+  
+  const [monopolyState, setMonopolyStateState] = useState<any>(null)
+  const monopolyStateRef = useRef<any>(null)
+  
+  const setMonopolyState = (state: any) => {
+    setMonopolyStateState(state)
+    monopolyStateRef.current = state
+  }
+
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [showRules, setShowRules] = useState(false)
+  const [copiedLink, setCopiedLink] = useState(false)
+  
+  const partyMembersRef = useRef(partyMembers)
+  const activeChannelRef = useRef<any>(null)
+
+  useEffect(() => {
+    partyMembersRef.current = partyMembers
+  }, [partyMembers])
+
+  
+  // Hardcoded mock games data
+  const mockGames = {
+    monopoly: {
+      id: 'monopoly',
+      name: 'Monopoly',
+      description: 'Classic real estate trading game',
+      image: '/images/monopoly thumbnail.png',
+      minPlayers: 2,
+      maxPlayers: 6,
+      duration: '60-180 min',
+      complexity: 'Medium'
+    },
+    battleship: {
+      id: 'battleship',
+      name: 'Battleship',
+      description: 'Naval combat game',
+      image: '/images/Battleship thumbnail.png',
+      minPlayers: 2,
+      maxPlayers: 2,
+      duration: '15-30 min',
+      complexity: 'Easy'
+    },
+    catan: {
+      id: 'catan',
+      name: 'Catan',
+      description: 'Build and trade to settle the island of Catan',
+      image: '/images/catan thumbnail.png',
+      minPlayers: 3,
+      maxPlayers: 4,
+      duration: '60-120 min',
+      complexity: 'Medium'
+    },
+    uno: {
+      id: 'uno',
+      name: 'Uno',
+      description: 'Classic card game of matching colors and numbers',
+      image: '/images/uno final thumbnail.png',
+      minPlayers: 2,
+      maxPlayers: 10,
+      duration: '15-30 min',
+      complexity: 'Easy'
+    },
+    poker: {
+      id: 'poker',
+      name: 'Poker',
+      description: 'Popular card game of skill and chance',
+      image: '/images/poker thumbnail.png',
+      minPlayers: 2,
+      maxPlayers: 10,
+      duration: '30-60 min',
+      complexity: 'Medium'
+    },
+    cluedo: {
+      id: 'cluedo',
+      name: 'Cluedo',
+      description: 'Solve the mystery of who committed the murder',
+      image: '/images/cluedo thumbnail.png',
+      minPlayers: 3,
+      maxPlayers: 6,
+      duration: '45-60 min',
+      complexity: 'Easy'
+    },
+    pictionary: {
+      id: 'pictionary',
+      name: 'Pictionary',
+      description: 'Draw and guess words against the clock',
+      image: '/images/pictionary thumbnail.png',
+      minPlayers: 4,
+      maxPlayers: 8,
+      duration: '30-60 min',
+      complexity: 'Easy'
+    },
+    scribbleio: {
+      id: 'scribbleio',
+      name: 'Scribble.io',
+      description: 'Online drawing and guessing game',
+      image: '/images/scribbleio thumbnail.png',
+      minPlayers: 2,
+      maxPlayers: 16,
+      duration: '15-30 min',
+      complexity: 'Easy'
+    },
+    codenames: {
+      id: 'codenames',
+      name: 'Codenames',
+      description: 'Give one-word clues to help your team guess the right words',
+      image: '/images/codenames thumbnal.png',
+      minPlayers: 4,
+      maxPlayers: 8,
+      duration: '15-30 min',
+      complexity: 'Easy'
+    },
+    terramystica: {
+      id: 'terramystica',
+      name: 'Terra Mystica',
+      description: 'Strategic game of terrain building and resource management',
+      image: '/images/terra mystica thumbnail.png',
+      minPlayers: 2,
+      maxPlayers: 5,
+      duration: '90-120 min',
+      complexity: 'Hard'
+    },
+    '7wonders': {
+      id: '7wonders',
+      name: '7 Wonders',
+      description: 'Build an ancient civilization and lead it to greatness',
+      image: '/images/7wonders thumbnail.png',
+      minPlayers: 3,
+      maxPlayers: 7,
+      duration: '30-60 min',
+      complexity: 'Medium'
+    }
+  }
+
+
+  const refreshPartyDetails = useCallback(async (pId: string, currentUid: string) => {
+    if (!pId || pId === "mock-party-id") return
+
+    try {
+      // Fetch party data
+      const { data: partyData, error: partyError } = await supabase
+        .from('parties')
+        .select('*')
+        .eq('id', pId)
+        .single()
+
+      if (partyError) throw partyError
+
+      // Fetch party members
+      const { data: membersData, error: membersError } = await supabase
+        .from('party_members')
+        .select('*')
+        .eq('party_id', pId)
+
+      if (membersError) throw membersError
+
+      // Fetch profiles for the members
+      const userIds = membersData?.map(m => m.user_id) || []
+      if (partyData && !userIds.includes(partyData.created_by)) {
+        userIds.push(partyData.created_by)
+      }
+
+      const profilesMap: Record<string, any> = {}
+      if (userIds.length > 0) {
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select('*')
+          .in('id', userIds)
+
+        if (!profilesError && profilesData) {
+          profilesData.forEach(p => {
+            profilesMap[p.id] = {
+              username: p.username || `User ${p.id.slice(0, 6)}`,
+              display_name: p.display_name,
+              avatar_url: p.avatar_url
+            }
+          })
+        }
+      }
+
+      // Map to PartyMember interface
+      const mappedMembers = (membersData || []).map(m => ({
+        id: m.id,
+        user_id: m.user_id,
+        joined_at: m.joined_at,
+        is_host: m.user_id === partyData.created_by || m.role === 'leader',
+        is_muted: m.is_muted,
+        profile: profilesMap[m.user_id] || { username: `User ${m.user_id.slice(0, 6)}` }
+      }))
+
+      // Prepend host if not in list
+      const hostInMembers = mappedMembers.some(m => m.user_id === partyData.created_by)
+      if (!hostInMembers && partyData.created_by) {
+        mappedMembers.unshift({
+          id: 'host-member',
+          user_id: partyData.created_by,
+          joined_at: partyData.created_at,
+          is_host: true,
+          is_muted: false,
+          profile: profilesMap[partyData.created_by] || { username: 'Host' }
+        })
+      }
+
+      setPartyMembers(mappedMembers)
+
+      // Fetch messages
+      const { data: messagesData, error: messagesError } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('party_id', pId)
+        .order('created_at', { ascending: true })
+
+      if (!messagesError && messagesData) {
+        const mappedMessages = messagesData.map(msg => {
+          const profile = profilesMap[msg.user_id] || {}
+          return {
+            id: msg.id,
+            user_id: msg.user_id,
+            content: msg.content,
+            created_at: msg.created_at,
+            username: profile.username || 'User',
+            display_name: profile.display_name || profile.username || 'User'
+          }
+        })
+        setChatMessages(mappedMessages)
+      }
+    } catch (err) {
+      console.error('Error refreshing party details in game page:', err)
+    }
+  }, [supabase])
+
+  // Fetch game data, party members, and chat messages
+  useEffect(() => {
+    const fetchGameData = async () => {
+      setLoading(true)
+      
+      try {
+        // Get current user session – fall back to a local mock user if Supabase is offline
+        const { data: { session } } = await supabase.auth.getSession()
+        const mockUser = {
+          id: 'local-player-' + (typeof window !== 'undefined' ? (localStorage.getItem('guestId') || (() => { const id = Math.random().toString(36).slice(2, 10); localStorage.setItem('guestId', id); return id; })()) : 'guest'),
+          user_metadata: { username: 'You' }
+        }
+        const activeUser = session?.user ?? mockUser
+        
+        setCurrentUserId(activeUser.id)
+        
+        // Find game data from slug
+        const gameSlug = params.slug as string
+        
+        console.log('Looking for game with ID:', gameSlug)
+        
+        // Find game in mock data
+        const game = mockGames[gameSlug as keyof typeof mockGames]
+        
+        if (!game) {
+          console.error('Game not found in mock data:', gameSlug)
+          router.push('/games')
+          return
+        }
+        
+        console.log('Found game:', game)
+        
+        // Set the game data from mock data
+        setGameData({
+          id: game.id,
+          name: game.name,
+          description: game.description,
+          image: game.image,
+          minPlayers: game.minPlayers,
+          maxPlayers: game.maxPlayers,
+          complexity: game.complexity,
+          duration: game.duration
+        })
+        
+        if (partyId && partyId !== "mock-party-id") {
+          await refreshPartyDetails(partyId, activeUser.id)
+        } else {
+          // Mock party data for now (when no partyId query param is provided)
+          setPartyId("mock-party-id")
+          
+          setPartyMembers([
+            {
+              id: "member-1",
+              user_id: activeUser.id,
+              joined_at: new Date().toISOString(),
+              is_host: true,
+              profile: {
+                username: activeUser.user_metadata?.username || "You",
+                display_name: activeUser.user_metadata?.username || "You"
+              }
+            },
+            {
+              id: "member-2",
+              user_id: "user-2",
+              joined_at: new Date().toISOString(),
+              profile: {
+                username: "player2",
+                display_name: "Player 2"
+              }
+            },
+            {
+              id: "member-3",
+              user_id: "user-3",
+              joined_at: new Date().toISOString(),
+              profile: {
+                username: "player3",
+                display_name: "Player 3"
+              }
+            }
+          ])
+          
+          setChatMessages([
+            {
+              id: "msg-1",
+              user_id: "user-2",
+              content: "Hey everyone, ready to play?",
+              created_at: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
+              username: "player2",
+              display_name: "Player 2"
+            },
+            {
+              id: "msg-2",
+              user_id: activeUser.id,
+              content: "Yes, let's start!",
+              created_at: new Date(Date.now() - 1000 * 60 * 2).toISOString(),
+              username: activeUser.user_metadata?.username || "You",
+              display_name: activeUser.user_metadata?.username || "You"
+            }
+          ])
+        }
+      } catch (error) {
+        console.error("Error fetching game data:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    fetchGameData()
+  }, [params.slug, router, supabase, partyId, refreshPartyDetails])
+
+  // Listen for real-time game broadcasts & db changes
+  useEffect(() => {
+    if (!partyId || !currentUserId) return
+
+    const channel = supabase.channel(`game-${partyId}`)
+    activeChannelRef.current = channel
+    
+    channel
+      .on('broadcast', { event: 'sync_state' }, ({ payload }) => {
+        console.log('Received broadcast state update:', payload)
+        setMonopolyState(payload)
+        setIsPlaying(true)
+      })
+      .on('broadcast', { event: 'game_start' }, ({ payload }) => {
+        console.log('Received game start broadcast:', payload)
+        setMonopolyState(payload)
+        setIsPlaying(true)
+      })
+      .on('broadcast', { event: 'request_sync' }, () => {
+        console.log('Received request_sync from player. monopolyStateRef.current:', monopolyStateRef.current)
+        const currentMembers = partyMembersRef.current
+        const isHost = currentMembers.some(m => m.user_id === currentUserId && m.is_host)
+        if (isHost && monopolyStateRef.current) {
+          channel.send({
+            type: 'broadcast',
+            event: 'sync_state',
+            payload: monopolyStateRef.current
+          })
+        }
+      })
+      .subscribe()
+
+    // Database changes channel
+    const dbChannel = supabase.channel(`game-db-${partyId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'party_members',
+        filter: `party_id=eq.${partyId}`
+      }, () => {
+        refreshPartyDetails(partyId, currentUserId)
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'messages',
+        filter: `party_id=eq.${partyId}`
+      }, () => {
+        refreshPartyDetails(partyId, currentUserId)
+      })
+      .subscribe()
+
+    // Request sync from host when guest player enters the page
+    const timer = setTimeout(() => {
+      const currentMembers = partyMembersRef.current
+      const isHost = currentMembers.some(m => m.user_id === currentUserId && m.is_host)
+      if (!isHost) {
+        channel.send({
+          type: 'broadcast',
+          event: 'request_sync',
+          payload: {}
+        })
+      }
+    }, 1500)
+
+    return () => {
+      activeChannelRef.current = null
+      supabase.removeChannel(channel)
+      supabase.removeChannel(dbChannel)
+      clearTimeout(timer)
+    }
+  }, [partyId, currentUserId, supabase, refreshPartyDetails])
+
+  
+  // Handle starting a new game
+  const handleStartGame = async () => {
+    if (!gameData || !currentUserId) return
+    
+    if (gameData.id === 'monopoly') {
+      const playersData = partyMembers.map(m => ({
+        id: m.user_id,
+        name: m.profile?.display_name || m.profile?.username || "You",
+        isBot: false
+      }))
+      
+      // Standalone/Single-player fallback: Add 2 bots if playing alone
+      if (playersData.length === 1) {
+        playersData.push({ id: 'bot-1', name: 'Mr. Monopoly', isBot: true })
+        playersData.push({ id: 'bot-2', name: 'Tycoon Bot', isBot: true })
+      }
+      
+      const initialState = initializeGame(playersData)
+      setMonopolyState(initialState)
+      setIsPlaying(true)
+      
+      // Broadcast to other players in the party
+      if (partyId && activeChannelRef.current) {
+        activeChannelRef.current.send({
+          type: 'broadcast',
+          event: 'game_start',
+          payload: initialState
+        })
+      }
+      return
+    }
+
+    if (gameData.id === 'catan') {
+      const playersData = partyMembers.map(m => ({
+        id: m.user_id,
+        name: m.profile?.display_name || m.profile?.username || "You",
+        isBot: false
+      }))
+      
+      // Standalone/Single-player fallback: Add 3 bots if playing alone
+      if (playersData.length === 1) {
+        playersData.push({ id: 'bot-1', name: 'Tycoon Bot', isBot: true })
+        playersData.push({ id: 'bot-2', name: 'Settler Bot', isBot: true })
+        playersData.push({ id: 'bot-3', name: 'Golden Bot', isBot: true })
+      }
+      
+      const initialState = initializeCatan(playersData)
+      setMonopolyState(initialState)
+      setIsPlaying(true)
+      
+      // Broadcast to other players in the party
+      if (partyId && activeChannelRef.current) {
+        activeChannelRef.current.send({
+          type: 'broadcast',
+          event: 'game_start',
+          payload: initialState
+        })
+      }
+      return
+    }
+
+    try {
+      // Create a new party for this game
+      const { data: party, error: partyError } = await supabase
+        .from('parties')
+        .insert([
+          { 
+            name: `${gameData.name} Party`,
+            game: gameData.name,
+            game_id: gameData.id,
+            game_image: gameData.image,
+            max_players: gameData.maxPlayers,
+            created_by: currentUserId,
+            status: 'waiting'
+          }
+        ])
+        .select()
+        .single()
+      
+      if (partyError) throw partyError
+      
+      // Add the creator as the first member
+      const { error: memberError } = await supabase
+        .from('party_members')
+        .insert([
+          {
+            party_id: party.id,
+            user_id: currentUserId,
+            role: 'leader'
+          }
+        ])
+      
+      if (memberError) throw memberError
+      
+      // Redirect to the party page
+      router.push(`/party/${party.id}`)
+    } catch (error) {
+      console.error('Error creating party:', error)
+      alert('Failed to create party. Please try again.')
+    }
+  }
+
+  // Handle sending a chat message
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!messageInput.trim() || !currentUserId || !partyId) return
+    
+    setSendingMessage(true)
+    
+    try {
+      if (partyId && partyId !== "mock-party-id") {
+        const { error } = await supabase
+          .from('messages')
+          .insert([
+            {
+              party_id: partyId,
+              user_id: currentUserId,
+              content: messageInput,
+              created_at: new Date().toISOString()
+            }
+          ])
+        if (error) throw error
+      } else {
+        // In a mock implementation, save locally
+        const newMessage: ChatMessage = {
+          id: `msg-${Date.now()}`,
+          user_id: currentUserId,
+          content: messageInput,
+          created_at: new Date().toISOString(),
+          username: partyMembers.find(m => m.user_id === currentUserId)?.profile?.username,
+          display_name: partyMembers.find(m => m.user_id === currentUserId)?.profile?.display_name
+        }
+        setChatMessages(prev => [...prev, newMessage])
+      }
+      setMessageInput("")
+    } catch (error) {
+      console.error("Error sending message:", error)
+    } finally {
+      setSendingMessage(false)
+    }
+  }
+  
+  // Handle copying invite link
+  const handleInviteFriends = () => {
+    if (!partyId) return
+    // If mock-party-id, just simulate
+    if (partyId === "mock-party-id") {
+      setCopiedLink(true)
+      setTimeout(() => setCopiedLink(false), 2000)
+      return
+    }
+    const inviteUrl = `${window.location.origin}${window.location.pathname}?partyId=${partyId}`
+    navigator.clipboard.writeText(inviteUrl)
+      .then(() => {
+        setCopiedLink(true)
+        setTimeout(() => setCopiedLink(false), 2000)
+      })
+      .catch((err) => {
+        console.error("Failed to copy link:", err)
+      })
+  }
+  
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-cyan-500 to-pink-500">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-white mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-white">Loading Game...</h2>
+        </div>
+      </div>
+    )
+  }
+  
+  if (!gameData) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-cyan-500 to-pink-500">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-white mb-4">Game not found</h2>
+          <Button onClick={() => router.push('/games')}>
+            Back to Games
+          </Button>
+        </div>
+      </div>
+    )
+  }
+  
+  return (
+    <div className="h-screen bg-gradient-to-br from-cyan-500 to-pink-500 p-0 m-0 overflow-hidden">
+      <div className="h-full p-0 flex w-full">
+        {/* Main content - Game and Sidebar */}
+        <div className="flex flex-col md:flex-row h-full w-full overflow-y-auto md:overflow-hidden">
+          {/* Game screen - Left side */}
+          <motion.div 
+            className="w-full md:w-[calc(100%-300px)] xl:w-[calc(100%-550px)] h-[72vh] md:h-full bg-black/20 backdrop-blur-md overflow-hidden shadow-xl border-r border-white/10 flex flex-col flex-shrink-0"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            {/* Game title */}
+            <div className="p-2 bg-black/30 border-b border-white/10">
+              <motion.h1 
+                className="text-xl font-bold text-white"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.2 }}
+              >
+                {gameData.name}
+              </motion.h1>
+            </div>
+            
+            <div className="flex-1 w-full relative overflow-hidden">
+              {isPlaying && gameData.id === 'monopoly' && monopolyState ? (
+                <MonopolyBoard
+                  state={monopolyState}
+                  currentPlayerId={currentUserId || ''}
+                  onStateChange={(nextState) => {
+                    setMonopolyState(nextState)
+                  }}
+                  onBroadcastAction={(event, payload) => {
+                    if (partyId && activeChannelRef.current) {
+                      activeChannelRef.current.send({
+                        type: 'broadcast',
+                        event: event,
+                        payload: payload
+                      })
+                    }
+                  }}
+                />
+              ) : isPlaying && gameData.id === 'catan' && monopolyState ? (
+                <CatanBoard
+                  state={monopolyState}
+                  currentPlayerId={currentUserId || ''}
+                  onStateChange={(nextState) => {
+                    setMonopolyState(nextState)
+                  }}
+                  onBroadcastAction={(event, payload) => {
+                    if (partyId && activeChannelRef.current) {
+                      activeChannelRef.current.send({
+                        type: 'broadcast',
+                        event: event,
+                        payload: payload
+                      })
+                    }
+                  }}
+                />
+              ) : (
+                <>
+                  <Image
+                    src={gameData.image}
+                    alt={gameData.name}
+                    fill
+                    className="object-cover"
+                    priority
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                    <div className="text-center p-6 bg-slate-950/70 border border-white/10 rounded-2xl backdrop-blur-md max-w-md mx-4">
+                      <h2 className="text-3xl font-black text-white mb-2 uppercase tracking-wide bg-clip-text bg-gradient-to-r from-pink-400 to-rose-400">
+                        {gameData.name}
+                      </h2>
+                      <p className="text-white/85 text-xs mb-6 leading-relaxed">
+                        {gameData.description}. Complete board spaces, custom tokens, and smart AI bot fallbacks ready to play.
+                      </p>
+                      <Button 
+                        onClick={handleStartGame}
+                        className="bg-gradient-to-r from-cyan-500 to-pink-500 hover:from-cyan-600 hover:to-pink-600 font-bold px-8 py-5 rounded-xl shadow-lg"
+                      >
+                        Start Game Lobby
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+            
+            {/* Game controls would go here */}
+            <div className="p-4 bg-black/30 border-t border-white/5">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-white/70 text-sm">
+                    Players: {gameData.minPlayers}-{gameData.maxPlayers} • 
+                    Complexity: {gameData.complexity} • 
+                    Duration: {gameData.duration}
+                  </p>
+                </div>
+                <Button 
+                  onClick={() => setShowRules(true)}
+                  variant="outline" 
+                  className="text-white border-white/20 hover:bg-white/10 flex items-center gap-1.5"
+                >
+                  <BookOpen className="w-4 h-4 text-pink-400" />
+                  Game Rules
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+          
+          {/* Sidebar - Right side */}
+          <motion.div 
+            className="w-full md:w-[300px] h-[55vh] md:h-full bg-black/20 backdrop-blur-md overflow-hidden shadow-xl border-l border-white/10 flex flex-col flex-shrink-0"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+          >
+            <Tabs defaultValue="party" className="w-full">
+              <TabsList className="w-full grid grid-cols-2">
+                <TabsTrigger value="party" className="flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  <span>Party</span>
+                </TabsTrigger>
+                <TabsTrigger value="chat" className="flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4" />
+                  <span>Chat</span>
+                </TabsTrigger>
+              </TabsList>
+              
+              {/* Party Members Tab */}
+              <TabsContent value="party" className="p-0">
+                <div className="p-4 border-b border-white/10">
+                  <h3 className="font-bold text-white">Party Members</h3>
+                </div>
+                <div className="max-h-[500px] overflow-y-auto p-2">
+                  {partyMembers.map((member) => (
+                    <div 
+                      key={member.id}
+                      className={`flex items-center p-3 mb-2 rounded-lg ${
+                        member.is_host ? 'bg-green-500/20 border border-green-500/30' : 'bg-white/10'
+                      }`}
+                    >
+                      <div className="h-8 w-8 rounded-full bg-gradient-to-br from-cyan-500 to-pink-500 flex items-center justify-center text-white font-bold mr-3">
+                        {member.profile?.username?.[0].toUpperCase() || 'U'}
+                      </div>
+                      <div>
+                        <p className="font-medium text-white flex items-center">
+                          {member.profile?.display_name || member.profile?.username || 'Unknown User'}
+                          {member.is_host && (
+                            <span className="ml-2 text-xs bg-green-500/30 text-green-300 px-1.5 py-0.5 rounded-full flex items-center">
+                              <span className="w-1.5 h-1.5 bg-green-400 rounded-full mr-1"></span>
+                              Host
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="p-3 border-t border-white/10">
+                  <Button 
+                    onClick={handleInviteFriends}
+                    className="w-full bg-gradient-to-r from-cyan-500 to-pink-500 hover:from-cyan-600 hover:to-pink-600"
+                  >
+                    {copiedLink ? "Link Copied!" : "Invite Friends"}
+                  </Button>
+                </div>
+              </TabsContent>
+              
+              {/* Chat Tab */}
+              <TabsContent value="chat" className="p-0 flex flex-col flex-1 overflow-hidden">
+                {/* Chat messages */}
+                <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                  {chatMessages.map((message) => (
+                    <div 
+                      key={message.id}
+                      className={`flex ${message.user_id === currentUserId ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div 
+                        className={`max-w-[80%] rounded-lg p-3 ${
+                          message.user_id === currentUserId 
+                            ? 'bg-cyan-500/30 text-white' 
+                            : 'bg-white/10 text-white'
+                        }`}
+                      >
+                        {message.user_id !== currentUserId && (
+                          <p className="text-xs font-medium mb-1 text-cyan-300">
+                            {message.display_name || message.username}
+                          </p>
+                        )}
+                        <p>{message.content}</p>
+                        <p className="text-xs opacity-70 mt-1 text-right">
+                          {new Date(message.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Message input */}
+                <div className="p-2 border-t border-white/10">
+                  <form onSubmit={handleSendMessage} className="flex gap-2">
+                    <Input
+                      type="text"
+                      placeholder="Type a message..."
+                      className="flex-1 h-9 bg-white/10 border-0 text-white placeholder:text-white/50 focus-visible:ring-1 focus-visible:ring-white/30 text-sm"
+                      value={messageInput}
+                      onChange={(e) => setMessageInput(e.target.value)}
+                    />
+                    <Button 
+                      type="submit" 
+                      size="sm" 
+                      className="h-9 px-3 bg-gradient-to-r from-cyan-500 to-pink-500 hover:from-cyan-600 hover:to-pink-600"
+                      disabled={sendingMessage}
+                    >
+                      {sendingMessage ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Send className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                  </form>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </motion.div>
+          
+          {/* Ad Space - Right side */}
+          <div className="hidden xl:block w-[250px] h-full bg-black/10 backdrop-blur-sm p-4 overflow-hidden border-l border-white/10">
+            <div className="text-center text-white/70 mb-4 text-sm">Advertisement</div>
+            <div className="bg-white/5 rounded-lg p-4 h-[calc(100%-2rem)] flex items-center justify-center border border-dashed border-white/20">
+              <div className="text-center">
+                <span className="text-white/50">Ad Space</span>
+                <p className="text-xs text-white/30 mt-2">300x600</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Game Rules Modal Overlay */}
+      <AnimatePresence>
+        {showRules && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="absolute inset-0" onClick={() => setShowRules(false)} />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative z-10 w-full max-w-lg bg-slate-900 border border-white/10 rounded-2xl p-6 shadow-2xl max-h-[80vh] overflow-y-auto"
+            >
+              <h3 className="text-lg font-black uppercase text-pink-400 tracking-wider mb-4 border-b border-white/10 pb-2">
+                Monopoly Board Game Rules
+              </h3>
+              
+              <div className="space-y-4 text-xs text-slate-300 leading-relaxed font-sans">
+                <div>
+                  <h4 className="font-bold text-white uppercase text-[10px] tracking-wider mb-1">1. Object of the Game</h4>
+                  <p>The object of the game is to become the wealthiest player through buying, renting, and trading properties. Force all opponents into bankruptcy to claim victory!</p>
+                </div>
+                
+                <div>
+                  <h4 className="font-bold text-white uppercase text-[10px] tracking-wider mb-1">2. Turns and Rolling</h4>
+                  <p>Roll the dice to move your token around the board. If you roll doubles, you get another throw! However, rolling doubles three times in a row sends you directly to jail.</p>
+                </div>
+
+                <div>
+                  <h4 className="font-bold text-white uppercase text-[10px] tracking-wider mb-1">3. Buying & Rent</h4>
+                  <p>When you land on an unowned property, railroad, or utility, you may purchase it from the bank. If you pass on it, it remains unowned. If you land on another player's property, you must pay them rent!</p>
+                </div>
+
+                <div>
+                  <h4 className="font-bold text-white uppercase text-[10px] tracking-wider mb-1">4. Color Groups & Houses</h4>
+                  <p>Own all properties of a color group to double the base rent! Once a complete set is owned, you can construct houses and hotels on them to exponentially increase rent charges. Houses must be built evenly.</p>
+                </div>
+
+                <div>
+                  <h4 className="font-bold text-white uppercase text-[10px] tracking-wider mb-1">5. Mortgages & Selling</h4>
+                  <p>If you need cash to cover a debt or purchase, you can sell houses for a 50% refund, or mortgage properties to receive their mortgage value. Mortgaged properties do not collect rent.</p>
+                </div>
+
+                <div>
+                  <h4 className="font-bold text-white uppercase text-[10px] tracking-wider mb-1">6. Jail Rules</h4>
+                  <p>Get out of Jail by: (1) rolling doubles on your next turn, (2) paying a $50 fine, or (3) using a Get Out Of Jail Free card. After 3 turns, you are forced to pay the fine.</p>
+                </div>
+              </div>
+
+              <Button
+                onClick={() => setShowRules(false)}
+                className="w-full mt-6 bg-gradient-to-r from-cyan-500 to-pink-500 hover:from-cyan-600 hover:to-pink-600 font-bold uppercase tracking-wider text-xs py-2 rounded-lg text-slate-950"
+              >
+                Close Rules
+              </Button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
