@@ -45,6 +45,122 @@ const RESOURCE_ICONS: Record<ResourceType, string> = {
   ORE: '🏔️'
 };
 
+function renderTerrainGraphics(terrain: TerrainType) {
+  switch (terrain) {
+    case 'FOREST':
+      return (
+        <g className="opacity-90">
+          {/* Back left tree */}
+          <g transform="translate(-8, -5) scale(0.65)">
+            <rect x="-2" y="5" width="4" height="6" fill="#78350f" />
+            <path d="M 0,-15 L 9,-3 L -9,-3 Z" fill="#166534" />
+            <path d="M 0,-7 L 11,5 L -11,5 Z" fill="#14532d" />
+            <path d="M 0,1 L 13,12 L -13,12 Z" fill="#0f2f1d" />
+          </g>
+          {/* Back right tree */}
+          <g transform="translate(8, -5) scale(0.65)">
+            <rect x="-2" y="5" width="4" height="6" fill="#78350f" />
+            <path d="M 0,-15 L 9,-3 L -9,-3 Z" fill="#166534" />
+            <path d="M 0,-7 L 11,5 L -11,5 Z" fill="#14532d" />
+            <path d="M 0,1 L 13,12 L -13,12 Z" fill="#0f2f1d" />
+          </g>
+          {/* Front center tree */}
+          <g transform="translate(0, -12) scale(0.85)">
+            <rect x="-2" y="5" width="4" height="6" fill="#78350f" />
+            <path d="M 0,-15 L 10,-3 L -10,-3 Z" fill="#22c55e" stroke="#15803d" strokeWidth="0.5" />
+            <path d="M 0,-7 L 12,5 L -12,5 Z" fill="#168a42" stroke="#14532d" strokeWidth="0.5" />
+            <path d="M 0,1 L 14,12 L -14,12 Z" fill="#14532d" stroke="#0f2f1d" strokeWidth="0.5" />
+          </g>
+        </g>
+      )
+    case 'HILLS':
+      return (
+        <g className="opacity-90">
+          <path d="M -30,12 Q -15,-6 3,12" fill="#7f1d1d" />
+          <path d="M -5,12 Q 12,-2 30,12" fill="#991b1b" />
+          <g transform="translate(0, -8) scale(0.7)">
+            <rect x="-8" y="-5" width="16" height="7" rx="1" fill="#dc2626" stroke="#450a0a" strokeWidth="1" />
+            <line x1="-8" y1="-1" x2="8" y2="-1" stroke="#ef4444" strokeWidth="0.5" />
+            <rect x="-17" y="3" width="16" height="7" rx="1" fill="#b91c1c" stroke="#450a0a" strokeWidth="1" />
+            <line x1="-17" y1="7" x2="-1" y2="7" stroke="#f87171" strokeWidth="0.5" />
+            <rect x="1" y="3" width="16" height="7" rx="1" fill="#991b1b" stroke="#450a0a" strokeWidth="1" />
+            <line x1="1" y1="7" x2="17" y2="7" stroke="#f87171" strokeWidth="0.5" />
+          </g>
+        </g>
+      )
+    case 'PASTURE':
+      return (
+        <g className="opacity-95">
+          <path d="M -30,10 Q 0,-2 30,10" fill="none" stroke="#4d7c0f" strokeWidth="2" />
+          <g transform="translate(0, -8) scale(0.8)">
+            <line x1="-5" y1="3" x2="-5" y2="9" stroke="#1f2937" strokeWidth="1.5" strokeLinecap="round" />
+            <line x1="-2" y1="3" x2="-2" y2="9" stroke="#1f2937" strokeWidth="1.5" strokeLinecap="round" />
+            <line x1="2" y1="3" x2="2" y2="9" stroke="#1f2937" strokeWidth="1.5" strokeLinecap="round" />
+            <line x1="5" y1="3" x2="5" y2="9" stroke="#1f2937" strokeWidth="1.5" strokeLinecap="round" />
+            <path d="M -9,-3 C -12,-3 -14,0 -11,3 C -14,6 -10,9 -7,8 C -5,11 0,11 2,8 C 5,11 9,10 8,7 C 11,5 10,1 8,-1 C 8,-4 4,-5 1,-4 C -1,-6 -6,-6 -9,-3 Z" fill="#f8fafc" stroke="#cbd5e1" strokeWidth="1" />
+            <ellipse cx="-9" cy="0" rx="3.5" ry="3" fill="#374151" />
+            <path d="M -10,-1 Q -11,-3 -11,-1" stroke="#374151" strokeWidth="1" />
+          </g>
+        </g>
+      )
+    case 'FIELDS':
+      return (
+        <g className="opacity-95" transform="translate(0, -6)">
+          <path d="M -12,12 Q -3,-3 6,-12" fill="none" stroke="#d97706" strokeWidth="1.5" strokeLinecap="round" />
+          <path d="M 6,-12 Q 9,-9 6,-6 Q 3,-9 6,-12 Z" fill="#fbbf24" stroke="#78350f" strokeWidth="0.75" />
+          <path d="M 3,-8 Q 6,-5 3,-2 Q 0,-5 3,-8 Z" fill="#fbbf24" stroke="#78350f" strokeWidth="0.75" />
+          <path d="M 0,-4 Q 3,-1 0,2 Q -3,-1 0,-4 Z" fill="#fbbf24" stroke="#78350f" strokeWidth="0.75" />
+          <path d="M 12,12 Q 3,-3 -6,-12" fill="none" stroke="#d97706" strokeWidth="1.5" strokeLinecap="round" />
+          <path d="M -6,-12 Q -9,-9 -6,-6 Q -3,-9 -6,-12 Z" fill="#fbbf24" stroke="#78350f" strokeWidth="0.75" />
+          <path d="M -3,-8 Q -6,-5 -3,-2 Q 0,-5 -3,-8 Z" fill="#fbbf24" stroke="#78350f" strokeWidth="0.75" />
+          <path d="M 0,-4 Q -3,-1 0,2 Q 3,-1 0,-4 Z" fill="#fbbf24" stroke="#78350f" strokeWidth="0.75" />
+        </g>
+      )
+    case 'MOUNTAINS':
+      return (
+        <g className="opacity-90">
+          <path d="M -22,12 L -12,-6 L -2,12 Z" fill="#4b5563" stroke="#1f2937" strokeWidth="1" />
+          <path d="M -14,-2 L -12,-6 L -10,-2 L -11,0 Z" fill="#f8fafc" />
+          <path d="M 2,12 L 12,-6 L 22,12 Z" fill="#6b7280" stroke="#1f2937" strokeWidth="1" />
+          <path d="M 10,-2 L 12,-6 L 14,-2 L 13,0 Z" fill="#f8fafc" />
+          <path d="M -14,14 L 0,-15 L 14,14 Z" fill="#374151" stroke="#111827" strokeWidth="1" />
+          <path d="M -5,-4 L 0,-15 L 5,-4 L 0,0 Z" fill="#ffffff" />
+        </g>
+      )
+    case 'DESERT':
+      return (
+        <g className="opacity-90">
+          <path d="M -30,12 Q -10,-4 10,12" fill="#d97706" opacity="0.3" />
+          <path d="M -10,12 Q 10,1 30,12" fill="#b45309" opacity="0.2" />
+          <g transform="translate(8, -8) scale(0.7)">
+            <path d="M 0,15 L 0,-8" fill="none" stroke="#16a34a" strokeWidth="3" strokeLinecap="round" />
+            <path d="M 0,1 L -4,1 L -4,-3" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" />
+            <path d="M 0,4 L 4,4 L 4,1" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" />
+          </g>
+        </g>
+      )
+    default:
+      return null
+  }
+}
+
+function renderPips(num: number) {
+  const count = 6 - Math.abs(7 - num)
+  if (count <= 0) return null
+  const isRed = [6, 8].includes(num)
+  const spacing = 3.2
+  const startX = -((count - 1) * spacing) / 2
+  return Array.from({ length: count }).map((_, i) => (
+    <circle
+      key={i}
+      cx={startX + i * spacing}
+      cy={7.5}
+      r={0.9}
+      fill={isRed ? "#dc2626" : "#1e293b"}
+    />
+  ))
+}
+
 export default function CatanBoard({ state, currentPlayerId, onStateChange, onBroadcastAction }: CatanBoardProps) {
   const [activeTab, setActiveTab]         = useState<'HUD' | 'BUILD' | 'TRADE' | 'DEV'>('HUD')
   const [tradeTargetId, setTradeTarget]   = useState<string>("")
@@ -150,8 +266,6 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
         // Can build anywhere during setup if it is our turn
         if (isMyTurn && state.phase.startsWith('SETUP')) {
           // Verify we haven't already placed a settlement on this setup turn
-          // Standard turn has 1 settlement and 1 road. If settlement is built, we must place road next.
-          // We check if settlements length matches the phase order
           const mySettlementCount = Object.values(state.settlements).filter(s => s.playerId === curPlayer.id).length
           const targetCount = state.phase === 'SETUP_1' ? 0 : 1
           if (mySettlementCount === targetCount) {
@@ -181,12 +295,10 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
       const isSetup = state.phase === 'SETUP_1' || state.phase === 'SETUP_2'
       if (isSetup && isMyTurn) {
         // Setup roads must touch the newly built settlement of the player
-        // Find player's most recent settlement (touching this edge)
         const myBuilds = Object.entries(state.settlements)
           .filter(([, s]) => s.playerId === curPlayer.id)
           .map(([vId]) => parseInt(vId))
         
-        // We can place road if it connects to any of our settlements that doesn't have a road yet
         const touchesMySettlement = e.vertices.some(vId => myBuilds.includes(vId))
         if (touchesMySettlement) {
           list.push(e.id)
@@ -296,6 +408,21 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
     onBroadcastAction?.('sync_state', next)
   }
 
+  // Ocean frame boundary coordinates
+  const oceanPoints = Array.from({ length: 6 }).map((_, i) => {
+    const angle = ((30 + 60 * i) * Math.PI) / 180
+    const px = 250 + 235 * Math.cos(angle)
+    const py = 250 + 235 * Math.sin(angle)
+    return `${px},${py}`
+  }).join(" ")
+
+  const oceanPointsInner = Array.from({ length: 6 }).map((_, i) => {
+    const angle = ((30 + 60 * i) * Math.PI) / 180
+    const px = 250 + 227 * Math.cos(angle)
+    const py = 250 + 227 * Math.sin(angle)
+    return `${px},${py}`
+  }).join(" ")
+
   return (
     <div className="flex w-full h-full overflow-hidden bg-slate-950 select-none p-2 gap-3 text-slate-200">
       
@@ -336,9 +463,43 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
                 <stop offset="100%" stopColor={style.grad[1]} />
               </linearGradient>
             ))}
+            {/* Ocean Gradient */}
+            <linearGradient id="ocean-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#1e3a8a" />
+              <stop offset="50%" stopColor="#1d4ed8" />
+              <stop offset="100%" stopColor="#172554" />
+            </linearGradient>
+            {/* Sand Gradient */}
+            <linearGradient id="sand-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#fef3c7" />
+              <stop offset="100%" stopColor="#d97706" />
+            </linearGradient>
+            {/* Parchment Gradient */}
+            <radialGradient id="parchment-grad" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#fffef0" />
+              <stop offset="80%" stopColor="#fcf8e3" />
+              <stop offset="100%" stopColor="#eadeb6" />
+            </radialGradient>
           </defs>
 
-          {/* 1. Harbors visualization */}
+          {/* Wooden Ocean Frame */}
+          <polygon
+            points={oceanPoints}
+            fill="url(#ocean-grad)"
+            stroke="#78350f"
+            strokeWidth="12"
+            strokeLinejoin="round"
+            className="filter drop-shadow-[0_10px_30px_rgba(0,0,0,0.6)]"
+          />
+          <polygon
+            points={oceanPointsInner}
+            fill="none"
+            stroke="#451a03"
+            strokeWidth="2"
+            strokeLinejoin="round"
+          />
+
+          {/* 1. Harbors (Docks and Sailing Ships) */}
           {layout.harbors.map((h, i) => {
             const v1 = layout.vertices[h.vertices[0]]
             const v2 = layout.vertices[h.vertices[1]]
@@ -347,19 +508,103 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
             const midX = (p1.x + p2.x) / 2
             const midY = (p1.y + p2.y) / 2
             
-            // Draw visual connector for harbor
+            // Outward projection vector
+            const dx = midX - 250
+            const dy = midY - 250
+            const len = Math.hypot(dx, dy) || 1
+            const ux = dx / len
+            const uy = dy / len
+            
+            // Badge & Ship locations
+            const badgeX = midX + ux * 18
+            const badgeY = midY + uy * 18
+            const shipX = midX + ux * 36
+            const shipY = midY + uy * 36
+
             return (
-              <g key={i} className="opacity-80">
-                <line x1={midX} y1={midY} x2={250} y2={250} stroke="#3b82f6" strokeWidth="1" strokeDasharray="3,3" opacity="0.3" />
-                <circle cx={midX} cy={midY} r="10" fill="#1e293b" stroke="#3b82f6" strokeWidth="1.5" />
-                <text x={midX} y={midY + 3} textAnchor="middle" className="text-[7px] font-bold fill-white">
-                  {h.resource === 'GENERIC' ? '3:1' : RESOURCE_ICONS[h.resource]}
-                </text>
+              <g key={`harbor-${i}`}>
+                {/* Wooden Docks V-shape */}
+                <line x1={p1.x} y1={p1.y} x2={badgeX} y2={badgeY} stroke="#78350f" strokeWidth="3.5" strokeLinecap="round" />
+                <line x1={p1.x} y1={p1.y} x2={badgeX} y2={badgeY} stroke="#d97706" strokeWidth="1.5" strokeLinecap="round" />
+                <line x1={p2.x} y1={p2.y} x2={badgeX} y2={badgeY} stroke="#78350f" strokeWidth="3.5" strokeLinecap="round" />
+                <line x1={p2.x} y1={p2.y} x2={badgeX} y2={badgeY} stroke="#d97706" strokeWidth="1.5" strokeLinecap="round" />
+
+                {/* Sailing Ship with rocking motion */}
+                <g transform={`translate(${shipX}, ${shipY})`}>
+                  <motion.g
+                    transformTemplate={({ rotate, y }) => `translate(0, ${y}) rotate(${rotate}) scale(0.6)`}
+                    animate={{
+                      y: [-1, 1, -1],
+                      rotate: [-2.5, 2.5, -2.5]
+                    }}
+                    transition={{
+                      repeat: Infinity,
+                      duration: 3 + (i % 3) * 0.7,
+                      ease: "easeInOut"
+                    }}
+                  >
+                    {/* Hull */}
+                    <path d="M -12,2 L 12,2 L 8,8 L -8,8 Z" fill="#5c2e0b" stroke="#331904" strokeWidth="1" />
+                    {/* Mast */}
+                    <line x1="0" y1="2" x2="0" y2="-12" stroke="#331904" strokeWidth="1.5" />
+                    {/* Sails */}
+                    <path d="M 0,-12 L 8,0 L 0,0 Z" fill="#fafaf9" stroke="#d6d3d1" strokeWidth="0.5" />
+                    <path d="M 0,-10 L -6,-2 L 0,-2 Z" fill="#e7e5e4" stroke="#d6d3d1" strokeWidth="0.5" />
+                    {/* Flag */}
+                    <polygon points="0,-12 -3,-10 0,-8" fill="#ef4444" />
+                  </motion.g>
+                </g>
+
+                {/* Circular Banner Badge */}
+                <g transform={`translate(${badgeX}, ${badgeY})`} className="filter drop-shadow-md">
+                  <circle r="12" fill="url(#parchment-grad)" stroke="#78350f" strokeWidth="1.5" />
+                  <circle r="10" fill="none" stroke="#d97706" strokeWidth="0.5" strokeDasharray="1,1" />
+                  {h.resource === 'GENERIC' ? (
+                    <text y="3" textAnchor="middle" className="text-[7.5px] font-black fill-[#78350f] font-mono">
+                      3:1
+                    </text>
+                  ) : (
+                    <g>
+                      <text y="-2" textAnchor="middle" className="text-[6px] font-bold fill-[#78350f] font-mono">
+                        2:1
+                      </text>
+                      <text y="6" textAnchor="middle" className="text-[9px] pointer-events-none select-none">
+                        {RESOURCE_ICONS[h.resource]}
+                      </text>
+                    </g>
+                  )}
+                </g>
               </g>
             )
           })}
 
-          {/* 2. Hexagons */}
+          {/* 2. Sandy Coastline (rendered underneath land hexes to border the island) */}
+          {state.hexes.map((hex) => {
+            const hexLayout = layout.hexes[hex.index]
+            const center = toPx(hexLayout.x, hexLayout.y)
+            const sandyPoints = hexLayout.vertices
+              .map(vId => {
+                const v = layout.vertices[vId]
+                const pt = toPx(v.x, v.y)
+                const sx = center.x + (pt.x - center.x) * 1.10
+                const sy = center.y + (pt.y - center.y) * 1.10
+                return `${sx},${sy}`
+              })
+              .join(" ")
+
+            return (
+              <polygon
+                key={`sand-${hex.index}`}
+                points={sandyPoints}
+                fill="url(#sand-grad)"
+                stroke="#d97706"
+                strokeWidth="1"
+                opacity="0.85"
+              />
+            )
+          })}
+
+          {/* 3. Hexagons (Land Tiles) */}
           {state.hexes.map((hex, idx) => {
             const hexLayout = layout.hexes[hex.index]
             const points = hexLayout.vertices
@@ -372,16 +617,18 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
 
             const center = toPx(hexLayout.x, hexLayout.y)
             const isClickableRobber = buildableHexes.includes(hex.index)
-            const style = TERRAIN_STYLES[hex.terrain]
 
             return (
               <g key={hex.index} className="group">
+                {/* Terrain Tile Face */}
                 <polygon
                   points={points}
                   fill={`url(#${hex.terrain}-grad)`}
-                  stroke="#1e293b"
+                  stroke="#2d1706"
                   strokeWidth="2.5"
-                  className={`transition duration-150 ${isClickableRobber ? 'cursor-pointer stroke-yellow-400 animate-pulse fill-yellow-500/20' : ''}`}
+                  className={`transition duration-200 hover:brightness-110 ${
+                    isClickableRobber ? 'cursor-pointer stroke-yellow-400 fill-yellow-500/20 animate-pulse' : 'cursor-default'
+                  }`}
                   onClick={() => {
                     if (isClickableRobber) {
                       if (isPlayingKnight) {
@@ -394,46 +641,50 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
                   }}
                 />
                 
-                {/* Terrain visual symbol */}
-                <text
-                  x={center.x}
-                  y={center.y - 12}
-                  textAnchor="middle"
-                  className="text-lg filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)] pointer-events-none select-none"
-                >
-                  {style.icon}
-                </text>
+                {/* Vector Terrain Art */}
+                <g transform={`translate(${center.x}, ${center.y})`} className="pointer-events-none select-none">
+                  {renderTerrainGraphics(hex.terrain)}
+                </g>
 
-                {/* Number token */}
+                {/* Parchment Number Token */}
                 {hex.numberToken > 0 && (
-                  <g transform={`translate(${center.x}, ${center.y + 12})`} className="pointer-events-none">
-                    <circle r="12" fill="#fffef0" stroke="#451a03" strokeWidth="1.5" className="filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]" />
+                  <g transform={`translate(${center.x}, ${center.y})`} className="pointer-events-none">
+                    <circle r="12" fill="url(#parchment-grad)" stroke="#78350f" strokeWidth="1.5" className="filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]" />
+                    <circle r="9.5" fill="none" stroke="#b45309" strokeWidth="0.5" strokeDasharray="1,1" />
                     <text
-                      y="4"
+                      y="3.5"
                       textAnchor="middle"
-                      className={`text-[11px] font-black ${[6, 8].includes(hex.numberToken) ? 'fill-red-600 font-extrabold' : 'fill-slate-900'}`}
+                      className={`text-[11px] font-black font-mono tracking-tight ${
+                        [6, 8].includes(hex.numberToken) ? 'fill-[#dc2626] font-extrabold' : 'fill-[#1e293b]'
+                      }`}
                     >
                       {hex.numberToken}
                     </text>
                     {/* Probability pips */}
-                    <text y="9" textAnchor="middle" className="text-[5px] font-bold fill-slate-500 tracking-tighter">
-                      {'.'.repeat(6 - Math.abs(7 - hex.numberToken))}
-                    </text>
+                    {renderPips(hex.numberToken)}
                   </g>
                 )}
 
-                {/* Robber Overlay */}
+                {/* Robber Visor Pawn Silhouette (placed offset to keep number token visible) */}
                 {hex.hasRobber && (
-                  <g transform={`translate(${center.x}, ${center.y})`} className="pointer-events-none">
-                    <circle r="18" fill="rgba(15,23,42,0.85)" stroke="#ef4444" strokeWidth="1.5" className="animate-pulse" />
-                    <text y="5" textAnchor="middle" className="text-xl">🕵️</text>
+                  <g transform={`translate(${center.x + 9}, ${center.y - 9})`} className="pointer-events-none">
+                    <ellipse cx="0" cy="12" rx="10" ry="4" fill="rgba(15,23,42,0.4)" />
+                    <circle r="18" fill="rgba(15,23,42,0.65)" stroke="#ef4444" strokeWidth="1.5" className="animate-pulse" />
+                    <path
+                      d="M -5,11 C -5,11 -8,9 -8,5 C -8,2 -4,1 -4,-2 C -4,-5 -6,-5 -6,-8 C -6,-11 -3,-12 0,-12 C 3,-12 6,-11 6,-8 C 6,-5 4,-5 4,-2 C 4,1 8,2 8,5 C 8,9 5,11 5,11 Z"
+                      fill="#1e293b"
+                      stroke="#0f172a"
+                      strokeWidth="1.5"
+                      className="filter drop-shadow-[0_3px_5px_rgba(0,0,0,0.5)]"
+                    />
+                    <path d="M -2.5,-8 L 2.5,-8" stroke="#ef4444" strokeWidth="1" strokeLinecap="round" />
                   </g>
                 )}
               </g>
             )
           })}
 
-          {/* 3. Roads (Edges) */}
+          {/* 4. Roads (Edges) */}
           {layout.edges.map(e => {
             const v1 = layout.vertices[e.vertices[0]]
             const v2 = layout.vertices[e.vertices[1]]
@@ -447,24 +698,36 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
 
             if (owner || isSelectedPending) {
               return (
-                <line
-                  key={e.id}
-                  x1={p1.x}
-                  y1={p1.y}
-                  x2={p2.x}
-                  y2={p2.y}
-                  stroke={isSelectedPending ? '#e11d48' : owner!.color}
-                  strokeWidth="5"
-                  strokeLinecap="round"
-                  className={`filter drop-shadow-[0_1.5px_3px_rgba(0,0,0,0.6)] ${isSelectedPending ? 'animate-pulse' : ''}`}
-                />
+                <g key={`road-${e.id}`}>
+                  {/* Road Shadow/Border */}
+                  <line
+                    x1={p1.x}
+                    y1={p1.y}
+                    x2={p2.x}
+                    y2={p2.y}
+                    stroke="#1e293b"
+                    strokeWidth="8"
+                    strokeLinecap="round"
+                  />
+                  {/* Road Core (Wooden look) */}
+                  <line
+                    x1={p1.x}
+                    y1={p1.y}
+                    x2={p2.x}
+                    y2={p2.y}
+                    stroke={isSelectedPending ? '#e11d48' : owner!.color}
+                    strokeWidth="5.2"
+                    strokeLinecap="round"
+                    className={`filter drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)] ${isSelectedPending ? 'animate-pulse' : ''}`}
+                  />
+                </g>
               )
             }
 
             if (isClickable) {
               return (
                 <line
-                  key={e.id}
+                  key={`clickable-road-${e.id}`}
                   x1={p1.x}
                   y1={p1.y}
                   x2={p2.x}
@@ -493,7 +756,7 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
             return null
           })}
 
-          {/* 4. Settlements / Cities (Vertices) */}
+          {/* 5. Settlements / Cities (Vertices) */}
           {layout.vertices.map(v => {
             const pt = toPx(v.x, v.y)
             const building = state.settlements[v.id]
@@ -505,42 +768,64 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
             if (owner && building) {
               return (
                 <g
-                  key={v.id}
+                  key={`building-${v.id}`}
                   transform={`translate(${pt.x}, ${pt.y})`}
-                  className="cursor-pointer filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]"
+                  className="cursor-pointer"
                   onClick={() => isClickableUpgrade && act('upgradeToCity', v.id)}
                 >
-                  <circle r="7" fill={owner.color} stroke="#fff" strokeWidth="1.5" />
-                  <text y="3" textAnchor="middle" className="text-[8px] font-bold fill-white">
-                    {building.type === 'city' ? '🏰' : '🏠'}
-                  </text>
+                  {building.type === 'city' ? (
+                    /* 3D Wooden City Piece */
+                    <g className="filter drop-shadow-[0_2.5px_4px_rgba(0,0,0,0.5)]">
+                      {/* Left face */}
+                      <path d="M -8,4 L -8,-1 L -4,-4 L 0,-1 L 0,4 Z" fill={owner.color} stroke="#fff" strokeWidth="1" strokeLinejoin="round" />
+                      {/* Right face (shaded) */}
+                      <path d="M 0,-1 L 0,-6 L 6,-6 L 6,4 L 0,4 Z" fill={owner.color} stroke="#fff" strokeWidth="1" strokeLinejoin="round" />
+                      <path d="M 0,-1 L 0,-6 L 6,-6 L 6,4 L 0,4 Z" fill="rgba(0,0,0,0.22)" stroke="none" />
+                    </g>
+                  ) : (
+                    /* 3D Wooden Settlement Piece */
+                    <g className="filter drop-shadow-[0_2px_3px_rgba(0,0,0,0.5)]">
+                      {/* Left face */}
+                      <path d="M -6,3 L -6,-2 L 0,-6 L 0,3 Z" fill={owner.color} stroke="#fff" strokeWidth="1" strokeLinejoin="round" />
+                      {/* Right face (shaded) */}
+                      <path d="M 0,-6 L 6,-2 L 6,3 L 0,3 Z" fill={owner.color} stroke="#fff" strokeWidth="1" strokeLinejoin="round" />
+                      <path d="M 0,-6 L 6,-2 L 6,3 L 0,3 Z" fill="rgba(0,0,0,0.2)" stroke="none" />
+                    </g>
+                  )}
                 </g>
               )
             }
 
             if (isClickableBuild) {
               return (
-                <circle
-                  key={v.id}
-                  cx={pt.x}
-                  cy={pt.y}
-                  r="6"
-                  fill={curPlayer.color}
-                  stroke="#fff"
-                  strokeWidth="1.5"
-                  className="cursor-pointer hover:scale-125 transition animate-ping"
-                  onClick={() => act('placeSettlement', v.id)}
-                />
+                <g key={`clickable-vertex-${v.id}`} transform={`translate(${pt.x}, ${pt.y})`} className="cursor-pointer">
+                  {/* Flashing glow indicator */}
+                  <circle
+                    r="9"
+                    fill="none"
+                    stroke={curPlayer.color}
+                    strokeWidth="1.5"
+                    className="animate-ping"
+                  />
+                  {/* Solid building spot */}
+                  <circle
+                    r="5"
+                    fill={curPlayer.color}
+                    stroke="#fff"
+                    strokeWidth="1.2"
+                    onClick={() => act('placeSettlement', v.id)}
+                  />
+                </g>
               )
             }
 
             if (isClickableUpgrade) {
               return (
                 <circle
-                  key={v.id}
+                  key={`upgrade-vertex-${v.id}`}
                   cx={pt.x}
                   cy={pt.y}
-                  r="8"
+                  r="9"
                   fill="none"
                   stroke={curPlayer.color}
                   strokeWidth="2.5"
