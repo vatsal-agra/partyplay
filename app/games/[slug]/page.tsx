@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback, useMemo } from "react"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 import Image from "next/image"
 import { motion, AnimatePresence } from "framer-motion"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -53,7 +53,7 @@ export default function GamePlayPage() {
   const params = useParams()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const supabase = useMemo(() => createClientComponentClient(), [])
+  const supabase = useMemo(() => getSupabaseBrowserClient(), [])
   
   const [loading, setLoading] = useState(true)
   const [gameData, setGameData] = useState<GameData | null>(null)

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 import { motion, AnimatePresence } from "framer-motion"
 import { toast } from "sonner"
 import { Loader2, Users, Plus, Trash2, Lock, Unlock, RefreshCw } from "lucide-react"
@@ -26,7 +26,7 @@ const PartiesSidebarV2 = () => {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [selectedPartyId, setSelectedPartyId] = useState<string | null>(null)
   
-  const supabase = createClientComponentClient()
+  const supabase = getSupabaseBrowserClient()
 
   // Fetch parties from the database
   const fetchParties = async () => {

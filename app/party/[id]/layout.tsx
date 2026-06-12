@@ -1,7 +1,7 @@
 "use client";
 
 import { SessionContextProvider } from "@supabase/auth-helpers-react";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { getSupabaseBrowserClient } from "@/lib/supabase-client";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -10,7 +10,7 @@ export default function PartyLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [supabaseClient] = useState(() => createClientComponentClient());
+  const [supabaseClient] = useState(() => getSupabaseBrowserClient());
   const router = useRouter();
   const [isMounted, setIsMounted] = useState(false);
 

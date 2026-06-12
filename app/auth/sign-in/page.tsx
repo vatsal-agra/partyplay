@@ -6,7 +6,7 @@ import { Label } from "../../../components/ui/label"
 import { Card } from "../../../components/ui/card"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 
 export default function SignInPage() {
   const [email, setEmail] = useState("")
@@ -15,7 +15,7 @@ export default function SignInPage() {
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
-  const supabaseClient = createClientComponentClient()
+  const supabaseClient = getSupabaseBrowserClient()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

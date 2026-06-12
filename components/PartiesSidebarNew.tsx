@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 import { Trash2, Users, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
@@ -17,7 +17,7 @@ export default function PartiesSidebarNew() {
   const [parties, setParties] = useState<Party[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
-  const supabase = createClientComponentClient()
+  const supabase = getSupabaseBrowserClient()
 
   // Fetch parties from the database
   const fetchParties = async () => {

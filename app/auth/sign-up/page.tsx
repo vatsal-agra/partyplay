@@ -6,7 +6,7 @@ import { Label } from "../../../components/ui/label"
 import { Card } from "../../../components/ui/card"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 
 // Add type declaration for window.usernameTimeout
 declare global {
@@ -25,7 +25,7 @@ export default function SignUpPage() {
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null)
   const [checkingUsername, setCheckingUsername] = useState(false)
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  const supabase = getSupabaseBrowserClient()
   
   // Initialize the timeout property if it doesn't exist
   if (typeof window !== 'undefined' && window.usernameTimeout === undefined) {

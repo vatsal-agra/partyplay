@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
@@ -36,7 +36,7 @@ export default function PartyDetailsPage({ params }: { params: { id: string } })
   const [loading, setLoading] = useState(true)
   const [copySuccess, setCopySuccess] = useState(false)
   const router = useRouter()
-  const supabase = createClientComponentClient()
+  const supabase = getSupabaseBrowserClient()
 
   // Generate a unique party code based on the party ID
   const partyCode = party?.id ? `${party.id.substring(0, 6).toUpperCase()}` : "------"

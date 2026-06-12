@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 import { Search, Filter, X, Gamepad2 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 
@@ -29,7 +29,7 @@ type DbGame = {
 
 export default function GamesPage() {
   const router = useRouter()
-  const supabaseClient = createClientComponentClient()
+  const supabaseClient = getSupabaseBrowserClient()
   
   // State management
   const [session, setSession] = useState<any>(null)

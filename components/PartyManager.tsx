@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 import { Plus, Trash2, Users, Lock, Unlock, RefreshCw, Loader2, Group, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -25,7 +25,7 @@ export default function PartyManager() {
   const [isJoining, setIsJoining] = useState(false)
   const [joinCode, setJoinCode] = useState("")
   const [joinError, setJoinError] = useState<string | null>(null)
-  const supabase = createClientComponentClient()
+  const supabase = getSupabaseBrowserClient()
   const router = useRouter()
 
   // Fetch the user's active parties (hosted or joined)

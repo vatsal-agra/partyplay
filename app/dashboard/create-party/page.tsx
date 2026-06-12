@@ -7,14 +7,14 @@ import { Card } from "@/components/ui/card"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useSessionContext } from "@supabase/auth-helpers-react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 import { Auth } from "@supabase/auth-ui-react"
 import { ThemeSupa } from "@supabase/auth-ui-shared"
 
 export default function CreateParty() {
   const router = useRouter()
   const { session, isLoading } = useSessionContext();
-  const supabaseClient = createClientComponentClient()
+  const supabaseClient = getSupabaseBrowserClient()
   const [partyName, setPartyName] = useState("")
   const [maxPlayers, setMaxPlayers] = useState("")
   const [isPrivate, setIsPrivate] = useState(false)

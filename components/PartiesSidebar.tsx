@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 import { Loader2, Group } from 'lucide-react'
 import { useEffect, useState, useCallback } from "react"
 import { ConfirmationModal } from '@/components/ui/ConfirmationModal'
@@ -44,7 +44,7 @@ export function PartiesSidebar() {
   const [expandedParty, setExpandedParty] = useState<string | null>(null)
   const [memberToAction, setMemberToAction] = useState<{partyId: string, memberId: string, action: 'kick' | 'mute'} | null>(null)
   
-  const supabase = createClientComponentClient()
+  const supabase = getSupabaseBrowserClient()
 
   const fetchParties = useCallback(async () => {
     console.log('[fetchParties] Fetching parties from database...')

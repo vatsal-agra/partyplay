@@ -2,7 +2,7 @@
 
 import { Button } from "./ui/button"
 import { Card } from "./ui/card"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 import { PartyPopper, Plus, Users, XCircle, MicOff, UserX, Loader2 } from "lucide-react"
 import { ConfirmationModal } from './ui/ConfirmationModal'
 import Link from "next/link"
@@ -37,7 +37,7 @@ export function PartiesSidebar() {
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false)
   const [partyToEndId, setPartyToEndId] = useState<string | null>(null)
   
-  const supabase = createClientComponentClient()
+  const supabase = getSupabaseBrowserClient()
 
   const fetchParties = useCallback(async () => {
     setLoading(true)
