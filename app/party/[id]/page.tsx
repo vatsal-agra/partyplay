@@ -424,9 +424,16 @@ export default function PartyPage() {
                   >
                     <option value="" className="bg-slate-900">Select a game</option>
                     <option value="monopoly" className="bg-slate-900">Monopoly</option>
-                    <option value="valorant" className="bg-slate-900">Valorant</option>
-                    <option value="league" className="bg-slate-900">League of Legends</option>
-                    <option value="apex" className="bg-slate-900">Apex Legends</option>
+                    <option value="catan" className="bg-slate-900">Catan</option>
+                    <option value="battleship" className="bg-slate-900">Battleship</option>
+                    <option value="uno" className="bg-slate-900">Uno</option>
+                    <option value="poker" className="bg-slate-900">Poker</option>
+                    <option value="cluedo" className="bg-slate-900">Cluedo</option>
+                    <option value="pictionary" className="bg-slate-900">Pictionary</option>
+                    <option value="scribbleio" className="bg-slate-900">Scribble.io</option>
+                    <option value="codenames" className="bg-slate-900">Codenames</option>
+                    <option value="terramystica" className="bg-slate-900">Terra Mystica</option>
+                    <option value="7wonders" className="bg-slate-900">7 Wonders</option>
                   </select>
                 </div>
                 <div>
