@@ -28,13 +28,14 @@ interface CatanBoardProps {
   onBroadcastAction?: (action: string, payload: any) => void
 }
 
+// Earthy, painted palette tuned to the real Catan terrain tiles
 const TERRAIN_STYLES: Record<TerrainType, { name: string; fill: string; grad: [string, string]; icon: string }> = {
-  FOREST:    { name: 'Forest',    fill: '#15803d', grad: ['#22c55e', '#14532d'], icon: '🌲' },
-  HILLS:     { name: 'Hills',     fill: '#b91c1c', grad: ['#f87171', '#7f1d1d'], icon: '🧱' },
-  PASTURE:   { name: 'Pasture',   fill: '#65a30d', grad: ['#a3e635', '#3f6212'], icon: '🐑' },
-  FIELDS:    { name: 'Fields',    fill: '#d97706', grad: ['#fbbf24', '#78350f'], icon: '🌾' },
-  MOUNTAINS: { name: 'Mountains', fill: '#4b5563', grad: ['#9ca3af', '#1f2937'], icon: '🏔️' },
-  DESERT:    { name: 'Desert',    fill: '#78716c', grad: ['#a8a29e', '#44403c'], icon: '🏜️' }
+  FOREST:    { name: 'Forest',    fill: '#2f7d36', grad: ['#3c8a3f', '#1c4d22'], icon: '🌲' },
+  HILLS:     { name: 'Hills',     fill: '#c2562e', grad: ['#cf6a3a', '#7e3417'], icon: '🧱' },
+  PASTURE:   { name: 'Pasture',   fill: '#7cb342', grad: ['#9fcf52', '#56962a'], icon: '🐑' },
+  FIELDS:    { name: 'Fields',    fill: '#e0a82e', grad: ['#f2c84c', '#bd861a'], icon: '🌾' },
+  MOUNTAINS: { name: 'Mountains', fill: '#6b7280', grad: ['#97a0af', '#3c424d'], icon: '🏔️' },
+  DESERT:    { name: 'Desert',    fill: '#d9b066', grad: ['#e8c98f', '#c2954a'], icon: '🏜️' }
 };
 
 const RESOURCE_ICONS: Record<ResourceType, string> = {
@@ -47,96 +48,117 @@ const RESOURCE_ICONS: Record<ResourceType, string> = {
 
 function renderTerrainGraphics(terrain: TerrainType) {
   switch (terrain) {
+    // LUMBER — a dense stand of pine trees
     case 'FOREST':
       return (
-        <g className="opacity-90">
-          {/* Back left tree */}
-          <g transform="translate(-8, -5) scale(0.65)">
-            <rect x="-2" y="5" width="4" height="6" fill="#78350f" />
-            <path d="M 0,-15 L 9,-3 L -9,-3 Z" fill="#166534" />
-            <path d="M 0,-7 L 11,5 L -11,5 Z" fill="#14532d" />
-            <path d="M 0,1 L 13,12 L -13,12 Z" fill="#0f2f1d" />
-          </g>
-          {/* Back right tree */}
-          <g transform="translate(8, -5) scale(0.65)">
-            <rect x="-2" y="5" width="4" height="6" fill="#78350f" />
-            <path d="M 0,-15 L 9,-3 L -9,-3 Z" fill="#166534" />
-            <path d="M 0,-7 L 11,5 L -11,5 Z" fill="#14532d" />
-            <path d="M 0,1 L 13,12 L -13,12 Z" fill="#0f2f1d" />
-          </g>
-          {/* Front center tree */}
-          <g transform="translate(0, -12) scale(0.85)">
-            <rect x="-2" y="5" width="4" height="6" fill="#78350f" />
-            <path d="M 0,-15 L 10,-3 L -10,-3 Z" fill="#22c55e" stroke="#15803d" strokeWidth="0.5" />
-            <path d="M 0,-7 L 12,5 L -12,5 Z" fill="#168a42" stroke="#14532d" strokeWidth="0.5" />
-            <path d="M 0,1 L 14,12 L -14,12 Z" fill="#14532d" stroke="#0f2f1d" strokeWidth="0.5" />
-          </g>
+        <g className="opacity-95">
+          {[
+            { x: -16, y: 6, s: 0.5, a: '#1f5a27', b: '#174420', c: '#0f3017' },
+            { x: 16, y: 7, s: 0.5, a: '#1f5a27', b: '#174420', c: '#0f3017' },
+            { x: -9, y: 0, s: 0.72, a: '#2f7d36', b: '#1f5a27', c: '#163f1c' },
+            { x: 10, y: -1, s: 0.72, a: '#2f7d36', b: '#1f5a27', c: '#163f1c' },
+            { x: 0, y: -8, s: 0.96, a: '#3c9342', b: '#2a7232', c: '#194a20' },
+          ].map((t, i) => (
+            <g key={i} transform={`translate(${t.x}, ${t.y}) scale(${t.s})`}>
+              <rect x="-1.6" y="6" width="3.2" height="7" fill="#5b3a1a" />
+              <path d="M 0,-15 L 8,-3 L -8,-3 Z" fill={t.a} />
+              <path d="M 0,-9 L 10,4 L -10,4 Z" fill={t.b} />
+              <path d="M 0,-3 L 11,10 L -11,10 Z" fill={t.c} />
+            </g>
+          ))}
         </g>
       )
+    // BRICK — rolling clay hills with a stack of bricks
     case 'HILLS':
       return (
-        <g className="opacity-90">
-          <path d="M -30,12 Q -15,-6 3,12" fill="#7f1d1d" />
-          <path d="M -5,12 Q 12,-2 30,12" fill="#991b1b" />
-          <g transform="translate(0, -8) scale(0.7)">
-            <rect x="-8" y="-5" width="16" height="7" rx="1" fill="#dc2626" stroke="#450a0a" strokeWidth="1" />
-            <line x1="-8" y1="-1" x2="8" y2="-1" stroke="#ef4444" strokeWidth="0.5" />
-            <rect x="-17" y="3" width="16" height="7" rx="1" fill="#b91c1c" stroke="#450a0a" strokeWidth="1" />
-            <line x1="-17" y1="7" x2="-1" y2="7" stroke="#f87171" strokeWidth="0.5" />
-            <rect x="1" y="3" width="16" height="7" rx="1" fill="#991b1b" stroke="#450a0a" strokeWidth="1" />
-            <line x1="1" y1="7" x2="17" y2="7" stroke="#f87171" strokeWidth="0.5" />
+        <g className="opacity-95">
+          <path d="M -27,13 Q -13,-5 1,13 Z" fill="#9c4521" />
+          <path d="M -3,13 Q 13,-7 29,13 Z" fill="#b5532a" />
+          <path d="M -28,14 Q -6,3 16,14 Z" fill="#7e3417" opacity="0.55" />
+          <g transform="translate(2, 1)">
+            <rect x="-9" y="-2.5" width="8" height="3.6" rx="0.6" fill="#d4703f" stroke="#5a2310" strokeWidth="0.5" />
+            <rect x="1" y="-2.5" width="8" height="3.6" rx="0.6" fill="#c2562e" stroke="#5a2310" strokeWidth="0.5" />
+            <rect x="-13" y="1.6" width="8" height="3.6" rx="0.6" fill="#cf6536" stroke="#5a2310" strokeWidth="0.5" />
+            <rect x="-4" y="1.6" width="8" height="3.6" rx="0.6" fill="#bb5028" stroke="#5a2310" strokeWidth="0.5" />
+            <rect x="5" y="1.6" width="8" height="3.6" rx="0.6" fill="#cf6536" stroke="#5a2310" strokeWidth="0.5" />
           </g>
         </g>
       )
+    // WOOL — green pasture with a fence and grazing sheep
     case 'PASTURE':
       return (
         <g className="opacity-95">
-          <path d="M -30,10 Q 0,-2 30,10" fill="none" stroke="#4d7c0f" strokeWidth="2" />
-          <g transform="translate(0, -8) scale(0.8)">
-            <line x1="-5" y1="3" x2="-5" y2="9" stroke="#1f2937" strokeWidth="1.5" strokeLinecap="round" />
-            <line x1="-2" y1="3" x2="-2" y2="9" stroke="#1f2937" strokeWidth="1.5" strokeLinecap="round" />
-            <line x1="2" y1="3" x2="2" y2="9" stroke="#1f2937" strokeWidth="1.5" strokeLinecap="round" />
-            <line x1="5" y1="3" x2="5" y2="9" stroke="#1f2937" strokeWidth="1.5" strokeLinecap="round" />
-            <path d="M -9,-3 C -12,-3 -14,0 -11,3 C -14,6 -10,9 -7,8 C -5,11 0,11 2,8 C 5,11 9,10 8,7 C 11,5 10,1 8,-1 C 8,-4 4,-5 1,-4 C -1,-6 -6,-6 -9,-3 Z" fill="#f8fafc" stroke="#cbd5e1" strokeWidth="1" />
-            <ellipse cx="-9" cy="0" rx="3.5" ry="3" fill="#374151" />
-            <path d="M -10,-1 Q -11,-3 -11,-1" stroke="#374151" strokeWidth="1" />
+          <path d="M -27,11 Q 0,-3 27,11 Z" fill="#6fae35" />
+          <path d="M -27,13 Q 0,3 27,13 Z" fill="#56962a" opacity="0.7" />
+          <g stroke="#6b4a23" strokeWidth="1.4" strokeLinecap="round">
+            <line x1="-20" y1="2" x2="-20" y2="8" />
+            <line x1="-14" y1="1" x2="-14" y2="7" />
+            <line x1="-8" y1="0" x2="-8" y2="6" />
+            <line x1="-21" y1="3.5" x2="-7" y2="1.5" />
           </g>
+          {[
+            { x: 7, y: -2, s: 0.85 },
+            { x: 15, y: 4, s: 0.7 },
+            { x: -1, y: 7, s: 0.7 },
+          ].map((s, i) => (
+            <g key={i} transform={`translate(${s.x}, ${s.y}) scale(${s.s})`}>
+              <ellipse cx="0" cy="0" rx="5" ry="3.6" fill="#f4f4f0" stroke="#d6d3cc" strokeWidth="0.6" />
+              <circle cx="-5" cy="-1" r="2.2" fill="#3b3b42" />
+              <line x1="-4" y1="3" x2="-4" y2="4.6" stroke="#3b3b42" strokeWidth="0.8" />
+              <line x1="3" y1="3" x2="3" y2="4.6" stroke="#3b3b42" strokeWidth="0.8" />
+            </g>
+          ))}
         </g>
       )
+    // GRAIN — golden field with furrows and wheat sheaves
     case 'FIELDS':
       return (
-        <g className="opacity-95" transform="translate(0, -6)">
-          <path d="M -12,12 Q -3,-3 6,-12" fill="none" stroke="#d97706" strokeWidth="1.5" strokeLinecap="round" />
-          <path d="M 6,-12 Q 9,-9 6,-6 Q 3,-9 6,-12 Z" fill="#fbbf24" stroke="#78350f" strokeWidth="0.75" />
-          <path d="M 3,-8 Q 6,-5 3,-2 Q 0,-5 3,-8 Z" fill="#fbbf24" stroke="#78350f" strokeWidth="0.75" />
-          <path d="M 0,-4 Q 3,-1 0,2 Q -3,-1 0,-4 Z" fill="#fbbf24" stroke="#78350f" strokeWidth="0.75" />
-          <path d="M 12,12 Q 3,-3 -6,-12" fill="none" stroke="#d97706" strokeWidth="1.5" strokeLinecap="round" />
-          <path d="M -6,-12 Q -9,-9 -6,-6 Q -3,-9 -6,-12 Z" fill="#fbbf24" stroke="#78350f" strokeWidth="0.75" />
-          <path d="M -3,-8 Q -6,-5 -3,-2 Q 0,-5 -3,-8 Z" fill="#fbbf24" stroke="#78350f" strokeWidth="0.75" />
-          <path d="M 0,-4 Q -3,-1 0,2 Q 3,-1 0,-4 Z" fill="#fbbf24" stroke="#78350f" strokeWidth="0.75" />
+        <g className="opacity-95">
+          <g stroke="#b8860b" strokeWidth="1" opacity="0.5" fill="none">
+            <path d="M -24,11 Q 0,3 24,11" />
+            <path d="M -22,6 Q 0,-1 22,6" />
+            <path d="M -18,1 Q 0,-5 18,1" />
+          </g>
+          {[-11, 0, 11].map((x, i) => (
+            <g key={i} transform={`translate(${x}, ${i === 1 ? -2 : 2})`} strokeLinecap="round">
+              <line x1="0" y1="9" x2="0" y2="-6" stroke="#c9920f" strokeWidth="1.3" />
+              <line x1="0" y1="-2" x2="-4" y2="-7" stroke="#e8b923" strokeWidth="0.8" />
+              <line x1="0" y1="-2" x2="4" y2="-7" stroke="#e8b923" strokeWidth="0.8" />
+              <line x1="0" y1="1" x2="-4" y2="-3" stroke="#e8b923" strokeWidth="0.8" />
+              <line x1="0" y1="1" x2="4" y2="-3" stroke="#e8b923" strokeWidth="0.8" />
+              <line x1="0" y1="-6" x2="0" y2="-10" stroke="#f2c84c" strokeWidth="0.9" />
+            </g>
+          ))}
         </g>
       )
+    // ORE — grey mountain range with snow caps and a mine
     case 'MOUNTAINS':
       return (
-        <g className="opacity-90">
-          <path d="M -22,12 L -12,-6 L -2,12 Z" fill="#4b5563" stroke="#1f2937" strokeWidth="1" />
-          <path d="M -14,-2 L -12,-6 L -10,-2 L -11,0 Z" fill="#f8fafc" />
-          <path d="M 2,12 L 12,-6 L 22,12 Z" fill="#6b7280" stroke="#1f2937" strokeWidth="1" />
-          <path d="M 10,-2 L 12,-6 L 14,-2 L 13,0 Z" fill="#f8fafc" />
-          <path d="M -14,14 L 0,-15 L 14,14 Z" fill="#374151" stroke="#111827" strokeWidth="1" />
-          <path d="M -5,-4 L 0,-15 L 5,-4 L 0,0 Z" fill="#ffffff" />
+        <g className="opacity-95">
+          <path d="M -24,13 L -12,-6 L 0,13 Z" fill="#5b6470" stroke="#363c46" strokeWidth="0.8" strokeLinejoin="round" />
+          <path d="M -16,-1 L -12,-6 L -8,-1 L -12,1 Z" fill="#eef2f7" />
+          <path d="M 2,13 L 14,-8 L 26,13 Z" fill="#6b7280" stroke="#363c46" strokeWidth="0.8" strokeLinejoin="round" />
+          <path d="M 9,-1 L 14,-8 L 19,-1 L 14,1 Z" fill="#eef2f7" />
+          <path d="M -13,14 L 2,-16 L 17,14 Z" fill="#4b5360" stroke="#2b303a" strokeWidth="0.8" strokeLinejoin="round" />
+          <path d="M -5,-3 L 2,-16 L 9,-3 L 2,0 Z" fill="#ffffff" />
+          <path d="M -2.5,14 Q -2.5,8 2,8 Q 6.5,8 6.5,14 Z" fill="#1f242c" stroke="#11141a" strokeWidth="0.6" />
+          <circle cx="0.5" cy="12" r="0.8" fill="#fbbf24" />
+          <circle cx="4" cy="12.5" r="0.6" fill="#fcd34d" />
         </g>
       )
+    // DESERT — dunes, a sun and a cactus
     case 'DESERT':
       return (
-        <g className="opacity-90">
-          <path d="M -30,12 Q -10,-4 10,12" fill="#d97706" opacity="0.3" />
-          <path d="M -10,12 Q 10,1 30,12" fill="#b45309" opacity="0.2" />
-          <g transform="translate(8, -8) scale(0.7)">
-            <path d="M 0,15 L 0,-8" fill="none" stroke="#16a34a" strokeWidth="3" strokeLinecap="round" />
-            <path d="M 0,1 L -4,1 L -4,-3" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" />
-            <path d="M 0,4 L 4,4 L 4,1" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" />
+        <g className="opacity-95">
+          <path d="M -27,11 Q -10,-1 8,11 Z" fill="#d9b066" opacity="0.7" />
+          <path d="M -6,12 Q 12,3 28,12 Z" fill="#c2954a" opacity="0.6" />
+          <circle cx="-14" cy="-9" r="4" fill="#fcd34d" opacity="0.85" />
+          <g transform="translate(8, -2)">
+            <path d="M 0,12 L 0,-7" fill="none" stroke="#3f7d35" strokeWidth="3.2" strokeLinecap="round" />
+            <path d="M 0,2 L -4,2 L -4,-3" fill="none" stroke="#3f7d35" strokeWidth="2.6" strokeLinecap="round" />
+            <path d="M 0,5 L 4,5 L 4,0" fill="none" stroke="#3f7d35" strokeWidth="2.6" strokeLinecap="round" />
           </g>
+          <ellipse cx="-9" cy="11" rx="3" ry="1.6" fill="#b08545" />
         </g>
       )
     default:
@@ -463,11 +485,11 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
                 <stop offset="100%" stopColor={style.grad[1]} />
               </linearGradient>
             ))}
-            {/* Ocean Gradient */}
+            {/* Ocean Gradient — teal Catan sea */}
             <linearGradient id="ocean-grad" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#1e3a8a" />
-              <stop offset="50%" stopColor="#1d4ed8" />
-              <stop offset="100%" stopColor="#172554" />
+              <stop offset="0%" stopColor="#2a8fa0" />
+              <stop offset="50%" stopColor="#1c6e80" />
+              <stop offset="100%" stopColor="#0e3f4d" />
             </linearGradient>
             {/* Sand Gradient */}
             <linearGradient id="sand-grad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -480,6 +502,20 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
               <stop offset="80%" stopColor="#fcf8e3" />
               <stop offset="100%" stopColor="#eadeb6" />
             </radialGradient>
+            {/* Tile vignette shading — gives each hex a printed, beveled depth */}
+            <radialGradient id="hex-shade" cx="50%" cy="42%" r="62%">
+              <stop offset="55%" stopColor="#000000" stopOpacity="0" />
+              <stop offset="100%" stopColor="#1a0f04" stopOpacity="0.32" />
+            </radialGradient>
+            {/* Top gloss highlight */}
+            <linearGradient id="hex-gloss" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#ffffff" stopOpacity="0.2" />
+              <stop offset="45%" stopColor="#ffffff" stopOpacity="0" />
+            </linearGradient>
+            {/* Soft shadow to lift the island off the sea */}
+            <filter id="island-shadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="6" stdDeviation="6" floodColor="#03161b" floodOpacity="0.55" />
+            </filter>
           </defs>
 
           {/* Wooden Ocean Frame */}
@@ -579,30 +615,32 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
           })}
 
           {/* 2. Sandy Coastline (rendered underneath land hexes to border the island) */}
-          {state.hexes.map((hex) => {
-            const hexLayout = layout.hexes[hex.index]
-            const center = toPx(hexLayout.x, hexLayout.y)
-            const sandyPoints = hexLayout.vertices
-              .map(vId => {
-                const v = layout.vertices[vId]
-                const pt = toPx(v.x, v.y)
-                const sx = center.x + (pt.x - center.x) * 1.10
-                const sy = center.y + (pt.y - center.y) * 1.10
-                return `${sx},${sy}`
-              })
-              .join(" ")
+          <g filter="url(#island-shadow)">
+            {state.hexes.map((hex) => {
+              const hexLayout = layout.hexes[hex.index]
+              const center = toPx(hexLayout.x, hexLayout.y)
+              const sandyPoints = hexLayout.vertices
+                .map(vId => {
+                  const v = layout.vertices[vId]
+                  const pt = toPx(v.x, v.y)
+                  const sx = center.x + (pt.x - center.x) * 1.10
+                  const sy = center.y + (pt.y - center.y) * 1.10
+                  return `${sx},${sy}`
+                })
+                .join(" ")
 
-            return (
-              <polygon
-                key={`sand-${hex.index}`}
-                points={sandyPoints}
-                fill="url(#sand-grad)"
-                stroke="#d97706"
-                strokeWidth="1"
-                opacity="0.85"
-              />
-            )
-          })}
+              return (
+                <polygon
+                  key={`sand-${hex.index}`}
+                  points={sandyPoints}
+                  fill="url(#sand-grad)"
+                  stroke="#d97706"
+                  strokeWidth="1"
+                  opacity="0.95"
+                />
+              )
+            })}
+          </g>
 
           {/* 3. Hexagons (Land Tiles) */}
           {state.hexes.map((hex, idx) => {
@@ -645,6 +683,10 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
                 <g transform={`translate(${center.x}, ${center.y})`} className="pointer-events-none select-none">
                   {renderTerrainGraphics(hex.terrain)}
                 </g>
+
+                {/* Printed-tile shading: edge vignette + top gloss (non-interactive) */}
+                <polygon points={points} fill="url(#hex-shade)" className="pointer-events-none" />
+                <polygon points={points} fill="url(#hex-gloss)" className="pointer-events-none" />
 
                 {/* Parchment Number Token */}
                 {hex.numberToken > 0 && (
