@@ -3,7 +3,6 @@
 import { Button } from "../../../components/ui/button"
 import { Input } from "../../../components/ui/input"
 import { Label } from "../../../components/ui/label"
-import { Card } from "../../../components/ui/card"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
@@ -139,15 +138,14 @@ export default function SignUpPage() {
   }
 
   return (
-    <Card>
       <div className="space-y-6">
         <div>
-          <h2 className="text-center text-2xl font-bold tracking-tight">
-            Create a new account
+          <h2 className="font-display text-center text-2xl font-bold tracking-tight text-white">
+            Join the party 🎉
           </h2>
           <p className="mt-2 text-center text-sm text-muted-foreground">
             Already have an account?{' '}
-            <a href="/auth/sign-in" className="font-medium text-primary hover:underline">
+            <a href="/auth/sign-in" className="font-semibold text-grape-300 hover:text-grape-200 hover:underline">
               Sign in
             </a>
           </p>
@@ -217,25 +215,28 @@ export default function SignUpPage() {
             />
           </div>
           {error && (
-            <p className="text-sm text-destructive">{error}</p>
+            <p className="rounded-lg bg-destructive/15 px-3 py-2 text-sm text-destructive">{error}</p>
           )}
-          <Button type="submit" disabled={loading}>
+          <Button type="submit" variant="brand" className="w-full" size="lg" disabled={loading}>
             {loading ? "Creating account..." : "Create account"}
           </Button>
         </form>
-        <div className="text-center">
-          <Button
-            variant="outline"
-            onClick={() => {
-              supabase.auth.signInWithOAuth({
-                provider: "google",
-              })
-            }}
-          >
-            Sign up with Google
-          </Button>
+
+        <div className="relative flex items-center gap-3">
+          <span className="h-px flex-1 bg-white/10" />
+          <span className="text-xs uppercase tracking-wider text-muted-foreground">or</span>
+          <span className="h-px flex-1 bg-white/10" />
         </div>
+
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={() => {
+            supabase.auth.signInWithOAuth({ provider: "google" })
+          }}
+        >
+          Continue with Google
+        </Button>
       </div>
-    </Card>
   )
 }

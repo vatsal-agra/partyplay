@@ -279,10 +279,10 @@ export function PartiesSidebar() {
   const isLeader = (party: Party) => currentUserId === party.created_by
 
   return (
-    <div className="h-full bg-gray-900/50 border-l border-pink-500/20 p-4 overflow-y-auto">
+    <div className="h-full overflow-y-auto">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-bold text-white flex items-center gap-2">
-          <Group className="h-5 w-5 text-pink-400" />
+        <h2 className="font-display text-xl font-bold text-white flex items-center gap-2">
+          <Group className="h-5 w-5 text-grape-300" />
           Your Parties
         </h2>
       </div>
@@ -290,16 +290,16 @@ export function PartiesSidebar() {
       {loading ? (
         <div className="space-y-4">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-20 bg-gray-800/50 rounded-lg animate-pulse"></div>
+            <div key={i} className="h-20 bg-white/5 rounded-xl animate-pulse"></div>
           ))}
         </div>
       ) : (
         <div className="space-y-4">
           {parties.length === 0 ? (
-            <p className="text-gray-400 text-center py-4">No active parties found</p>
+            <p className="text-muted-foreground text-center py-6 text-sm">No active parties yet</p>
           ) : (
             parties.map((party) => (
-              <Card key={party.id} className="bg-gray-800/50 border-pink-500/20 overflow-hidden">
+              <Card key={party.id} className="bg-white/[0.04] border-white/10 overflow-hidden">
                 <div className="p-4 cursor-pointer" onClick={() => toggleExpandParty(party.id)}>
                   <div className="flex justify-between items-start">
                     <div>
@@ -340,22 +340,22 @@ export function PartiesSidebar() {
                 
                 {/* Party Members List */}
                 {expandedParty === party.id && (
-                  <div className="bg-gray-900/50 border-t border-pink-500/20 p-3">
+                  <div className="bg-black/20 border-t border-white/10 p-3">
                     <h4 className="text-sm font-medium text-white mb-2">Party Members</h4>
                     
                     {loadingMembers[party.id] ? (
                       <div className="flex justify-center py-3">
-                        <Loader2 className="h-5 w-5 animate-spin text-pink-400" />
+                        <Loader2 className="h-5 w-5 animate-spin text-grape-300" />
                       </div>
                     ) : party.members && party.members.length > 0 ? (
                       <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                         {party.members.map((member) => (
-                          <div 
-                            key={member.id} 
-                            className="flex items-center justify-between p-2 rounded-md bg-gray-800/70 hover:bg-gray-800"
+                          <div
+                            key={member.id}
+                            className="flex items-center justify-between p-2 rounded-lg bg-white/5 hover:bg-white/10"
                           >
                             <div className="flex items-center">
-                              <div className="h-6 w-6 rounded-full bg-gradient-to-br from-cyan-500 to-pink-500 flex items-center justify-center text-white font-bold mr-2 text-xs">
+                              <div className="h-6 w-6 rounded-full bg-brand flex items-center justify-center text-white font-bold mr-2 text-xs">
                                 {member.profile?.username ? member.profile.username[0].toUpperCase() : 'U'}
                               </div>
                               <div>

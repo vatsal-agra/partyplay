@@ -3,354 +3,344 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
-import { Search, Filter, X, Gamepad2 } from "lucide-react"
+import { Search, Filter, Gamepad2, Vote as VoteIcon, ArrowRight } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 
 import { GameCard } from "@/components/games/GameCard"
-import { Game, UserParty, PartyMember, Filters } from "@/app/types"
+import { Game, Filters } from "@/app/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { PartiesSidebar } from "@/components/PartiesSidebar"
+import { GAMES_CATALOG } from "@/lib/games-catalog"
 
-// Define the database game type
-type DbGame = {
-  id: string;
-  name: string;
-  description: string;
-  min_players: number;
-  max_players: number;
-  image_url: string;
-  duration: string;
-  complexity: 'Easy' | 'Medium' | 'Hard';
-  category: string[];
-  slug: string;
+// The party the current viewer belongs to (host or member).
+interface ActiveParty {
+  id: string
+  name: string
+  status: string | null
+  created_by: string
+  game_id?: string | null
+  isHost: boolean
 }
 
+interface VoteRow {
+  user_id: string
+  game_id: string
+  game_name: string
+  user_name: string | null
+}
 
 export default function GamesPage() {
   const router = useRouter()
   const supabaseClient = getSupabaseBrowserClient()
-  
-  // State management
+
   const [session, setSession] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [isCreatingParty, setIsCreatingParty] = useState(false)
-  const [userParty, setUserParty] = useState<UserParty | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [showFilters, setShowFilters] = useState(false)
-  const [games, setGames] = useState<Game[]>([])
+  const [games] = useState<Game[]>(GAMES_CATALOG)
+  const [activeParty, setActiveParty] = useState<ActiveParty | null>(null)
+  const [votes, setVotes] = useState<VoteRow[]>([])
   const [filters, setFilters] = useState<Filters>({
     players: "",
     complexity: "",
-    duration: ""
+    duration: "",
   })
+
+  const displayName = useMemo(() => {
+    if (!session?.user) return "Someone"
+    return (
+      session.user.user_metadata?.username ||
+      session.user.user_metadata?.full_name ||
+      session.user.email?.split("@")[0] ||
+      "Someone"
+    )
+  }, [session])
 
   // Filter games based on search and filters
   const filteredGames = useMemo(() => {
     return games.filter((game) => {
-      // Type assertion to ensure game has the correct type
-      const typedGame = game as Game;
-      
-      // Search query filter
-      const matchesSearch = typedGame.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         typedGame.description.toLowerCase().includes(searchQuery.toLowerCase());
-      
-      // Players filter
-      const matchesPlayers = !filters.players || 
-                           (typedGame.minPlayers <= parseInt(filters.players) && 
-                            typedGame.maxPlayers >= parseInt(filters.players));
-      
-      // Complexity filter
-      const matchesComplexity = !filters.complexity || 
-                              typedGame.complexity === filters.complexity;
-      
-      // Duration filter (simplified example)
-      const matchesDuration = !filters.duration || 
+      const matchesSearch =
+        game.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        game.description.toLowerCase().includes(searchQuery.toLowerCase())
+
+      const matchesPlayers =
+        !filters.players ||
+        (game.minPlayers <= parseInt(filters.players) && game.maxPlayers >= parseInt(filters.players))
+
+      const matchesComplexity = !filters.complexity || game.complexity === filters.complexity
+
+      const matchesDuration =
+        !filters.duration ||
         (() => {
-          const maxDuration = parseInt(filters.duration) * 30 // Convert to minutes
-          const [minDuration] = typedGame.duration.split('-').map(s => parseInt(s.trim()))
+          const maxDuration = parseInt(filters.duration) * 30
+          const [minDuration] = game.duration.split("-").map((s) => parseInt(s.trim()))
           return minDuration <= maxDuration
         })()
-      
-      return matchesSearch && matchesPlayers && matchesComplexity && matchesDuration;
-    });
-  }, [games, searchQuery, filters]);
 
-  // Use hardcoded mock data for games
-  useEffect(() => {
-    console.log('Loading mock games data...')
-    
-    const mockGames: Game[] = [
-      {
-        id: 'monopoly',
-        name: 'Monopoly',
-        description: 'Classic real estate trading game',
-        image: '/images/monopoly thumbnail.png',
-        minPlayers: 2,
-        maxPlayers: 6,
-        duration: '60-180 min',
-        complexity: 'Medium',
-        category: ['Strategy', 'Economic']
-      },
-      {
-        id: 'battleship',
-        name: 'Battleship',
-        description: 'Naval combat game',
-        image: '/images/Battleship thumbnail.png',
-        minPlayers: 2,
-        maxPlayers: 2,
-        duration: '15-30 min',
-        complexity: 'Easy',
-        category: ['Strategy']
-      },
-      {
-        id: 'catan',
-        name: 'Catan',
-        description: 'Build and trade to settle the island of Catan',
-        image: '/images/catan thumbnail.png',
-        minPlayers: 3,
-        maxPlayers: 4,
-        duration: '60-120 min',
-        complexity: 'Medium',
-        category: ['Strategy', 'Economic']
-      },
-      {
-        id: 'uno',
-        name: 'Uno',
-        description: 'Classic card game of matching colors and numbers',
-        image: '/images/uno final thumbnail.png',
-        minPlayers: 2,
-        maxPlayers: 10,
-        duration: '15-30 min',
-        complexity: 'Easy' as const,
-        category: ['Card Game', 'Family']
-      },
-      {
-        id: 'poker',
-        name: 'Poker',
-        description: 'Popular card game of skill and chance',
-        image: '/images/poker thumbnail.png',
-        minPlayers: 2,
-        maxPlayers: 10,
-        duration: '30-60 min',
-        complexity: 'Medium',
-        category: ['Card Game', 'Gambling']
-      },
-      {
-        id: 'cluedo',
-        name: 'Cluedo',
-        description: 'Solve the mystery of who committed the murder',
-        image: '/images/cluedo thumbnail.png',
-        minPlayers: 3,
-        maxPlayers: 6,
-        duration: '45-60 min',
-        complexity: 'Easy',
-        category: ['Mystery', 'Deduction']
-      },
-      {
-        id: 'pictionary',
-        name: 'Pictionary',
-        description: 'Draw and guess words against the clock',
-        image: '/images/pictionary thumbnail.png',
-        minPlayers: 4,
-        maxPlayers: 8,
-        duration: '30-60 min',
-        complexity: 'Easy',
-        category: ['Party', 'Drawing']
-      },
-      {
-        id: 'scribbleio',
-        name: 'Scribble.io',
-        description: 'Online drawing and guessing game',
-        image: '/images/scribbleio thumbnail.png',
-        minPlayers: 2,
-        maxPlayers: 16,
-        duration: '15-30 min',
-        complexity: 'Easy',
-        category: ['Party', 'Drawing', 'Online']
-      },
-      {
-        id: 'codenames',
-        name: 'Codenames',
-        description: 'Give one-word clues to help your team guess the right words',
-        image: '/images/codenames thumbnal.png',
-        minPlayers: 4,
-        maxPlayers: 8,
-        duration: '15-30 min',
-        complexity: 'Easy',
-        category: ['Party', 'Word Game']
-      },
-      {
-        id: 'terramystica',
-        name: 'Terra Mystica',
-        description: 'Strategic game of terrain building and resource management',
-        image: '/images/terra mystica thumbnail.png',
-        minPlayers: 2,
-        maxPlayers: 5,
-        duration: '90-120 min',
-        complexity: 'Hard',
-        category: ['Strategy', 'Eurogame']
-      },
-      {
-        id: '7wonders',
-        name: '7 Wonders',
-        description: 'Build an ancient civilization and lead it to greatness',
-        image: '/images/7wonders thumbnail.png',
-        minPlayers: 3,
-        maxPlayers: 7,
-        duration: '30-60 min',
-        complexity: 'Medium',
-        category: ['Strategy', 'Card Game']
-      }
-    ]
-    
-    console.log('Setting mock games data:', mockGames)
-    setGames(mockGames)
-    setLoading(false)
-  }, [])
-
-  // Get unique complexities for filter
-  const complexities = useMemo(() => {
-    return Array.from(new Set(games.map(game => game.complexity)))
-  }, [games])
-
-  // Handle creating a new game party
-  const handleCreateParty = useCallback(async (gameId: string) => {
-    if (!session) {
-      router.push('/auth/sign-in?redirect=/games')
-      return
-    }
-    
-    try {
-      setIsCreatingParty(true)
-      
-      // If user already has a party, redirect to it
-      if (userParty) {
-        router.push(`/party/${userParty.id}`)
-        return
-      }
-      
-      // Find the selected game
-      const game = games.find(g => g.id === gameId)
-      if (!game) {
-        throw new Error('Game not found')
-      }
-      
-      // Create a new party
-      const { data: party, error: partyError } = await supabaseClient
-        .from('parties')
-        .insert([
-          { 
-            name: `${session.user.user_metadata.full_name || 'My'} ${game.name} Party`,
-            game: game.name,
-            game_id: game.id,
-            game_image: game.image,
-            max_players: game.maxPlayers,
-            created_by: session.user.id,
-            status: 'waiting'
-          }
-        ])
-        .select()
-        .single()
-      
-      if (partyError) throw partyError
-      
-      // Add the creator as the first member
-      const { error: memberError } = await supabaseClient
-        .from('party_members')
-        .insert([
-          {
-            party_id: party.id,
-            user_id: session.user.id,
-            role: 'leader'
-          }
-        ])
-      
-      if (memberError) throw memberError
-      
-      // Update local state
-      setUserParty(party)
-      
-      // Redirect to the new party
-      router.push(`/party/${party.id}`)
-    } catch (error) {
-      console.error('Error creating party:', error)
-      alert('Failed to create party. Please try again.')
-    } finally {
-      setIsCreatingParty(false)
-    }
-  }, [session, userParty, router, supabaseClient])
-
-  // Clear all filters
-  const clearFilters = useCallback(() => {
-    setFilters({
-      players: "",
-      complexity: "",
-      duration: ""
+      return matchesSearch && matchesPlayers && matchesComplexity && matchesDuration
     })
-    setSearchQuery("")
-  }, [])
+  }, [games, searchQuery, filters])
 
-  const fetchUserParty = useCallback(async (userId: string) => {
-    try {
-      const { data: party, error } = await supabaseClient
-        .from('parties')
-        .select('*')
-        .eq('created_by', userId)
-        .neq('status', 'ended')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-      if (error) throw error
-      
-      setUserParty(party)
-    } catch (error) {
-      console.error('Error fetching user party:', error)
-    } finally {
-      setLoading(false)
+  // ----- Vote tallies -------------------------------------------------------
+  const tally = useMemo(() => {
+    const map: Record<string, { count: number; voters: string[] }> = {}
+    for (const v of votes) {
+      if (!map[v.game_id]) map[v.game_id] = { count: 0, voters: [] }
+      map[v.game_id].count += 1
+      map[v.game_id].voters.push(v.user_name || "Someone")
     }
-  }, [supabaseClient])
+    return map
+  }, [votes])
+
+  const maxVotes = useMemo(() => {
+    const counts = Object.values(tally).map((t) => t.count)
+    return counts.length ? Math.max(...counts) : 0
+  }, [tally])
+
+  const myVoteGameId = useMemo(() => {
+    if (!session?.user?.id) return null
+    return votes.find((v) => v.user_id === session.user.id)?.game_id ?? null
+  }, [votes, session])
+
+  const leadingGameName = useMemo(() => {
+    if (maxVotes === 0) return null
+    const leaders = Object.entries(tally)
+      .filter(([, t]) => t.count === maxVotes)
+      .map(([gameId]) => games.find((g) => g.id === gameId)?.name)
+      .filter(Boolean) as string[]
+    if (leaders.length === 0) return null
+    if (leaders.length === 1) return leaders[0]
+    return `${leaders.slice(0, -1).join(", ")} & ${leaders[leaders.length - 1]} (tie)`
+  }, [tally, maxVotes, games])
+
+  // ----- Data fetching ------------------------------------------------------
+  const fetchVotes = useCallback(
+    async (partyId: string) => {
+      const { data, error } = await supabaseClient
+        .from("votes")
+        .select("user_id, game_id, game_name, user_name")
+        .eq("party_id", partyId)
+      if (!error && data) setVotes(data as VoteRow[])
+    },
+    [supabaseClient]
+  )
+
+  // Find the party the user is currently part of (as host or as a member).
+  const fetchActiveParty = useCallback(
+    async (userId: string) => {
+      try {
+        // Parties this user is a member of
+        const { data: memberships } = await supabaseClient
+          .from("party_members")
+          .select("party_id")
+          .eq("user_id", userId)
+
+        const partyIds = new Set<string>((memberships || []).map((m: any) => m.party_id))
+
+        // Parties this user hosts
+        const { data: hosted } = await supabaseClient
+          .from("parties")
+          .select("*")
+          .eq("created_by", userId)
+          .neq("status", "ended")
+          .order("created_at", { ascending: false })
+
+        let party: any = (hosted || [])[0] || null
+
+        // If not hosting, resolve the most recent active party they belong to
+        if (!party && partyIds.size > 0) {
+          const { data: memberParties } = await supabaseClient
+            .from("parties")
+            .select("*")
+            .in("id", Array.from(partyIds))
+            .neq("status", "ended")
+            .order("created_at", { ascending: false })
+          party = (memberParties || [])[0] || null
+        }
+
+        if (party) {
+          setActiveParty({
+            id: party.id,
+            name: party.name,
+            status: party.status ?? null,
+            created_by: party.created_by,
+            game_id: party.game_id ?? null,
+            isHost: party.created_by === userId,
+          })
+          await fetchVotes(party.id)
+        } else {
+          setActiveParty(null)
+        }
+      } catch (error) {
+        console.error("Error fetching active party:", error)
+      } finally {
+        setLoading(false)
+      }
+    },
+    [supabaseClient, fetchVotes]
+  )
 
   useEffect(() => {
     const getSession = async () => {
       try {
         const { data: { session } } = await supabaseClient.auth.getSession()
         setSession(session || null)
-        
         if (session?.user?.id) {
-          await fetchUserParty(session.user.id)
+          await fetchActiveParty(session.user.id)
         } else {
           setLoading(false)
         }
       } catch (error) {
-        console.error('Error getting session:', error)
+        console.error("Error getting session:", error)
         setLoading(false)
       }
     }
-
     getSession()
-  }, [supabaseClient, fetchUserParty])
+  }, [supabaseClient, fetchActiveParty])
+
+  // Realtime: keep tallies live + auto-launch when the host starts the game.
+  useEffect(() => {
+    if (!activeParty?.id) return
+    const partyId = activeParty.id
+
+    const channel = supabaseClient
+      .channel(`games-voting-${partyId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "votes", filter: `party_id=eq.${partyId}` },
+        () => fetchVotes(partyId)
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "parties", filter: `id=eq.${partyId}` },
+        (payload) => {
+          const updated = payload.new as any
+          if (updated?.status === "ready") {
+            router.push(`/games/${updated.game_id || "monopoly"}?partyId=${partyId}`)
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabaseClient.removeChannel(channel)
+    }
+  }, [activeParty?.id, supabaseClient, fetchVotes, router])
+
+  // ----- Voting -------------------------------------------------------------
+  const handleVote = useCallback(
+    async (game: Game) => {
+      if (!session?.user?.id || !activeParty) return
+      const userId = session.user.id
+      const partyId = activeParty.id
+
+      // Toggle off if voting for the game you already chose
+      if (myVoteGameId === game.id) {
+        setVotes((prev) => prev.filter((v) => v.user_id !== userId)) // optimistic
+        await supabaseClient.from("votes").delete().eq("party_id", partyId).eq("user_id", userId)
+        fetchVotes(partyId)
+        return
+      }
+
+      // Optimistic update (single vote per member)
+      setVotes((prev) => [
+        ...prev.filter((v) => v.user_id !== userId),
+        { user_id: userId, game_id: game.id, game_name: game.name, user_name: displayName },
+      ])
+
+      const { error } = await supabaseClient.from("votes").upsert(
+        {
+          party_id: partyId,
+          user_id: userId,
+          game_id: game.id,
+          game_name: game.name,
+          user_name: displayName,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "party_id,user_id" }
+      )
+      if (error) console.error("Error casting vote:", error)
+      fetchVotes(partyId)
+    },
+    [session, activeParty, myVoteGameId, displayName, supabaseClient, fetchVotes]
+  )
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-grape-400"></div>
       </div>
     )
   }
 
+  const votingEnabled = !!activeParty
+  const totalVotes = votes.length
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-cyan-500 to-pink-500 dark:from-cyan-600 dark:to-pink-600 overflow-x-hidden">
+    <div className="min-h-screen overflow-x-hidden">
       <div className="flex h-full w-full">
-        {/* Main Content */}
-        <div className="flex-1 overflow-y-auto py-12 w-0 min-w-0">
+        <div className="flex-1 overflow-y-auto py-10 w-0 min-w-0">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="bg-black/20 backdrop-blur-sm rounded-2xl p-8 shadow-lg">
+            <div className="glass p-6 sm:p-8 shadow-soft">
+              {/* Voting banner (only when in a party) */}
+              <AnimatePresence>
+                {votingEnabled && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="mb-6 rounded-xl border border-cyan-300/40 bg-gradient-to-r from-cyan-500/20 to-pink-500/20 p-5"
+                  >
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                      <div className="flex items-start gap-3">
+                        <div className="rounded-lg bg-cyan-500/30 p-2">
+                          <VoteIcon className="h-6 w-6 text-white" />
+                        </div>
+                        <div>
+                          <h2 className="text-lg font-bold text-white">
+                            🗳️ Voting for{" "}
+                            <span className="text-cyan-200">{activeParty?.name}</span>
+                          </h2>
+                          <p className="text-sm text-white/80">
+                            {myVoteGameId
+                              ? "Your vote is in — tap another game to change it, or tap it again to undo."
+                              : "Tap Vote on the game you want to play. Most votes wins!"}
+                            {leadingGameName && (
+                              <>
+                                {" "}
+                                Currently leading: <span className="font-semibold text-yellow-200">{leadingGameName}</span>.
+                              </>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        onClick={() => router.push(`/party/${activeParty?.id}`)}
+                        className="bg-white/15 hover:bg-white/25 text-white border border-white/20 whitespace-nowrap"
+                      >
+                        Back to party
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </div>
+                    <p className="mt-3 text-xs text-white/60">
+                      {totalVotes} {totalVotes === 1 ? "vote" : "votes"} cast so far
+                      {activeParty?.isHost && " · As host, head back to the party to launch the winning game."}
+                    </p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <div>
-                  <h1 className="text-3xl font-bold text-white">Find Your Next Game</h1>
-                  <p className="text-gray-200">Browse our collection of board games and start playing with friends</p>
+                  <h1 className="text-3xl font-bold text-white">
+                    {votingEnabled ? "Vote For Your Next Game" : "Find Your Next Game"}
+                  </h1>
+                  <p className="text-gray-200">
+                    {votingEnabled
+                      ? "Rally your party around a favourite — the most-voted game gets played."
+                      : "Browse our collection of board games and start playing with friends"}
+                  </p>
                 </div>
                 <div className="flex gap-2 w-full md:w-auto">
                   <div className="relative flex-1 md:w-64">
@@ -363,8 +353,8 @@ export default function GamesPage() {
                       onChange={(e) => setSearchQuery(e.target.value)}
                     />
                   </div>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="flex items-center gap-2 bg-white/10 hover:bg-white/20 border-white/20 text-white"
                     onClick={() => setShowFilters(!showFilters)}
                   >
@@ -378,18 +368,18 @@ export default function GamesPage() {
                 {showFilters && (
                   <motion.div
                     initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
+                    animate={{ opacity: 1, height: "auto" }}
                     exit={{ opacity: 0, height: 0 }}
                     className="overflow-hidden"
                   >
-                    <div className="mt-6 p-4 bg-black/30 rounded-lg border border-white/10">
+                    <div className="mt-6 p-4 bg-black/30 rounded-lg border border-white/10 mb-2">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-200 mb-1">Players</label>
                           <select
                             className="w-full bg-black/30 border border-white/10 rounded-md px-3 py-2 text-white text-sm"
                             value={filters.players}
-                            onChange={(e) => setFilters({...filters, players: e.target.value})}
+                            onChange={(e) => setFilters({ ...filters, players: e.target.value })}
                           >
                             <option value="">Any</option>
                             <option value="1">1 Player</option>
@@ -404,7 +394,7 @@ export default function GamesPage() {
                           <select
                             className="w-full bg-black/30 border border-white/10 rounded-md px-3 py-2 text-white text-sm"
                             value={filters.complexity}
-                            onChange={(e) => setFilters({...filters, complexity: e.target.value})}
+                            onChange={(e) => setFilters({ ...filters, complexity: e.target.value })}
                           >
                             <option value="">Any</option>
                             <option value="Easy">Easy</option>
@@ -417,7 +407,7 @@ export default function GamesPage() {
                           <select
                             className="w-full bg-black/30 border border-white/10 rounded-md px-3 py-2 text-white text-sm"
                             value={filters.duration}
-                            onChange={(e) => setFilters({...filters, duration: e.target.value})}
+                            onChange={(e) => setFilters({ ...filters, duration: e.target.value })}
                           >
                             <option value="">Any</option>
                             <option value="<30">Under 30 min</option>
@@ -427,12 +417,12 @@ export default function GamesPage() {
                         </div>
                       </div>
                       <div className="mt-4 flex justify-end">
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           size="sm"
                           onClick={() => {
-                            setFilters({ players: '', complexity: '', duration: '' })
-                            setSearchQuery('')
+                            setFilters({ players: "", complexity: "", duration: "" })
+                            setSearchQuery("")
                           }}
                           className="text-white border-white/50 hover:bg-white/10"
                         >
@@ -453,18 +443,21 @@ export default function GamesPage() {
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {filteredGames.map((game) => {
-                    const isInParty = userParty?.game_id === game.id
-                    
+                    const t = tally[game.id]
+                    const count = t?.count ?? 0
                     return (
                       <GameCard
                         key={game.id}
                         game={game}
-                        onPlay={() => {
-                          // Use the game's ID for navigation
-                          router.push(`/games/${game.id}`)
-                        }}
-                        isInParty={isInParty}
-                        isCreatingParty={isCreatingParty}
+                        onPlay={() => router.push(`/games/${game.id}`)}
+                        isInParty={activeParty?.game_id === game.id}
+                        isCreatingParty={false}
+                        votingEnabled={votingEnabled}
+                        voteCount={count}
+                        voters={t?.voters ?? []}
+                        hasVoted={myVoteGameId === game.id}
+                        isLeading={count === maxVotes && maxVotes > 0}
+                        onVote={() => handleVote(game)}
                       />
                     )
                   })}
@@ -475,7 +468,7 @@ export default function GamesPage() {
         </div>
 
         {/* Parties Sidebar */}
-        <div className="hidden lg:block w-80 flex-shrink-0 bg-gray-900/50 border-l border-pink-500/20 p-4 overflow-y-auto">
+        <div className="hidden lg:block w-80 flex-shrink-0 border-l border-white/10 bg-white/[0.02] backdrop-blur-xl p-4 overflow-y-auto">
           <PartiesSidebar />
         </div>
       </div>

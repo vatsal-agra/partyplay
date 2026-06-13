@@ -97,7 +97,7 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-cyan-500 via-purple-500 to-pink-500">
+      <div className="flex flex-col items-center justify-center min-h-[70vh]">
         <motion.div
           animate={{
             scale: [1, 1.1, 1],
@@ -158,13 +158,9 @@ export default function Dashboard() {
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
-            <h1 className="text-5xl font-bold mb-4 relative inline-block">
-              <span className="relative z-10 text-white">
-                Your Game Dashboard
-              </span>
-              <span className="absolute inset-0 text-transparent bg-clip-text [text-shadow:0_0_1px_#fff,0_0_2px_#fff,0_0_3px_#fff]">
-                Your Game Dashboard
-              </span>
+            <h1 className="font-display text-5xl font-bold mb-4 inline-block">
+              <span className="text-white">Your Game </span>
+              <span className="text-gradient">Dashboard</span>
             </h1>
           </motion.div>
           
@@ -187,9 +183,11 @@ export default function Dashboard() {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
-              <Button 
+              <Button
+                variant="brand"
+                size="lg"
                 onClick={() => router.push('/dashboard/create-party')}
-                className="bg-gradient-to-r from-cyan-500 to-pink-500 hover:from-cyan-600 hover:to-pink-600 text-white font-medium flex items-center gap-2 px-8 py-6 text-base shadow-lg hover:shadow-cyan-500/30 transition-all duration-300"
+                className="gap-2"
               >
                 <Plus className="h-5 w-5" />
                 Create New Party
@@ -253,7 +251,7 @@ export default function Dashboard() {
                     
                     <div className="ml-4 flex-1">
                       <div className="flex items-center">
-                        <div className="h-10 w-10 rounded-full bg-gradient-to-br from-cyan-500 to-pink-500 flex items-center justify-center text-white font-bold mr-3">
+                        <div className="h-10 w-10 rounded-full bg-brand flex items-center justify-center text-white font-bold mr-3">
                           {player.username[0].toUpperCase()}
                         </div>
                         <div>

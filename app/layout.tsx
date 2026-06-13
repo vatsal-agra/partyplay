@@ -1,15 +1,25 @@
 import type { Metadata } from "next"
-import { Inter } from "next/font/google"
+import { Plus_Jakarta_Sans, Space_Grotesk } from "next/font/google"
 import "./globals.css"
 import { Providers } from "./providers"
 import { MainNav } from "@/components/MainNav"
 import { Toaster } from "sonner"
 
-const inter = Inter({ subsets: ["latin"] })
+const jakarta = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  display: "swap",
+})
+
+const grotesk = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-display",
+  display: "swap",
+})
 
 export const metadata: Metadata = {
-  title: "BoardGame Nexus - Play Board Games Online",
-  description: "Play your favorite board games online with friends in real-time. Create or join game sessions and have fun together!",
+  title: "PartyPlay — Game Night, Anywhere",
+  description: "Create a party, rally your friends, vote on a game, and play together in real time. The funnest way to host game night online.",
 }
 
 export default function RootLayout({
@@ -18,13 +28,15 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
+    <html lang="en" suppressHydrationWarning className={`${jakarta.variable} ${grotesk.variable}`}>
+      <body className="font-sans">
+        {/* Animated aurora backdrop for the whole app */}
+        <div className="aurora" aria-hidden />
         <Providers>
           <MainNav />
           <main className="pt-16 min-h-screen">
             {children}
-            <Toaster position="top-right" richColors />
+            <Toaster position="top-right" richColors theme="dark" />
           </main>
         </Providers>
       </body>

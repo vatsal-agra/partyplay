@@ -64,6 +64,7 @@ export interface Vote {
   id: string;
   party_id: string;
   user_id: string;
+  game_id: string;
   game_name: string;
   user_name: string;
   created_at: string;

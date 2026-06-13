@@ -646,7 +646,7 @@ export default function GamePlayPage() {
   
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-cyan-500 to-pink-500">
+      <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="text-center">
           <Loader2 className="h-12 w-12 animate-spin text-white mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-white">Loading Game...</h2>
@@ -657,7 +657,7 @@ export default function GamePlayPage() {
   
   if (!gameData) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-cyan-500 to-pink-500">
+      <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-white mb-4">Game not found</h2>
           <Button onClick={() => router.push('/games')}>
@@ -669,7 +669,7 @@ export default function GamePlayPage() {
   }
   
   return (
-    <div className="h-screen bg-gradient-to-br from-cyan-500 to-pink-500 p-0 m-0 overflow-hidden">
+    <div className="h-screen bg-gradient-to-br from-[#0d0a17] via-[#140e26] to-[#1c1033] p-0 m-0 overflow-hidden">
       <div className="h-full p-0 flex w-full">
         {/* Main content - Game and Sidebar */}
         <div className="flex flex-col md:flex-row h-full w-full overflow-y-auto md:overflow-hidden">
@@ -746,7 +746,7 @@ export default function GamePlayPage() {
                       </p>
                       <Button 
                         onClick={handleStartGame}
-                        className="bg-gradient-to-r from-cyan-500 to-pink-500 hover:from-cyan-600 hover:to-pink-600 font-bold px-8 py-5 rounded-xl shadow-lg"
+                        className="bg-brand hover:brightness-110 font-bold px-8 py-5 rounded-xl shadow-lg"
                       >
                         Start Game Lobby
                       </Button>
@@ -810,7 +810,7 @@ export default function GamePlayPage() {
                         member.is_host ? 'bg-green-500/20 border border-green-500/30' : 'bg-white/10'
                       }`}
                     >
-                      <div className="h-8 w-8 rounded-full bg-gradient-to-br from-cyan-500 to-pink-500 flex items-center justify-center text-white font-bold mr-3">
+                      <div className="h-8 w-8 rounded-full bg-brand flex items-center justify-center text-white font-bold mr-3">
                         {member.profile?.username?.[0].toUpperCase() || 'U'}
                       </div>
                       <div>
@@ -830,7 +830,7 @@ export default function GamePlayPage() {
                 <div className="p-3 border-t border-white/10">
                   <Button 
                     onClick={handleInviteFriends}
-                    className="w-full bg-gradient-to-r from-cyan-500 to-pink-500 hover:from-cyan-600 hover:to-pink-600"
+                    className="w-full bg-brand hover:brightness-110"
                   >
                     {copiedLink ? "Link Copied!" : "Invite Friends"}
                   </Button>
@@ -849,7 +849,7 @@ export default function GamePlayPage() {
                       <div 
                         className={`max-w-[80%] rounded-lg p-3 ${
                           message.user_id === currentUserId 
-                            ? 'bg-cyan-500/30 text-white' 
+                            ? 'bg-grape-500/30 text-white'
                             : 'bg-white/10 text-white'
                         }`}
                       >
@@ -880,7 +880,7 @@ export default function GamePlayPage() {
                     <Button 
                       type="submit" 
                       size="sm" 
-                      className="h-9 px-3 bg-gradient-to-r from-cyan-500 to-pink-500 hover:from-cyan-600 hover:to-pink-600"
+                      className="h-9 px-3 bg-brand hover:brightness-110"
                       disabled={sendingMessage}
                     >
                       {sendingMessage ? (
@@ -957,7 +957,7 @@ export default function GamePlayPage() {
 
               <Button
                 onClick={() => setShowRules(false)}
-                className="w-full mt-6 bg-gradient-to-r from-cyan-500 to-pink-500 hover:from-cyan-600 hover:to-pink-600 font-bold uppercase tracking-wider text-xs py-2 rounded-lg text-slate-950"
+                className="w-full mt-6 bg-brand hover:brightness-110 font-bold uppercase tracking-wider text-xs py-2 rounded-lg text-slate-950"
               >
                 Close Rules
               </Button>
