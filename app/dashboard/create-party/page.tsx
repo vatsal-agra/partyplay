@@ -142,35 +142,30 @@ export default function CreateParty() {
   return (
     <div className="w-full">
       <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold mb-4 relative inline-block">
-            <span className="relative z-10 bg-clip-text text-transparent bg-gradient-to-r from-cyan-600 to-pink-600">
-              Create New Party
-            </span>
-            <span className="absolute inset-0 bg-clip-text text-transparent bg-gradient-to-r from-cyan-500 to-pink-500 [text-shadow:0_0_8px_rgba(255,255,255,0.5)]">
-              Create New Party
-            </span>
+        <div className="text-center mb-10">
+          <h1 className="font-display text-4xl font-bold mb-3">
+            <span className="text-white">Create a </span>
+            <span className="text-gradient">New Party</span>
           </h1>
-          <p className="text-white text-lg mb-8">Set up your gaming session and invite friends</p>
+          <p className="text-muted-foreground text-lg">Set up your game night and invite friends</p>
         </div>
-        
-        <Card className="bg-background/50 backdrop-blur-sm border border-foreground/10 p-8 rounded-xl shadow-xl">
+
+        <Card className="p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="partyName" className="text-gray-300">Party Name</Label>
+              <Label htmlFor="partyName" className="text-white/90">Party Name</Label>
               <Input
                 id="partyName"
                 type="text"
                 value={partyName}
                 onChange={(e) => setPartyName(e.target.value)}
                 required
-                placeholder="Enter party name"
-                className="bg-gray-700/50 border-gray-600 text-white/90 placeholder-gray-400 focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                placeholder="Friday Night Showdown"
               />
             </div>
-            
+
             <div className="space-y-2">
-              <Label htmlFor="maxPlayers" className="text-gray-300">Maximum Players</Label>
+              <Label htmlFor="maxPlayers" className="text-white/90">Maximum Players</Label>
               <Input
                 id="maxPlayers"
                 type="number"
@@ -180,34 +175,35 @@ export default function CreateParty() {
                 min="2"
                 max="10"
                 placeholder="2-10 players"
-                className="bg-gray-700/50 border-gray-600 text-white/90 placeholder-gray-400 focus:ring-2 focus:ring-pink-500 focus:border-transparent"
               />
             </div>
-            
+
             <div className="flex items-center">
               <input
                 id="isPrivate"
                 type="checkbox"
                 checked={isPrivate}
                 onChange={(e) => setIsPrivate(e.target.checked)}
-                className="h-5 w-5 rounded border-gray-600 bg-gray-700 text-pink-500 focus:ring-pink-500 focus:ring-offset-gray-800"
+                className="h-5 w-5 rounded border-white/20 bg-white/10 text-grape-500 focus:ring-grape-500 focus:ring-offset-background"
               />
-              <Label htmlFor="isPrivate" className="ml-3 text-gray-300">
+              <Label htmlFor="isPrivate" className="ml-3 text-white/90">
                 Make this party private
               </Label>
             </div>
-            
+
             {error && (
-              <div className="p-3 bg-red-900/30 border border-red-800 text-red-200 rounded-md text-sm">
+              <div className="p-3 bg-destructive/15 border border-destructive/40 text-destructive rounded-xl text-sm">
                 {error}
               </div>
             )}
-            
+
             <div className="pt-2">
               <Button
                 type="submit"
+                variant="brand"
+                size="lg"
                 disabled={loading}
-                className="w-full bg-gradient-to-r from-cyan-500 to-pink-500 hover:from-cyan-600 hover:to-pink-600 text-white py-6 text-base font-medium transition-all duration-300 transform hover:scale-[1.02]"
+                className="w-full"
               >
                 {loading ? (
                   <>

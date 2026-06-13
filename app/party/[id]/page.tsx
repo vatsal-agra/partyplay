@@ -3,11 +3,12 @@
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
-import { Copy, Share2, ArrowLeft } from "lucide-react"
+import { Copy, Share2, ArrowLeft, Crown, Trophy, Vote as VoteIcon, Rocket } from "lucide-react"
 import { useRouter, useParams } from "next/navigation"
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import Image from "next/image";
+import { getGameById } from "@/lib/games-catalog";
 import type { Session } from "@supabase/auth-helpers-nextjs";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import type { Party, PartyMember, Message, Vote, UserProfile } from "@/app/types";
@@ -28,7 +29,7 @@ function LoadingSpinner() {
 
 function ErrorMessage({ message }: { message: string }) {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 dark:from-blue-900 dark:to-purple-900">
+    <div className="min-h-screen">
       <div className="container mx-auto px-4 py-8">
         <div className="flex items-center justify-center">
           <div className="text-center">
@@ -51,13 +52,43 @@ export default function PartyPage() {
   const [party, setParty] = useState<Party | null>(null);
   const [members, setMembers] = useState<PartyMember[]>([]);
   const [isLeader, setIsLeader] = useState(false);
-  const [game, setGame] = useState<string>('');
-  const [map, setMap] = useState<string>('');
-  const [queue, setQueue] = useState<string>('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [votes, setVotes] = useState<Vote[]>([]);
   const [newMessage, setNewMessage] = useState<string>('');
+  const [selectedWinnerId, setSelectedWinnerId] = useState<string | null>(null);
+  const [launching, setLaunching] = useState(false);
   const supabase = getSupabaseBrowserClient()
+
+  // Aggregate the party's votes into a per-game tally.
+  const voteTally = useMemo(() => {
+    const map: Record<string, { gameId: string; name: string; count: number; voters: string[] }> = {}
+    for (const v of votes as any[]) {
+      const gid: string | undefined = v.game_id
+      if (!gid) continue
+      if (!map[gid]) {
+        map[gid] = { gameId: gid, name: v.game_name || getGameById(gid)?.name || gid, count: 0, voters: [] }
+      }
+      map[gid].count += 1
+      map[gid].voters.push(v.user_name || v.user?.username || v.user?.email || 'Someone')
+    }
+    return Object.values(map).sort((a, b) => b.count - a.count)
+  }, [votes])
+
+  const maxVotes = voteTally.length ? voteTally[0].count : 0
+  const winners = useMemo(
+    () => voteTally.filter((t) => t.count === maxVotes && maxVotes > 0),
+    [voteTally, maxVotes]
+  )
+  const isTie = winners.length > 1
+  // The game the host will launch: their pick on a tie, else the sole winner.
+  const effectiveWinnerId = isTie ? selectedWinnerId : winners[0]?.gameId ?? null
+  const effectiveWinner = winners.find((w) => w.gameId === effectiveWinnerId) ?? null
+
+  const myVote = useMemo(
+    () => (votes as any[]).find((v) => v.user_id === session?.user?.id) ?? null,
+    [votes, session]
+  )
+  const myVoteName: string | null = myVote ? (myVote.game_name || getGameById(myVote.game_id)?.name || null) : null
 
   useEffect(() => {
     const getSession = async () => {
@@ -118,12 +149,6 @@ export default function PartyPage() {
         return
       }
       
-      if (partyData) {
-        setGame(partyData.game_id || '')
-        setMap(partyData.map || '')
-        setQueue(partyData.queue || '')
-      }
-
       // Fetch party members
       const { data: membersData, error: membersError } = await supabase
         .from('party_members')
@@ -260,6 +285,14 @@ export default function PartyPage() {
               getParty(session)
             }
           })
+          .on('postgres_changes', {
+            event: '*',
+            schema: 'public',
+            table: 'votes',
+            filter: `party_id=eq.${partyId}`,
+          }, () => {
+            getParty(session)
+          })
           .on('broadcast', { event: 'game_launch' }, ({ payload }) => {
             console.log('Received game_launch broadcast:', payload)
             router.push(`/games/${payload.gameId || 'monopoly'}?partyId=${partyId}`)
@@ -282,6 +315,35 @@ export default function PartyPage() {
       }
     }
   }, [])
+
+  // Host launches the winning game (or their chosen game on a tie).
+  const launchGame = async (gameId: string) => {
+    if (!gameId || launching) return
+    try {
+      setLaunching(true)
+      const catalogGame = getGameById(gameId)
+      await supabase.from('parties').update({
+        game: catalogGame?.name || gameId,
+        game_id: gameId,
+        game_image: catalogGame?.image || null,
+        status: 'ready',
+      }).eq('id', partyId)
+
+      // Tell everyone (party page + games page voters) to jump into the game.
+      if (window.partyChannel) {
+        window.partyChannel.send({
+          type: 'broadcast',
+          event: 'game_launch',
+          payload: { gameId },
+        })
+      }
+
+      router.push(`/games/${gameId}?partyId=${partyId}`)
+    } catch (error) {
+      console.error('Error launching game:', error)
+      setLaunching(false)
+    }
+  }
 
   if (loading) {
     return <LoadingSpinner />
@@ -317,7 +379,7 @@ export default function PartyPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-500 to-purple-600 dark:from-blue-900 dark:to-purple-900">
+    <div className="min-h-screen">
       <div className="container mx-auto px-4 py-8">
         {/* Back button */}
         <div className="flex justify-between items-center mb-6">
@@ -335,13 +397,13 @@ export default function PartyPage() {
           {/* Main Content */}
           <div className="flex-1 space-y-8">
             {/* Party Header */}
-            <div className="bg-gradient-to-r from-blue-600 to-purple-700 rounded-2xl p-8 shadow-lg">
+            <div className="relative overflow-hidden bg-brand rounded-2xl p-8 shadow-glow-grape">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                  <h1 className="text-4xl font-bold text-white bg-clip-text bg-gradient-to-r from-white to-purple-300">
+                  <h1 className="font-display text-4xl font-bold text-white drop-shadow">
                     {party?.name}
                   </h1>
-                  <p className="text-lg text-gray-200 mt-2">
+                  <p className="text-lg text-white/80 mt-2">
                     {members.length}/{party?.max_players} players
                   </p>
                   
@@ -368,106 +430,154 @@ export default function PartyPage() {
                     </Button>
                   </div>
                 </div>
-                {isLeader && (
-                  <Button
-                    onClick={async () => {
-                      try {
-                        // Find matching game to update game_id
-                        const selectedGameId = game || 'monopoly';
-                        
-                        await supabase.from('parties').update({
-                          game: selectedGameId.charAt(0).toUpperCase() + selectedGameId.slice(1),
-                          game_id: selectedGameId,
-                          map: map,
-                          queue: queue,
-                          status: 'ready'
-                        }).eq('id', partyId)
-
-                        // Broadcast game launch to other members via websocket channel
-                        if (window.partyChannel) {
-                          window.partyChannel.send({
-                            type: 'broadcast',
-                            event: 'game_launch',
-                            payload: { gameId: selectedGameId }
-                          })
-                        }
-
-                        // Launch game using the selected game slug
-                        const gameLaunchUrl = `/games/${selectedGameId}?partyId=${partyId}`;
-                        router.push(gameLaunchUrl);
-                      } catch (error) {
-                        console.error('Error starting game:', error)
-                      }
-                    }}
-                    className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-6 py-3 rounded-lg shadow-lg font-bold"
-                  >
-                    Start Game
-                  </Button>
-                )}
+                <Button
+                  variant="ghost"
+                  onClick={() => router.push('/games')}
+                  className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-5 py-3 rounded-lg font-semibold whitespace-nowrap"
+                >
+                  <VoteIcon className="mr-2 h-4 w-4" />
+                  {myVoteName ? `You voted: ${myVoteName}` : 'Vote on a game'}
+                </Button>
               </div>
             </div>
 
-            {/* Game Settings */}
+            {/* Game Voting */}
             <Card className="bg-white/5 backdrop-blur-md border border-white/20 hover:border-purple-300 transition-all duration-300 p-6 rounded-xl shadow-lg">
-              <h2 className="text-2xl font-bold text-white mb-4">Game Settings</h2>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="game" className="text-white mb-2">
-                    Select Game
-                  </Label>
-                  <select
-                    id="game"
-                    value={game}
-                    onChange={(e) => setGame(e.target.value)}
-                    className="w-full bg-white/5 border-white/20 hover:border-white/50 focus:border-purple-300 focus:ring-purple-300 rounded-lg p-2 text-white bg-slate-900"
-                    disabled={!isLeader}
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                  <VoteIcon className="h-6 w-6 text-cyan-300" />
+                  Game Voting
+                </h2>
+                <span className="text-sm text-gray-300">
+                  {votes.length} / {members.length} voted
+                </span>
+              </div>
+
+              {voteTally.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-300 mb-1">No votes yet.</p>
+                  <p className="text-sm text-gray-400 mb-5">
+                    Head to the games page and vote for what you want to play — the most-voted game wins!
+                  </p>
+                  <Button
+                    onClick={() => router.push('/games')}
+                    variant="brand"
                   >
-                    <option value="" className="bg-slate-900">Select a game</option>
-                    <option value="monopoly" className="bg-slate-900">Monopoly</option>
-                    <option value="catan" className="bg-slate-900">Catan</option>
-                    <option value="battleship" className="bg-slate-900">Battleship</option>
-                    <option value="uno" className="bg-slate-900">Uno</option>
-                    <option value="poker" className="bg-slate-900">Poker</option>
-                    <option value="cluedo" className="bg-slate-900">Cluedo</option>
-                    <option value="pictionary" className="bg-slate-900">Pictionary</option>
-                    <option value="scribbleio" className="bg-slate-900">Scribble.io</option>
-                    <option value="codenames" className="bg-slate-900">Codenames</option>
-                    <option value="terramystica" className="bg-slate-900">Terra Mystica</option>
-                    <option value="7wonders" className="bg-slate-900">7 Wonders</option>
-                  </select>
+                    <VoteIcon className="mr-2 h-4 w-4" />
+                    Open Voting
+                  </Button>
                 </div>
-                <div>
-                  <Label htmlFor="map" className="text-white mb-2">
-                    Select Map
-                  </Label>
-                  <select
-                    id="map"
-                    value={map}
-                    onChange={(e) => setMap(e.target.value)}
-                    className="w-full bg-white/5 border-white/20 hover:border-white/50 focus:border-purple-300 focus:ring-purple-300 rounded-lg p-2"
-                  >
-                    <option value="">Select a map</option>
-                    <option value="ascent">Ascent</option>
-                    <option value="bind">Bind</option>
-                    <option value="haven">Haven</option>
-                  </select>
+              ) : (
+                <div className="space-y-3">
+                  {voteTally.map((t) => {
+                    const isWinner = t.count === maxVotes
+                    const pct = maxVotes > 0 ? Math.round((t.count / maxVotes) * 100) : 0
+                    const gameImg = getGameById(t.gameId)?.image
+                    return (
+                      <div
+                        key={t.gameId}
+                        className={`relative overflow-hidden rounded-lg border p-3 ${
+                          isWinner ? 'border-yellow-400/70 bg-yellow-400/10' : 'border-white/10 bg-white/5'
+                        }`}
+                      >
+                        {/* progress fill */}
+                        <div
+                          className={`absolute inset-y-0 left-0 ${isWinner ? 'bg-yellow-400/15' : 'bg-cyan-400/10'}`}
+                          style={{ width: `${pct}%` }}
+                        />
+                        <div className="relative flex items-center gap-3">
+                          {gameImg && (
+                            <div className="h-10 w-10 rounded-md overflow-hidden flex-shrink-0 bg-black/30">
+                              <Image src={gameImg} alt={t.name} width={40} height={40} className="h-full w-full object-cover" />
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              {isWinner && <Crown className="h-4 w-4 text-yellow-300 flex-shrink-0" />}
+                              <span className="font-semibold text-white truncate">{t.name}</span>
+                            </div>
+                            <p className="text-xs text-gray-300 truncate">{t.voters.join(', ')}</p>
+                          </div>
+                          <span className="font-bold text-white whitespace-nowrap">
+                            {t.count} {t.count === 1 ? 'vote' : 'votes'}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
-                <div>
-                  <Label htmlFor="queue" className="text-white mb-2">
-                    Queue Type
-                  </Label>
-                  <select
-                    id="queue"
-                    value={queue}
-                    onChange={(e) => setQueue(e.target.value)}
-                    className="w-full bg-white/5 border-white/20 hover:border-white/50 focus:border-purple-300 focus:ring-purple-300 rounded-lg p-2"
-                  >
-                    <option value="">Select queue</option>
-                    <option value="competitive">Competitive</option>
-                    <option value="unrated">Unrated</option>
-                    <option value="spike_rush">Spike Rush</option>
-                  </select>
-                </div>
+              )}
+
+              {/* Launch controls */}
+              <div className="mt-6 border-t border-white/10 pt-5">
+                {isLeader ? (
+                  maxVotes === 0 ? (
+                    <Button
+                      disabled
+                      className="w-full bg-white/10 text-white/60 font-bold cursor-not-allowed"
+                    >
+                      Waiting for votes…
+                    </Button>
+                  ) : (
+                    <>
+                      {isTie && (
+                        <div className="mb-4">
+                          <p className="text-sm text-yellow-200 mb-2 flex items-center gap-1.5">
+                            <Trophy className="h-4 w-4" />
+                            It&apos;s a tie! Pick the winner to launch:
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {winners.map((w) => (
+                              <button
+                                key={w.gameId}
+                                onClick={() => setSelectedWinnerId(w.gameId)}
+                                className={`px-3 py-1.5 rounded-lg text-sm font-semibold border transition-all ${
+                                  selectedWinnerId === w.gameId
+                                    ? 'bg-yellow-400 text-yellow-950 border-yellow-300'
+                                    : 'bg-white/5 text-white border-white/20 hover:bg-white/15'
+                                }`}
+                              >
+                                {w.name}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <Button
+                        onClick={() => effectiveWinnerId && launchGame(effectiveWinnerId)}
+                        disabled={!effectiveWinnerId || launching}
+                        className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-6 py-6 rounded-lg shadow-lg font-bold text-lg disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        <Rocket className="mr-2 h-5 w-5" />
+                        {launching
+                          ? 'Launching…'
+                          : effectiveWinner
+                            ? `Start ${effectiveWinner.name}`
+                            : 'Pick a game to start'}
+                      </Button>
+                    </>
+                  )
+                ) : (
+                  <div className="text-center">
+                    {effectiveWinner ? (
+                      <p className="text-sm text-gray-200 mb-3">
+                        <span className="text-yellow-200 font-semibold">{effectiveWinner.name}</span> is winning — waiting for the host to launch.
+                      </p>
+                    ) : isTie ? (
+                      <p className="text-sm text-gray-200 mb-3">It&apos;s a tie — the host will pick the winner.</p>
+                    ) : (
+                      <p className="text-sm text-gray-200 mb-3">Cast your vote to help decide the game!</p>
+                    )}
+                    <Button
+                      onClick={() => router.push('/games')}
+                      variant="outline"
+                      className="text-white border-white/20 hover:bg-white/10"
+                    >
+                      <VoteIcon className="mr-2 h-4 w-4" />
+                      {myVoteName ? 'Change my vote' : 'Cast my vote'}
+                    </Button>
+                  </div>
+                )}
               </div>
             </Card>
 
@@ -478,7 +588,7 @@ export default function PartyPage() {
                 <div className="h-64 overflow-y-auto border border-white/20 p-4 rounded-lg bg-white/5">
                   {messages.map((message) => (
                     <div key={message.id} className="flex items-start gap-3 mb-4">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                      <div className="w-8 h-8 rounded-full bg-brand flex items-center justify-center">
                         <span className="text-white font-bold">
                           {message.user.email[0].toUpperCase()}
                         </span>
@@ -520,7 +630,7 @@ export default function PartyPage() {
 
                       setNewMessage('')
                     }}
-                    className="bg-gradient-to-r from-blue-600 to-purple-700 hover:from-blue-700 hover:to-purple-800 text-white px-6 py-3 rounded-lg shadow-lg"
+                    variant="brand"
                   >
                     Send
                   </Button>
@@ -540,7 +650,7 @@ export default function PartyPage() {
                     className="flex items-center justify-between p-4 bg-white/10 rounded-lg"
                   >
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                      <div className="w-12 h-12 rounded-full bg-brand flex items-center justify-center">
                         <span className="text-white font-bold">
                           {member.user?.email?.[0]?.toUpperCase() || '?'}
                         </span>

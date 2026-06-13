@@ -262,22 +262,23 @@ export default function PartyManager() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-          <Users className="h-5 w-5 text-cyan-400" />
+        <h2 className="font-display text-xl font-bold text-white mb-4 flex items-center gap-2">
+          <Users className="h-5 w-5 text-aqua-400" />
           Join Party via Code
         </h2>
         <form onSubmit={handleJoinParty} className="flex flex-col sm:flex-row gap-3">
           <Input
             type="text"
-            placeholder="Enter 6-character party code (e.g. A1B2C3)"
+            placeholder="Enter party code (e.g. A1B2C3)"
             value={joinCode}
             onChange={(e) => setJoinCode(e.target.value.slice(0, 6))}
-            className="flex-1 bg-white/5 border-white/20 text-white placeholder-white/40 focus:border-cyan-400 focus:ring-cyan-400 uppercase font-mono tracking-widest text-center text-lg"
+            className="flex-1 uppercase font-mono tracking-[0.3em] text-center text-lg"
             disabled={isJoining}
           />
           <Button
             type="submit"
-            className="bg-gradient-to-r from-cyan-500 to-pink-500 hover:from-cyan-600 hover:to-pink-600 text-white px-8 font-medium shadow-md shadow-cyan-500/10"
+            variant="brand"
+            className="px-8"
             disabled={isJoining}
           >
             {isJoining ? (
@@ -299,8 +300,8 @@ export default function PartyManager() {
         transition={{ duration: 0.5, delay: 0.1 }}
       >
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <Group className="h-5 w-5 text-pink-400" />
+          <h2 className="font-display text-xl font-bold text-white flex items-center gap-2">
+            <Group className="h-5 w-5 text-bubble-400" />
             Your Hosted Parties
           </h2>
           <Button
