@@ -13,6 +13,10 @@ import MonopolyBoard from "../monopoly/components/MonopolyBoard"
 import { initializeGame } from "../monopoly/lib/monopolyEngine"
 import CatanBoard from "../catan/components/CatanBoard"
 import { initializeGame as initializeCatan } from "../catan/lib/catanEngine"
+import MysteryBoard from "../cluedo/components/MysteryBoard"
+import { initializeGame as initializeMystery } from "../cluedo/lib/mysteryEngine"
+import BattleshipBoard from "../battleship/components/BattleshipBoard"
+import { initializeGame as initializeBattleship } from "../battleship/lib/battleshipEngine"
 
 
 // Define types
@@ -530,8 +534,75 @@ export default function GamePlayPage() {
       const initialState = initializeCatan(playersData)
       setMonopolyState(initialState)
       setIsPlaying(true)
-      
+
       // Broadcast to other players in the party
+      if (partyId && activeChannelRef.current) {
+        activeChannelRef.current.send({
+          type: 'broadcast',
+          event: 'game_start',
+          payload: initialState
+        })
+      }
+      return
+    }
+
+    if (gameData.id === 'cluedo') {
+      // In mock / no-party mode, the route injects placeholder members; play
+      // solo against bots instead of stalling on members who never respond.
+      const isMock = !partyId || partyId === 'mock-party-id'
+      const humanMembers = isMock
+        ? partyMembers.filter(m => m.user_id === currentUserId)
+        : partyMembers
+
+      const playersData = humanMembers.map(m => ({
+        id: m.user_id,
+        name: m.profile?.display_name || m.profile?.username || "You",
+        isBot: false
+      }))
+
+      // Fill the manor with AI sleuths so there are at least 4 investigators.
+      const botNames = ['Inspector Vox', 'Detective Cyan', 'Sleuth Sigma', 'Agent Onyx', 'Constable Vale']
+      let bi = 0
+      while (playersData.length < 4) {
+        playersData.push({ id: `bot-${bi + 1}`, name: botNames[bi], isBot: true })
+        bi++
+      }
+
+      const initialState = initializeMystery(playersData)
+      setMonopolyState(initialState)
+      setIsPlaying(true)
+
+      if (partyId && activeChannelRef.current) {
+        activeChannelRef.current.send({
+          type: 'broadcast',
+          event: 'game_start',
+          payload: initialState
+        })
+      }
+      return
+    }
+
+    if (gameData.id === 'battleship') {
+      const isMock = !partyId || partyId === 'mock-party-id'
+      const humanMembers = isMock
+        ? partyMembers.filter(m => m.user_id === currentUserId)
+        : partyMembers
+
+      const playersData = humanMembers.slice(0, 2).map(m => ({
+        id: m.user_id,
+        name: m.profile?.display_name || m.profile?.username || "You",
+        isBot: false
+      }))
+
+      // Naval Clash is 1v1 — add an AI admiral if there's no second human.
+      if (playersData.length < 2) {
+        playersData.push({ id: 'bot-1', name: 'Admiral Bot', isBot: true })
+      }
+
+      const initialState = initializeBattleship(playersData)
+      setMonopolyState(initialState)
+      setIsPlaying(true)
+
       if (partyId && activeChannelRef.current) {
         activeChannelRef.current.send({
           type: 'broadcast',
@@ -712,6 +783,40 @@ export default function GamePlayPage() {
                 />
               ) : isPlaying && gameData.id === 'catan' && monopolyState ? (
                 <CatanBoard
+                  state={monopolyState}
+                  currentPlayerId={currentUserId || ''}
+                  onStateChange={(nextState) => {
+                    setMonopolyState(nextState)
+                  }}
+                  onBroadcastAction={(event, payload) => {
+                    if (partyId && activeChannelRef.current) {
+                      activeChannelRef.current.send({
+                        type: 'broadcast',
+                        event: event,
+                        payload: payload
+                      })
+                    }
+                  }}
+                />
+              ) : isPlaying && gameData.id === 'cluedo' && monopolyState ? (
+                <MysteryBoard
+                  state={monopolyState}
+                  currentPlayerId={currentUserId || ''}
+                  onStateChange={(nextState) => {
+                    setMonopolyState(nextState)
+                  }}
+                  onBroadcastAction={(event, payload) => {
+                    if (partyId && activeChannelRef.current) {
+                      activeChannelRef.current.send({
+                        type: 'broadcast',
+                        event: event,
+                        payload: payload
+                      })
+                    }
+                  }}
+                />
+              ) : isPlaying && gameData.id === 'battleship' && monopolyState ? (
+                <BattleshipBoard
                   state={monopolyState}
                   currentPlayerId={currentUserId || ''}
                   onStateChange={(nextState) => {
