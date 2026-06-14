@@ -1,4 +1,4 @@
-// Catan Board UI Component — Premium Visual Overhaul
+// Hexland Board UI Component — Premium Visual Overhaul
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
@@ -1115,7 +1115,7 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
                 <Award className="w-10 h-10 text-yellow-400 mx-auto" />
                 <h3 className="text-lg font-black text-yellow-400 uppercase tracking-widest font-mono">Completed!</h3>
                 <p className="text-xs text-slate-300 font-medium leading-relaxed">
-                  👑 <strong>{state.players.find(p => p.id === state.winnerId)?.name}</strong> won Catan!
+                  👑 <strong>{state.players.find(p => p.id === state.winnerId)?.name}</strong> won Hexland!
                 </p>
                 <button
                   onClick={() => {
@@ -1192,7 +1192,7 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
                   onClick={handleAddBot}
                   className="w-full py-2 bg-white/5 hover:bg-white/10 border border-dashed border-white/20 text-slate-400 hover:text-white rounded-xl text-[10px] uppercase font-bold flex items-center justify-center gap-1.5 transition active:scale-95"
                 >
-                  <UserPlus className="w-3.5 h-3.5 text-pink-400" /> Add Catan Bot
+                  <UserPlus className="w-3.5 h-3.5 text-pink-400" /> Add Hexland Bot
                 </button>
               )}
             </div>
@@ -1200,7 +1200,7 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
             {/* Broadcast Log */}
             <div className="flex-1 flex flex-col bg-slate-950 border border-white/10 rounded-2xl p-3 overflow-hidden min-h-0">
               <h4 className="text-[9px] font-black uppercase text-slate-500 tracking-wider mb-2 flex items-center gap-1.5 flex-shrink-0 border-b border-white/5 pb-1">
-                <FileText className="w-3.5 h-3.5 text-pink-400" /> Catan Game Log
+                <FileText className="w-3.5 h-3.5 text-pink-400" /> Hexland Game Log
               </h4>
               <div className="flex-1 overflow-y-auto space-y-1 pr-1 min-h-0 scrollbar-thin">
                 {state.log.map((msg, i) => (
@@ -1376,7 +1376,8 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
               )
 
               return list.map(([type, count]) => {
-                const cardName = type.replace('_', ' ')
+                const DEV_LABELS: Record<string, string> = { KNIGHT: 'Knight', ROAD_BUILDING: 'Road Building', YEAR_OF_PLENTY: 'Year of Plenty', MONOPOLY: 'Embargo', VICTORY_POINT: 'Victory Point' }
+                const cardName = DEV_LABELS[type] || type.replace('_', ' ')
                 return (
                   <div key={type} className="flex justify-between items-center bg-slate-900/40 border border-white/5 px-3 py-2 rounded-xl">
                     <div className="flex flex-col">
@@ -1575,7 +1576,7 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
           </div>
         )}
 
-        {/* Monopoly Dialog */}
+        {/* Embargo Dialog */}
         {showMonopolyDialog && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
             <motion.div
@@ -1584,7 +1585,7 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
               exit={{ opacity: 0, scale: 0.95 }}
               className="bg-slate-900 border border-white/10 rounded-2xl p-5 shadow-2xl max-w-sm w-full text-center"
             >
-              <h3 className="text-sm font-black uppercase text-pink-400 tracking-wider mb-2">🃏 Monopoly</h3>
+              <h3 className="text-sm font-black uppercase text-pink-400 tracking-wider mb-2">🃏 Embargo</h3>
               <p className="text-xs text-slate-300 mb-4 leading-normal">
                 Select 1 resource. All other players must surrender all their cards of this resource type to you.
               </p>

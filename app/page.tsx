@@ -34,7 +34,7 @@ const gameImages = [
 const features = [
   { icon: Users, color: "text-grape-300", glow: "group-hover:shadow-glow-grape", title: "Instant Parties", description: "Spin up a game room in seconds and pull friends in with a single share code." },
   { icon: Vote, color: "text-bubble-400", glow: "group-hover:shadow-glow-bubble", title: "Vote To Play", description: "Can't agree on a game? Everyone votes — the crowd favourite wins and launches for all." },
-  { icon: Gamepad2, color: "text-aqua-400", glow: "group-hover:shadow-glow-aqua", title: "Real Board Games", description: "Fully playable Monopoly & Catan right now, with more classics rolling in." },
+  { icon: Gamepad2, color: "text-aqua-400", glow: "group-hover:shadow-glow-aqua", title: "Real Board Games", description: "Fully playable Property Empire & Hexland right now, with more classics rolling in." },
   { icon: MessageSquare, color: "text-grape-300", glow: "group-hover:shadow-glow-grape", title: "Live Chat", description: "Talk smack, plan trades, and celebrate wins with realtime in-party chat." },
   { icon: Zap, color: "text-sunny-400", glow: "group-hover:shadow-glow-sunny", title: "Zero Installs", description: "No downloads, no setup. It runs in your browser and syncs everyone instantly." },
   { icon: Trophy, color: "text-bubble-400", glow: "group-hover:shadow-glow-bubble", title: "Game On", description: "Climb the leaderboard, track your wins, and earn bragging rights for the group chat." },

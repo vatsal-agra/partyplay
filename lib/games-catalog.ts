@@ -8,7 +8,7 @@ import { Game } from "@/app/types"
 export const GAMES_CATALOG: Game[] = [
   {
     id: 'monopoly',
-    name: 'Monopoly',
+    name: 'Property Empire',
     description: 'Buy, sell, and trade properties to become the wealthiest player in this classic board game of economic strategy.',
     image: '/images/monopoly thumbnail.png',
     minPlayers: 2,
@@ -19,7 +19,7 @@ export const GAMES_CATALOG: Game[] = [
   },
   {
     id: 'battleship',
-    name: 'Battleship',
+    name: 'Naval Clash',
     description: 'Strategically place your fleet and take turns firing at your opponent\'s ships in this classic naval combat game.',
     image: '/images/Battleship thumbnail.png',
     minPlayers: 2,
@@ -30,7 +30,7 @@ export const GAMES_CATALOG: Game[] = [
   },
   {
     id: 'catan',
-    name: 'Catan',
+    name: 'Hexland',
     description: 'Collect resources and build settlements in this classic strategy game of trading and development.',
     image: '/images/catan thumbnail.png',
     minPlayers: 3,
@@ -41,7 +41,7 @@ export const GAMES_CATALOG: Game[] = [
   },
   {
     id: 'uno',
-    name: 'Uno',
+    name: 'Color Clash',
     description: 'Be the first to play all your cards by matching color or number in this fast-paced card game.',
     image: '/images/uno final thumbnail.png',
     minPlayers: 2,
@@ -63,7 +63,7 @@ export const GAMES_CATALOG: Game[] = [
   },
   {
     id: 'cluedo',
-    name: 'Cluedo',
+    name: 'Mystery Manor',
     description: 'Solve the mystery of who committed the murder, with what weapon, and in which room.',
     image: '/images/cluedo thumbnail.png',
     minPlayers: 3,
@@ -74,7 +74,7 @@ export const GAMES_CATALOG: Game[] = [
   },
   {
     id: 'pictionary',
-    name: 'Pictionary',
+    name: 'Quick Draw',
     description: 'Draw clues for your team to guess in this classic drawing and guessing game.',
     image: '/images/pictionary thumbnail.png',
     minPlayers: 4,
@@ -85,7 +85,7 @@ export const GAMES_CATALOG: Game[] = [
   },
   {
     id: 'scribbleio',
-    name: 'Scribble.io',
+    name: 'Doodle Dash',
     description: 'Draw and guess drawings in this fun online multiplayer game where creativity meets competition.',
     image: '/images/scribbleio thumbnail.png',
     minPlayers: 2,
@@ -96,7 +96,7 @@ export const GAMES_CATALOG: Game[] = [
   },
   {
     id: 'codenames',
-    name: 'Codenames',
+    name: 'Spymaster',
     description: 'Give one-word clues to help your team identify agents while avoiding the assassin.',
     image: '/images/codenames thumbnal.png',
     minPlayers: 4,
@@ -107,7 +107,7 @@ export const GAMES_CATALOG: Game[] = [
   },
   {
     id: 'terramystica',
-    name: 'Terra Mystica',
+    name: 'Mystic Realms',
     description: 'Shape the land and develop your civilization in this deep strategy game.',
     image: '/images/terra mystica thumbnail.png',
     minPlayers: 2,
@@ -118,7 +118,7 @@ export const GAMES_CATALOG: Game[] = [
   },
   {
     id: '7wonders',
-    name: '7 Wonders',
+    name: 'Ancient Wonders',
     description: 'Lead an ancient civilization as it rises from its barbaric roots to become a world power.',
     image: '/images/7wonders thumbnail.png',
     minPlayers: 3,

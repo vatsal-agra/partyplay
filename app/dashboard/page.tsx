@@ -56,7 +56,7 @@ export default function Dashboard() {
         display_name: 'Game Master',
         wins: 42,
         games_played: 50,
-        favorite_game: 'Monopoly'
+        favorite_game: 'Property Empire'
       },
       {
         id: '2',
@@ -72,7 +72,7 @@ export default function Dashboard() {
         display_name: 'Strategy King',
         wins: 35,
         games_played: 48,
-        favorite_game: 'Catan'
+        favorite_game: 'Hexland'
       },
       {
         id: '4',

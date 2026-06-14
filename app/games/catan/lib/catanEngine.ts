@@ -1,5 +1,5 @@
-// Catan Game Engine
-// Pure state management and Catan gameplay rules
+// Hexland Game Engine
+// Pure state management and Hexland gameplay rules
 
 export type ResourceType = 'WOOD' | 'BRICK' | 'SHEEP' | 'WHEAT' | 'ORE';
 export type TerrainType = 'FOREST' | 'HILLS' | 'PASTURE' | 'FIELDS' | 'MOUNTAINS' | 'DESERT';
@@ -336,7 +336,7 @@ export function initializeGame(playersData: { id: string; name: string; isBot: b
     largestArmyActive: false
   }));
 
-  // Build Dev Card Deck (14 Knights, 2 Road Building, 2 Year of Plenty, 2 Monopoly, 5 VP)
+  // Build Dev Card Deck (14 Knights, 2 Road Building, 2 Year of Plenty, 2 Embargo, 5 VP)
   const devCardDeck: DevCardType[] = [
     ...Array(14).fill('KNIGHT'),
     ...Array(2).fill('ROAD_BUILDING'),
@@ -853,7 +853,7 @@ export function playMonopoly(state: CatanState, resource: ResourceType): CatanSt
     ...state,
     players: finalPlayers,
     playedDevCardThisTurn: true,
-    log: [...state.log, `🃏 ${activePlayer.name} played Monopoly on ${resource}! Stole ${totalStolen} cards from opponents.`]
+    log: [...state.log, `🃏 ${activePlayer.name} played Embargo on ${resource}! Stole ${totalStolen} cards from opponents.`]
   };
 }
 
@@ -1240,7 +1240,7 @@ function recalculateVPs(state: CatanState): CatanState {
   const logs = [...state.log];
   if (winnerId) {
     const winnerName = nextPlayers.find(p => p.id === winnerId)!.name;
-    logs.push(`🏆 GAME OVER! ${winnerName} won Catan by reaching ${nextPlayers.find(p => p.id === winnerId)!.victoryPoints} Victory Points!`);
+    logs.push(`🏆 GAME OVER! ${winnerName} won Hexland by reaching ${nextPlayers.find(p => p.id === winnerId)!.victoryPoints} Victory Points!`);
   }
 
   return {

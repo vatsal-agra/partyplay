@@ -90,7 +90,7 @@ export default function GamePlayPage() {
   const mockGames = {
     monopoly: {
       id: 'monopoly',
-      name: 'Monopoly',
+      name: 'Property Empire',
       description: 'Classic real estate trading game',
       image: '/images/monopoly thumbnail.png',
       minPlayers: 2,
@@ -100,7 +100,7 @@ export default function GamePlayPage() {
     },
     battleship: {
       id: 'battleship',
-      name: 'Battleship',
+      name: 'Naval Clash',
       description: 'Naval combat game',
       image: '/images/Battleship thumbnail.png',
       minPlayers: 2,
@@ -110,8 +110,8 @@ export default function GamePlayPage() {
     },
     catan: {
       id: 'catan',
-      name: 'Catan',
-      description: 'Build and trade to settle the island of Catan',
+      name: 'Hexland',
+      description: 'Build and trade to settle the island',
       image: '/images/catan thumbnail.png',
       minPlayers: 3,
       maxPlayers: 4,
@@ -120,7 +120,7 @@ export default function GamePlayPage() {
     },
     uno: {
       id: 'uno',
-      name: 'Uno',
+      name: 'Color Clash',
       description: 'Classic card game of matching colors and numbers',
       image: '/images/uno final thumbnail.png',
       minPlayers: 2,
@@ -140,7 +140,7 @@ export default function GamePlayPage() {
     },
     cluedo: {
       id: 'cluedo',
-      name: 'Cluedo',
+      name: 'Mystery Manor',
       description: 'Solve the mystery of who committed the murder',
       image: '/images/cluedo thumbnail.png',
       minPlayers: 3,
@@ -150,7 +150,7 @@ export default function GamePlayPage() {
     },
     pictionary: {
       id: 'pictionary',
-      name: 'Pictionary',
+      name: 'Quick Draw',
       description: 'Draw and guess words against the clock',
       image: '/images/pictionary thumbnail.png',
       minPlayers: 4,
@@ -160,7 +160,7 @@ export default function GamePlayPage() {
     },
     scribbleio: {
       id: 'scribbleio',
-      name: 'Scribble.io',
+      name: 'Doodle Dash',
       description: 'Online drawing and guessing game',
       image: '/images/scribbleio thumbnail.png',
       minPlayers: 2,
@@ -170,7 +170,7 @@ export default function GamePlayPage() {
     },
     codenames: {
       id: 'codenames',
-      name: 'Codenames',
+      name: 'Spymaster',
       description: 'Give one-word clues to help your team guess the right words',
       image: '/images/codenames thumbnal.png',
       minPlayers: 4,
@@ -180,7 +180,7 @@ export default function GamePlayPage() {
     },
     terramystica: {
       id: 'terramystica',
-      name: 'Terra Mystica',
+      name: 'Mystic Realms',
       description: 'Strategic game of terrain building and resource management',
       image: '/images/terra mystica thumbnail.png',
       minPlayers: 2,
@@ -190,7 +190,7 @@ export default function GamePlayPage() {
     },
     '7wonders': {
       id: '7wonders',
-      name: '7 Wonders',
+      name: 'Ancient Wonders',
       description: 'Build an ancient civilization and lead it to greatness',
       image: '/images/7wonders thumbnail.png',
       minPlayers: 3,
@@ -494,7 +494,7 @@ export default function GamePlayPage() {
       
       // Standalone/Single-player fallback: Add 2 bots if playing alone
       if (playersData.length === 1) {
-        playersData.push({ id: 'bot-1', name: 'Mr. Monopoly', isBot: true })
+        playersData.push({ id: 'bot-1', name: 'Mr. Mogul', isBot: true })
         playersData.push({ id: 'bot-2', name: 'Tycoon Bot', isBot: true })
       }
       
@@ -920,7 +920,7 @@ export default function GamePlayPage() {
               className="relative z-10 w-full max-w-lg bg-slate-900 border border-white/10 rounded-2xl p-6 shadow-2xl max-h-[80vh] overflow-y-auto"
             >
               <h3 className="text-lg font-black uppercase text-pink-400 tracking-wider mb-4 border-b border-white/10 pb-2">
-                Monopoly Board Game Rules
+                Property Empire — How to Play
               </h3>
               
               <div className="space-y-4 text-xs text-slate-300 leading-relaxed font-sans">

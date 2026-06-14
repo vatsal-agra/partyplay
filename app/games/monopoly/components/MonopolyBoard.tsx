@@ -82,38 +82,38 @@ function CornerSpace({ space, playersOn }: { space: Space; playersOn: Player[] }
   const icons: Record<string, JSX.Element> = {
     START: (
       <div className="flex flex-col items-center justify-center h-full gap-0.5 select-none">
-        <span className="text-[7px] font-black text-slate-400 uppercase tracking-wider">Collect</span>
-        <span className="text-[10px] font-black text-yellow-400">$200</span>
-        <ArrowRightToLine className="w-3.5 h-3.5 text-red-500 rotate-90" />
-        <span className="text-[9px] font-black text-red-500 tracking-wider uppercase">GO</span>
+        <span className="text-[7px] font-black text-[#1b1b1b] uppercase tracking-wider">Collect</span>
+        <span className="text-[10px] font-black text-[#1b1b1b]">$200</span>
+        <ArrowRightToLine className="w-3.5 h-3.5 text-red-600 rotate-90" />
+        <span className="text-[11px] font-black text-red-600 tracking-wider uppercase">GO</span>
       </div>
     ),
     JAIL: (
-      <div className="relative w-full h-full flex items-center justify-center bg-slate-850 p-1">
-        <div className="absolute top-0 right-0 left-0 bottom-0 border border-slate-700/50 m-0.5 rounded flex flex-col items-center justify-center gap-0.5 bg-slate-800">
-          <Lock className="w-3.5 h-3.5 text-slate-400" />
-          <span className="text-[7px] font-black text-yellow-500 uppercase tracking-widest leading-none">JAIL</span>
+      <div className="relative w-full h-full flex items-center justify-center bg-[#f0a83c] p-1">
+        <div className="absolute top-0 right-0 left-0 bottom-0 border-2 border-[#1b1b1b]/70 m-0.5 rounded flex flex-col items-center justify-center gap-0.5 bg-[#f7f2e4]">
+          <Lock className="w-3.5 h-3.5 text-[#1b1b1b]" />
+          <span className="text-[7px] font-black text-[#1b1b1b] uppercase tracking-widest leading-none">JAIL</span>
         </div>
-        <div className="absolute bottom-0.5 left-0.5 text-[6px] text-slate-500 font-bold uppercase tracking-tighter rotate-45 pointer-events-none">Visiting</div>
+        <div className="absolute bottom-0.5 left-0.5 text-[6px] text-red-600 font-bold uppercase tracking-tighter rotate-45 pointer-events-none">Visiting</div>
       </div>
     ),
     FREE_PARKING: (
       <div className="flex flex-col items-center justify-center h-full gap-0.5">
-        <ParkingCircle className="w-4 h-4 text-emerald-400" />
-        <span className="text-[7px] font-black text-slate-400 uppercase tracking-wider text-center leading-none">Free<br/>Parking</span>
+        <span className="text-base leading-none">🚗</span>
+        <span className="text-[7px] font-black text-red-600 uppercase tracking-wider text-center leading-none">Free<br/>Parking</span>
       </div>
     ),
     GO_TO_JAIL: (
       <div className="flex flex-col items-center justify-center h-full gap-0.5">
         <span className="text-sm">👮</span>
-        <span className="text-[7px] font-black text-red-400 uppercase tracking-wider text-center leading-none">Go To<br/>Jail</span>
+        <span className="text-[7px] font-black text-red-600 uppercase tracking-wider text-center leading-none">Go To<br/>Jail</span>
       </div>
     ),
   }
 
   return (
-    <div className="relative w-full h-full flex items-center justify-center bg-slate-800 border border-white/10 select-none shadow-md">
-      {icons[space.type] || <span className="text-white text-[9px]">{space.name}</span>}
+    <div className="relative w-full h-full flex items-center justify-center bg-[#f7f2e4] border border-black/30 select-none shadow-md">
+      {icons[space.type] || <span className="text-[#1b1b1b] text-[9px]">{space.name}</span>}
       
       {/* Player tokens inside space */}
       <div className="absolute inset-0 flex items-center justify-center p-1 gap-1 flex-wrap pointer-events-none">
@@ -150,8 +150,8 @@ function BoardSpace({
     [`border${bandSide.charAt(0).toUpperCase() + bandSide.slice(1)}`]: `6px solid ${bandColor}`,
   } : {}
 
-  const backgroundStyle = owner 
-    ? { backgroundColor: `${owner.color}1e` } // ~12% opacity color overlay
+  const backgroundStyle = owner
+    ? { backgroundColor: `${owner.color}30` } // light color overlay on cream
     : {}
 
   let specialIcon: string | null = null
@@ -164,13 +164,13 @@ function BoardSpace({
   return (
     <div
       onClick={onClick}
-      className="relative w-full h-full cursor-pointer transition-all duration-150 hover:bg-slate-800 bg-slate-900 border border-white/5 overflow-hidden flex flex-col justify-between select-none"
+      className="relative w-full h-full cursor-pointer transition-all duration-150 hover:bg-[#efe8d4] bg-[#f7f2e4] border border-black/20 overflow-hidden flex flex-col justify-between select-none"
       style={{ ...bandStyle, ...backgroundStyle }}
     >
       <div className="w-full h-full flex flex-col justify-between p-1.5 relative">
         {/* Name */}
         <span
-          className="text-[6.5px] leading-tight font-extrabold text-slate-200 truncate"
+          className="text-[6.5px] leading-tight font-extrabold text-[#1b1b1b] truncate"
           style={{ color: owner ? owner.color : undefined }}
         >
           {space.name.replace(' Avenue', ' Ave').replace(' Railroad', ' RR').replace('Community Chest', 'Comm. Chest')}
@@ -189,7 +189,7 @@ function BoardSpace({
 
         {/* Cost */}
         {space.cost && (
-          <span className="text-[6px] text-yellow-500 font-mono font-bold text-center">
+          <span className="text-[6px] text-[#1b1b1b] font-mono font-bold text-center">
             ${space.cost}
           </span>
         )}
@@ -330,7 +330,7 @@ export default function MonopolyBoard({ state, currentPlayerId, onStateChange, o
 
   const handleAddBot = () => {
     if (state.players.length >= 6) return
-    const names = ['Mr. Monopoly', 'Tycoon Bot', 'Richie Rich', 'Goldman AI', 'Capitalist']
+    const names = ['Mr. Mogul', 'Tycoon Bot', 'Richie Rich', 'Goldman AI', 'Capitalist']
     const used  = state.players.map(p => p.name)
     const name  = names.find(n => !used.includes(n)) || `Bot ${state.players.length + 1}`
     const players = [...state.players.map(p => ({ id: p.id, name: p.name, isBot: p.isBot })),
@@ -358,7 +358,7 @@ export default function MonopolyBoard({ state, currentPlayerId, onStateChange, o
       {/* COLUMN 1: BOARD */}
       <div className="flex flex-col items-center justify-center p-1 bg-slate-900/40 rounded-2xl border border-white/5 shadow-2xl relative">
         <div
-          className="grid grid-cols-11 grid-rows-11 gap-[1.5px] bg-slate-950 border-[4px] border-slate-800 rounded-xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.8)]"
+          className="grid grid-cols-11 grid-rows-11 gap-[1.5px] bg-[#0c0c0c] border-[6px] border-[#0c0c0c] rounded-xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.8)]"
           style={{ width: 'min(78vh, 700px)', height: 'min(78vh, 700px)' }}
         >
           {BOARD_SPACES.map(space => {
@@ -391,26 +391,26 @@ export default function MonopolyBoard({ state, currentPlayerId, onStateChange, o
 
           {/* Center Area */}
           <div
-            className="relative overflow-hidden flex flex-col items-center justify-between bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 rounded-lg border border-white/5 p-6"
+            className="relative overflow-hidden flex flex-col items-center justify-between bg-[#cfe6cb] rounded-lg border border-black/20 p-6"
             style={{ gridRow: '2 / 11', gridColumn: '2 / 11' }}
           >
             {/* Branding Logo */}
-            <div className="rotate-[-10deg] text-center select-none pointer-events-none drop-shadow-[0_10px_25px_rgba(0,0,0,0.8)] z-10 mt-2">
-              <span className="block text-[8px] font-black uppercase tracking-widest text-pink-500/60 font-mono mb-1">Classic Edition</span>
-              <h2 className="text-3xl xl:text-4xl font-black text-white tracking-wider px-5 py-2 bg-gradient-to-r from-pink-500 via-rose-500 to-red-500 border-2 border-white rounded shadow-2xl uppercase font-serif">
-                PARTY PLAY
+            <div className="rotate-[-10deg] text-center select-none pointer-events-none drop-shadow-[0_8px_18px_rgba(0,0,0,0.25)] z-10 mt-2">
+              <span className="block text-[8px] font-black uppercase tracking-widest text-red-700/70 font-mono mb-1">Classic Edition</span>
+              <h2 className="text-2xl xl:text-3xl font-black text-white tracking-wider px-5 py-2 bg-[#e2362d] border-2 border-white rounded shadow-2xl uppercase font-serif -skew-x-6">
+                PROPERTY EMPIRE
               </h2>
             </div>
 
             {/* Deck slots */}
-            <div className="absolute inset-x-8 top-[38%] flex justify-between items-center opacity-30 pointer-events-none">
-              <div className="w-16 h-24 border border-dashed border-pink-400 rounded-xl rotate-12 flex flex-col items-center justify-center text-pink-400">
-                <span className="text-lg font-black">?</span>
-                <span className="text-[7px] uppercase font-mono tracking-widest font-bold">Chance</span>
+            <div className="absolute inset-x-8 top-[38%] flex justify-between items-center opacity-90 pointer-events-none">
+              <div className="w-16 h-24 bg-[#f4943f] border-2 border-[#1b1b1b]/40 rounded-lg rotate-12 flex flex-col items-center justify-center text-[#1b1b1b] shadow-lg">
+                <span className="text-xl font-black">?</span>
+                <span className="text-[7px] uppercase font-mono tracking-widest font-bold">Fortune</span>
               </div>
-              <div className="w-16 h-24 border border-dashed border-cyan-400 rounded-xl -rotate-12 flex flex-col items-center justify-center text-cyan-400">
+              <div className="w-16 h-24 bg-[#f6d35a] border-2 border-[#1b1b1b]/40 rounded-lg -rotate-12 flex flex-col items-center justify-center text-[#1b1b1b] shadow-lg">
                 <span className="text-lg font-black">📦</span>
-                <span className="text-[7px] uppercase font-mono tracking-widest font-bold">Chest</span>
+                <span className="text-[7px] uppercase font-mono tracking-widest font-bold text-center leading-tight">Treasury</span>
               </div>
             </div>
 

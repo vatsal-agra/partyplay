@@ -1,4 +1,4 @@
-// Property Title Deed & Chance/Community Chest Card View Component
+// Property Title Deed & Fortune/Treasury Card View Component
 "use client"
 
 import { useState } from "react"
@@ -84,7 +84,7 @@ export function PropertyCardView({ space, propertyState, onClose, isCardDraw = f
                 </div>
                 <div className="text-center">
                   <h3 className="text-2xl font-black tracking-widest text-white uppercase drop-shadow-md">
-                    {cardType === 'CHANCE' ? 'CHANCE' : 'COMMUNITY CHEST'}
+                    {cardType === 'CHANCE' ? 'FORTUNE' : 'TREASURY'}
                   </h3>
                   <p className="text-xs text-white/75 mt-1 font-mono">Click to reveal card</p>
                 </div>
@@ -107,7 +107,7 @@ export function PropertyCardView({ space, propertyState, onClose, isCardDraw = f
 
                 <div className="flex justify-between items-center z-10">
                   <span className={`text-xs font-mono font-bold uppercase ${cardType === 'CHANCE' ? 'text-pink-400' : 'text-cyan-400'}`}>
-                    {cardType === 'CHANCE' ? 'Chance' : 'Community Chest'}
+                    {cardType === 'CHANCE' ? 'Fortune' : 'Treasury'}
                   </span>
                   <Sparkles className="w-4 h-4 text-yellow-500 animate-spin" style={{ animationDuration: '3s' }} />
                 </div>

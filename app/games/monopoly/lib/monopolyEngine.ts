@@ -1,4 +1,4 @@
-// Monopoly Game Engine
+// Property Empire Game Engine
 // Pure state management and gameplay rules
 
 export type SpaceType = 'START' | 'PROPERTY' | 'RAILROAD' | 'UTILITY' | 'TAX' | 'CHANCE' | 'COMMUNITY_CHEST' | 'JAIL' | 'FREE_PARKING' | 'GO_TO_JAIL';
@@ -79,48 +79,48 @@ export interface MonopolyState {
   lastRentPaid: { amount: number; from: string; to: string; propertyName: string } | null;
 }
 
-// Classic Monopoly Board Configuration
+// Property Empire Board Configuration
 export const BOARD_SPACES: Space[] = [
   { index: 0, name: 'GO', type: 'START', group: 'SPECIAL', description: 'Collect $200 salary as you pass.' },
-  { index: 1, name: 'Mediterranean Avenue', type: 'PROPERTY', group: 'BROWN', cost: 60, mortgageValue: 30, houseCost: 50, rents: [2, 10, 30, 90, 160, 250] },
-  { index: 2, name: 'Community Chest', type: 'COMMUNITY_CHEST', group: 'SPECIAL' },
-  { index: 3, name: 'Baltic Avenue', type: 'PROPERTY', group: 'BROWN', cost: 60, mortgageValue: 30, houseCost: 50, rents: [4, 20, 60, 180, 320, 450] },
+  { index: 1, name: 'Cairo', type: 'PROPERTY', group: 'BROWN', cost: 60, mortgageValue: 30, houseCost: 50, rents: [2, 10, 30, 90, 160, 250] },
+  { index: 2, name: 'Treasury', type: 'COMMUNITY_CHEST', group: 'SPECIAL' },
+  { index: 3, name: 'Mumbai', type: 'PROPERTY', group: 'BROWN', cost: 60, mortgageValue: 30, houseCost: 50, rents: [4, 20, 60, 180, 320, 450] },
   { index: 4, name: 'Income Tax', type: 'TAX', group: 'SPECIAL', cost: 200, description: 'Pay $200' },
-  { index: 5, name: 'Reading Railroad', type: 'RAILROAD', group: 'RAILROAD', cost: 200, mortgageValue: 100, rents: [25, 50, 100, 200] },
-  { index: 6, name: 'Oriental Avenue', type: 'PROPERTY', group: 'LIGHT_BLUE', cost: 100, mortgageValue: 50, houseCost: 50, rents: [6, 30, 90, 270, 400, 550] },
-  { index: 7, name: 'Chance', type: 'CHANCE', group: 'SPECIAL' },
-  { index: 8, name: 'Vermont Avenue', type: 'PROPERTY', group: 'LIGHT_BLUE', cost: 100, mortgageValue: 50, houseCost: 50, rents: [6, 30, 90, 270, 400, 550] },
-  { index: 9, name: 'Connecticut Avenue', type: 'PROPERTY', group: 'LIGHT_BLUE', cost: 120, mortgageValue: 60, houseCost: 50, rents: [8, 40, 100, 300, 450, 600] },
+  { index: 5, name: 'North Station', type: 'RAILROAD', group: 'RAILROAD', cost: 200, mortgageValue: 100, rents: [25, 50, 100, 200] },
+  { index: 6, name: 'Bangkok', type: 'PROPERTY', group: 'LIGHT_BLUE', cost: 100, mortgageValue: 50, houseCost: 50, rents: [6, 30, 90, 270, 400, 550] },
+  { index: 7, name: 'Fortune', type: 'CHANCE', group: 'SPECIAL' },
+  { index: 8, name: 'Hanoi', type: 'PROPERTY', group: 'LIGHT_BLUE', cost: 100, mortgageValue: 50, houseCost: 50, rents: [6, 30, 90, 270, 400, 550] },
+  { index: 9, name: 'Manila', type: 'PROPERTY', group: 'LIGHT_BLUE', cost: 120, mortgageValue: 60, houseCost: 50, rents: [8, 40, 100, 300, 450, 600] },
   { index: 10, name: 'Jail / Just Visiting', type: 'JAIL', group: 'SPECIAL', description: 'Just visiting or locked up' },
-  { index: 11, name: 'St. Charles Place', type: 'PROPERTY', group: 'PINK', cost: 140, mortgageValue: 70, houseCost: 100, rents: [10, 50, 150, 450, 625, 750] },
-  { index: 12, name: 'Electric Company', type: 'UTILITY', group: 'UTILITY', cost: 150, mortgageValue: 75, description: 'Utility: Rent is 4x dice if 1 owned, 10x if both owned.' },
-  { index: 13, name: 'States Avenue', type: 'PROPERTY', group: 'PINK', cost: 140, mortgageValue: 70, houseCost: 100, rents: [10, 50, 150, 450, 625, 750] },
-  { index: 14, name: 'Virginia Avenue', type: 'PROPERTY', group: 'PINK', cost: 160, mortgageValue: 80, houseCost: 100, rents: [12, 60, 180, 500, 700, 900] },
-  { index: 15, name: 'Pennsylvania Railroad', type: 'RAILROAD', group: 'RAILROAD', cost: 200, mortgageValue: 100, rents: [25, 50, 100, 200] },
-  { index: 16, name: 'St. James Place', type: 'PROPERTY', group: 'ORANGE', cost: 180, mortgageValue: 90, houseCost: 100, rents: [14, 70, 200, 550, 750, 950] },
-  { index: 17, name: 'Community Chest', type: 'COMMUNITY_CHEST', group: 'SPECIAL' },
-  { index: 18, name: 'Tennessee Avenue', type: 'PROPERTY', group: 'ORANGE', cost: 180, mortgageValue: 90, houseCost: 100, rents: [14, 70, 200, 550, 750, 950] },
-  { index: 19, name: 'New York Avenue', type: 'PROPERTY', group: 'ORANGE', cost: 200, mortgageValue: 100, houseCost: 100, rents: [16, 80, 220, 600, 800, 1000] },
+  { index: 11, name: 'Athens', type: 'PROPERTY', group: 'PINK', cost: 140, mortgageValue: 70, houseCost: 100, rents: [10, 50, 150, 450, 625, 750] },
+  { index: 12, name: 'Power Grid', type: 'UTILITY', group: 'UTILITY', cost: 150, mortgageValue: 75, description: 'Utility: Rent is 4x dice if 1 owned, 10x if both owned.' },
+  { index: 13, name: 'Lisbon', type: 'PROPERTY', group: 'PINK', cost: 140, mortgageValue: 70, houseCost: 100, rents: [10, 50, 150, 450, 625, 750] },
+  { index: 14, name: 'Prague', type: 'PROPERTY', group: 'PINK', cost: 160, mortgageValue: 80, houseCost: 100, rents: [12, 60, 180, 500, 700, 900] },
+  { index: 15, name: 'East Station', type: 'RAILROAD', group: 'RAILROAD', cost: 200, mortgageValue: 100, rents: [25, 50, 100, 200] },
+  { index: 16, name: 'Dublin', type: 'PROPERTY', group: 'ORANGE', cost: 180, mortgageValue: 90, houseCost: 100, rents: [14, 70, 200, 550, 750, 950] },
+  { index: 17, name: 'Treasury', type: 'COMMUNITY_CHEST', group: 'SPECIAL' },
+  { index: 18, name: 'Vienna', type: 'PROPERTY', group: 'ORANGE', cost: 180, mortgageValue: 90, houseCost: 100, rents: [14, 70, 200, 550, 750, 950] },
+  { index: 19, name: 'Madrid', type: 'PROPERTY', group: 'ORANGE', cost: 200, mortgageValue: 100, houseCost: 100, rents: [16, 80, 220, 600, 800, 1000] },
   { index: 20, name: 'Free Parking', type: 'FREE_PARKING', group: 'SPECIAL', description: 'Take a rest. No tax or rent.' },
-  { index: 21, name: 'Kentucky Avenue', type: 'PROPERTY', group: 'RED', cost: 220, mortgageValue: 110, houseCost: 150, rents: [18, 90, 250, 700, 875, 1050] },
-  { index: 22, name: 'Chance', type: 'CHANCE', group: 'SPECIAL' },
-  { index: 23, name: 'Indiana Avenue', type: 'PROPERTY', group: 'RED', cost: 220, mortgageValue: 110, houseCost: 150, rents: [18, 90, 250, 700, 875, 1050] },
-  { index: 24, name: 'Illinois Avenue', type: 'PROPERTY', group: 'RED', cost: 240, mortgageValue: 120, houseCost: 150, rents: [20, 100, 300, 750, 925, 1100] },
-  { index: 25, name: 'B. & O. Railroad', type: 'RAILROAD', group: 'RAILROAD', cost: 200, mortgageValue: 100, rents: [25, 50, 100, 200] },
-  { index: 26, name: 'Atlantic Avenue', type: 'PROPERTY', group: 'YELLOW', cost: 260, mortgageValue: 130, houseCost: 150, rents: [22, 110, 330, 800, 975, 1150] },
-  { index: 27, name: 'Ventnor Avenue', type: 'PROPERTY', group: 'YELLOW', cost: 260, mortgageValue: 130, houseCost: 150, rents: [22, 110, 330, 800, 975, 1150] },
-  { index: 28, name: 'Water Works', type: 'UTILITY', group: 'UTILITY', cost: 150, mortgageValue: 75, description: 'Utility: Rent is 4x dice if 1 owned, 10x if both owned.' },
-  { index: 29, name: 'Marvin Gardens', type: 'PROPERTY', group: 'YELLOW', cost: 280, mortgageValue: 140, houseCost: 150, rents: [24, 120, 360, 850, 1025, 1200] },
+  { index: 21, name: 'Berlin', type: 'PROPERTY', group: 'RED', cost: 220, mortgageValue: 110, houseCost: 150, rents: [18, 90, 250, 700, 875, 1050] },
+  { index: 22, name: 'Fortune', type: 'CHANCE', group: 'SPECIAL' },
+  { index: 23, name: 'Toronto', type: 'PROPERTY', group: 'RED', cost: 220, mortgageValue: 110, houseCost: 150, rents: [18, 90, 250, 700, 875, 1050] },
+  { index: 24, name: 'Rome', type: 'PROPERTY', group: 'RED', cost: 240, mortgageValue: 120, houseCost: 150, rents: [20, 100, 300, 750, 925, 1100] },
+  { index: 25, name: 'South Station', type: 'RAILROAD', group: 'RAILROAD', cost: 200, mortgageValue: 100, rents: [25, 50, 100, 200] },
+  { index: 26, name: 'Amsterdam', type: 'PROPERTY', group: 'YELLOW', cost: 260, mortgageValue: 130, houseCost: 150, rents: [22, 110, 330, 800, 975, 1150] },
+  { index: 27, name: 'Barcelona', type: 'PROPERTY', group: 'YELLOW', cost: 260, mortgageValue: 130, houseCost: 150, rents: [22, 110, 330, 800, 975, 1150] },
+  { index: 28, name: 'Water Supply', type: 'UTILITY', group: 'UTILITY', cost: 150, mortgageValue: 75, description: 'Utility: Rent is 4x dice if 1 owned, 10x if both owned.' },
+  { index: 29, name: 'Seoul', type: 'PROPERTY', group: 'YELLOW', cost: 280, mortgageValue: 140, houseCost: 150, rents: [24, 120, 360, 850, 1025, 1200] },
   { index: 30, name: 'Go to Jail', type: 'GO_TO_JAIL', group: 'SPECIAL', description: 'Go directly to jail. Do not pass GO. Do not collect $200.' },
-  { index: 31, name: 'Pacific Avenue', type: 'PROPERTY', group: 'GREEN', cost: 300, mortgageValue: 150, houseCost: 200, rents: [26, 130, 390, 900, 1100, 1275] },
-  { index: 32, name: 'North Carolina Avenue', type: 'PROPERTY', group: 'GREEN', cost: 300, mortgageValue: 150, houseCost: 200, rents: [26, 130, 390, 900, 1100, 1275] },
-  { index: 33, name: 'Community Chest', type: 'COMMUNITY_CHEST', group: 'SPECIAL' },
-  { index: 34, name: 'Pennsylvania Avenue', type: 'PROPERTY', group: 'GREEN', cost: 320, mortgageValue: 160, houseCost: 200, rents: [28, 150, 450, 1000, 1200, 1400] },
-  { index: 35, name: 'Short Line Railroad', type: 'RAILROAD', group: 'RAILROAD', cost: 200, mortgageValue: 100, rents: [25, 50, 100, 200] },
-  { index: 36, name: 'Chance', type: 'CHANCE', group: 'SPECIAL' },
-  { index: 37, name: 'Park Place', type: 'PROPERTY', group: 'DARK_BLUE', cost: 350, mortgageValue: 175, houseCost: 200, rents: [35, 175, 500, 1100, 1300, 1500] },
+  { index: 31, name: 'Sydney', type: 'PROPERTY', group: 'GREEN', cost: 300, mortgageValue: 150, houseCost: 200, rents: [26, 130, 390, 900, 1100, 1275] },
+  { index: 32, name: 'Dubai', type: 'PROPERTY', group: 'GREEN', cost: 300, mortgageValue: 150, houseCost: 200, rents: [26, 130, 390, 900, 1100, 1275] },
+  { index: 33, name: 'Treasury', type: 'COMMUNITY_CHEST', group: 'SPECIAL' },
+  { index: 34, name: 'Hong Kong', type: 'PROPERTY', group: 'GREEN', cost: 320, mortgageValue: 160, houseCost: 200, rents: [28, 150, 450, 1000, 1200, 1400] },
+  { index: 35, name: 'West Station', type: 'RAILROAD', group: 'RAILROAD', cost: 200, mortgageValue: 100, rents: [25, 50, 100, 200] },
+  { index: 36, name: 'Fortune', type: 'CHANCE', group: 'SPECIAL' },
+  { index: 37, name: 'Paris', type: 'PROPERTY', group: 'DARK_BLUE', cost: 350, mortgageValue: 175, houseCost: 200, rents: [35, 175, 500, 1100, 1300, 1500] },
   { index: 38, name: 'Luxury Tax', type: 'TAX', group: 'SPECIAL', cost: 100, description: 'Pay $100' },
-  { index: 39, name: 'Boardwalk', type: 'PROPERTY', group: 'DARK_BLUE', cost: 400, mortgageValue: 200, houseCost: 200, rents: [50, 200, 600, 1400, 1700, 2000] }
+  { index: 39, name: 'New York', type: 'PROPERTY', group: 'DARK_BLUE', cost: 400, mortgageValue: 200, houseCost: 200, rents: [50, 200, 600, 1400, 1700, 2000] }
 ];
 
 export interface Card {
@@ -128,18 +128,18 @@ export interface Card {
   action: (state: MonopolyState, playerId: string) => MonopolyState;
 }
 
-// Chance Cards Deck
+// Fortune Cards Deck
 export const CHANCE_CARDS: Card[] = [
   {
     text: 'Advance to "GO" (Collect $200)',
     action: (state, pid) => movePlayerToSpace(state, pid, 0)
   },
   {
-    text: 'Advance to Illinois Avenue. If you pass GO, collect $200.',
+    text: 'Advance to Rome. If you pass GO, collect $200.',
     action: (state, pid) => movePlayerToSpace(state, pid, 24)
   },
   {
-    text: 'Advance to St. Charles Place. If you pass GO, collect $200.',
+    text: 'Advance to Athens. If you pass GO, collect $200.',
     action: (state, pid) => movePlayerToSpace(state, pid, 11)
   },
   {
@@ -151,7 +151,7 @@ export const CHANCE_CARDS: Card[] = [
     }
   },
   {
-    text: 'Advance to the nearest Railroad. If unowned, buy it. If owned, pay double rent.',
+    text: 'Advance to the nearest Station. If unowned, buy it. If owned, pay double the fare.',
     action: (state, pid) => {
       const p = state.players.find(x => x.id === pid)!;
       let target = 5;
@@ -202,15 +202,15 @@ export const CHANCE_CARDS: Card[] = [
     action: (state, pid) => adjustCash(state, pid, -15, 'Speeding fine')
   },
   {
-    text: 'Take a trip to Reading Railroad. If you pass GO, collect $200.',
+    text: 'Take a trip to North Station. If you pass GO, collect $200.',
     action: (state, pid) => movePlayerToSpace(state, pid, 5)
   },
   {
-    text: 'Advance to Boardwalk.',
+    text: 'Advance to New York.',
     action: (state, pid) => movePlayerToSpace(state, pid, 39)
   },
   {
-    text: 'You have been elected Chairman of the Board. Pay each player $50.',
+    text: 'You are elected city mayor. Pay each player $50.',
     action: (state, pid) => {
       let activeOpponentsCount = state.players.filter(p => p.id !== pid && !p.isBankrupt).length;
       let totalCost = activeOpponentsCount * 50;
@@ -230,7 +230,7 @@ export const CHANCE_CARDS: Card[] = [
   }
 ];
 
-// Community Chest Cards Deck
+// Treasury Cards Deck
 export const COMMUNITY_CHEST_CARDS: Card[] = [
   {
     text: 'Advance to "GO" (Collect $200)',
@@ -312,7 +312,7 @@ export const COMMUNITY_CHEST_CARDS: Card[] = [
     }
   },
   {
-    text: 'You have won second prize in a beauty contest. Collect $10.',
+    text: 'You win second prize in a talent show. Collect $10.',
     action: (state, pid) => adjustCash(state, pid, 10, 'Beauty contest prize')
   },
   {
@@ -451,7 +451,7 @@ export function initializeGame(playersData: { id: string; name: string; isBot: b
     players,
     currentPlayerIndex: 0,
     properties,
-    log: ['🏆 Welcome to Monopoly! Game initialized.'],
+    log: ['🏆 Welcome to Property Empire! Game initialized.'],
     chanceDeck: shuffleDeck(CHANCE_CARDS.length),
     communityChestDeck: shuffleDeck(COMMUNITY_CHEST_CARDS.length),
     chanceIndex: 0,
@@ -600,7 +600,7 @@ function evaluateLandingSpace(state: MonopolyState, pid: string, index: number):
   } else if (space.type === 'GO_TO_JAIL') {
     return sendPlayerToJail(state, pid);
   } else if (space.type === 'CHANCE') {
-    return drawChanceCard(state, pid);
+    return drawFortuneCard(state, pid);
   } else if (space.type === 'COMMUNITY_CHEST') {
     return drawCommunityChestCard(state, pid);
   }
@@ -663,16 +663,16 @@ function isColorSetWithPotential(state: MonopolyState, colorGroup: ColorGroup, o
 }
 
 // Draw card routines
-function drawChanceCard(state: MonopolyState, pid: string): MonopolyState {
+function drawFortuneCard(state: MonopolyState, pid: string): MonopolyState {
   const cardIndex = state.chanceDeck[state.chanceIndex];
   const card = CHANCE_CARDS[cardIndex];
   
-  let nextChanceIndex = (state.chanceIndex + 1) % CHANCE_CARDS.length;
+  let nextFortuneIndex = (state.chanceIndex + 1) % CHANCE_CARDS.length;
   let updated = {
     ...state,
-    chanceIndex: nextChanceIndex,
+    chanceIndex: nextFortuneIndex,
     lastCardDrawn: { type: 'CHANCE' as const, text: card.text },
-    log: [...state.log, `🃏 ${getPlayerName(state, pid)} drew Chance card: "${card.text}"`]
+    log: [...state.log, `🃏 ${getPlayerName(state, pid)} drew Fortune card: "${card.text}"`]
   };
 
   return card.action(updated, pid);
@@ -687,7 +687,7 @@ function drawCommunityChestCard(state: MonopolyState, pid: string): MonopolyStat
     ...state,
     communityChestIndex: nextChestIndex,
     lastCardDrawn: { type: 'COMMUNITY_CHEST' as const, text: card.text },
-    log: [...state.log, `📦 ${getPlayerName(state, pid)} drew Community Chest card: "${card.text}"`]
+    log: [...state.log, `📦 ${getPlayerName(state, pid)} drew Treasury card: "${card.text}"`]
   };
 
   return card.action(updated, pid);

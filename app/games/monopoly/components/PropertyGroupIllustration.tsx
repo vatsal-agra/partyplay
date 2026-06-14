@@ -1,4 +1,4 @@
-// Thematic SVG Illustrations for Monopoly Property Groups
+// Thematic SVG Illustrations for Property Empire Property Groups
 import React, { useId } from "react"
 
 interface IllustrationProps {
@@ -293,7 +293,7 @@ export function PropertyGroupIllustration({ group, name = "", mini = false }: Il
             </defs>
           </svg>
           
-          <div className="absolute bottom-2 right-3 text-[9px] font-mono text-yellow-400/70 tracking-wider">Golden Boardwalk</div>
+          <div className="absolute bottom-2 right-3 text-[9px] font-mono text-yellow-400/70 tracking-wider">Golden Skyline</div>
         </div>
       )
     case "GREEN":
@@ -313,7 +313,7 @@ export function PropertyGroupIllustration({ group, name = "", mini = false }: Il
             <line x1="62" y1="55" x2="62" y2="80" stroke="#34d399" strokeWidth="2" />
           </svg>
           
-          <div className="absolute bottom-2 right-3 text-[9px] font-mono text-emerald-400/70 tracking-wider">Botanical Embassy Avenue</div>
+          <div className="absolute bottom-2 right-3 text-[9px] font-mono text-emerald-400/70 tracking-wider">Botanical Gardens</div>
         </div>
       )
     case "DARK_BLUE":
@@ -335,7 +335,7 @@ export function PropertyGroupIllustration({ group, name = "", mini = false }: Il
             <rect x="53" y="76" width="5" height="5" rx="1" fill="#bfdbfe" />
           </svg>
           
-          <div className="absolute bottom-2 right-3 text-[9px] font-mono text-blue-400/80 tracking-wider">Park Place / Boardwalk Luxury</div>
+          <div className="absolute bottom-2 right-3 text-[9px] font-mono text-blue-400/80 tracking-wider">Luxury District</div>
         </div>
       )
     case "RAILROAD":
@@ -363,7 +363,7 @@ export function PropertyGroupIllustration({ group, name = "", mini = false }: Il
         </div>
       )
     case "UTILITY":
-      const isElectric = name.includes("Electric")
+      const isElectric = name.includes("Power")
       return (
         <div className="w-full h-full relative flex items-center justify-center bg-gradient-to-br from-slate-900 to-indigo-950 p-2 overflow-hidden select-none">
           <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:10px_10px]" />
