@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Confetti } from "@/components/Confetti"
 import { getAchievement } from "@/lib/achievements"
 import type { GameSummary } from "@/lib/gameSummary"
-import { Trophy, RotateCcw, LogOut, Share2, Crown } from "lucide-react"
+import { Trophy, RotateCcw, LogOut, Share2, Crown, X } from "lucide-react"
 import { useState } from "react"
 
 interface Props {
@@ -13,11 +13,13 @@ interface Props {
   summary: GameSummary
   newAchievements: string[]   // ids earned this game (to celebrate)
   canRematch: boolean         // only the host can re-deal
+  leaveLabel: string          // "Back to Party" or "Leave"
   onRematch: () => void
   onLeave: () => void
+  onClose: () => void         // dismiss the overlay (peek at the final board)
 }
 
-export function GameOverScreen({ gameName, summary, newAchievements, canRematch, onRematch, onLeave }: Props) {
+export function GameOverScreen({ gameName, summary, newAchievements, canRematch, leaveLabel, onRematch, onLeave, onClose }: Props) {
   const [shared, setShared] = useState(false)
   const medals = ["🥇", "🥈", "🥉"]
 
@@ -38,16 +40,27 @@ export function GameOverScreen({ gameName, summary, newAchievements, canRematch,
   }
 
   return (
-    <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/70 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto">
+    // Full-viewport modal so it's never clipped by the (short) board area, and
+    // the action footer is pinned so Rematch / Leave are always reachable.
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
       <Confetti fire={summary.youWon} />
       <motion.div
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ type: "spring", stiffness: 220, damping: 22 }}
-        className="relative z-10 w-full max-w-md my-auto rounded-2xl border border-white/10 bg-slate-900/95 shadow-2xl"
+        className="relative z-10 flex max-h-[90vh] w-full max-w-md flex-col rounded-2xl border border-white/10 bg-slate-900/95 shadow-2xl"
       >
-        {/* Header */}
-        <div className="px-5 pt-6 pb-4 text-center border-b border-white/10">
+        {/* Close (peek at the final board) */}
+        <button
+          onClick={onClose}
+          title="Close"
+          className="absolute right-3 top-3 z-20 grid h-8 w-8 place-items-center rounded-lg bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-colors"
+        >
+          <X className="h-4 w-4" />
+        </button>
+
+        {/* Header (fixed) */}
+        <div className="shrink-0 px-5 pt-6 pb-4 text-center border-b border-white/10">
           <div className="mx-auto mb-2 grid h-14 w-14 place-items-center rounded-2xl bg-brand shadow-glow-grape">
             <Trophy className="h-7 w-7 text-white" />
           </div>
@@ -57,9 +70,9 @@ export function GameOverScreen({ gameName, summary, newAchievements, canRematch,
           </h2>
         </div>
 
-        {/* Standings */}
-        <div className="px-5 py-4">
-          <div className="space-y-1.5 max-h-[34vh] overflow-y-auto pr-1">
+        {/* Body (scrolls if long) */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          <div className="space-y-1.5">
             {summary.standings.map((s, i) => (
               <div
                 key={s.id || s.name + i}
@@ -99,8 +112,8 @@ export function GameOverScreen({ gameName, summary, newAchievements, canRematch,
           )}
         </div>
 
-        {/* Actions */}
-        <div className="flex flex-col gap-2 px-5 pb-5 sm:flex-row">
+        {/* Actions (pinned, always visible) */}
+        <div className="shrink-0 flex flex-col gap-2 border-t border-white/10 px-5 py-4 sm:flex-row">
           {canRematch && (
             <Button onClick={onRematch} className="flex-1 bg-brand hover:brightness-110 font-bold">
               <RotateCcw className="mr-2 h-4 w-4" /> Rematch
@@ -109,8 +122,8 @@ export function GameOverScreen({ gameName, summary, newAchievements, canRematch,
           <Button onClick={shareResult} variant="outline" className="flex-1 text-white border-white/20 hover:bg-white/10">
             <Share2 className="mr-2 h-4 w-4" /> {shared ? "Copied!" : "Share"}
           </Button>
-          <Button onClick={onLeave} variant="ghost" className="flex-1 text-white/70 hover:text-white hover:bg-white/10">
-            <LogOut className="mr-2 h-4 w-4" /> Leave
+          <Button onClick={onLeave} variant="ghost" className="flex-1 text-white/80 hover:text-white hover:bg-white/10">
+            <LogOut className="mr-2 h-4 w-4" /> {leaveLabel}
           </Button>
         </div>
       </motion.div>

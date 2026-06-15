@@ -123,6 +123,9 @@ export default function GamePlayPage() {
 
   // Badges earned in the just-finished game (shown on the game-over screen).
   const [newAchievements, setNewAchievements] = useState<string[]>([])
+  // Lets the player dismiss the game-over overlay to peek at the final board.
+  const [gameOverDismissed, setGameOverDismissed] = useState(false)
+  const inRealParty = !!partyId && partyId !== "mock-party-id"
 
   const isHost = useMemo(
     () => partyMembers.some((m) => m.user_id === currentUserId && m.is_host),
@@ -578,9 +581,11 @@ export default function GamePlayPage() {
     if (!isHost || !isPlaying || !monopolyState || !partyId || partyId === "mock-party-id") return
     clearTimeout(persistTimerRef.current)
     persistTimerRef.current = setTimeout(() => {
+      // Persist the snapshot AND mark the party active — active play must keep
+      // the party alive so the idle-cleanup sweep never reaps it mid-session.
       supabase
         .from("parties")
-        .update({ game_state: monopolyState })
+        .update({ game_state: monopolyState, last_active_at: new Date().toISOString() })
         .eq("id", partyId)
         .then(({ error }: any) => { if (error) console.warn("persist game_state failed:", error.message) })
     }, 1200)
@@ -615,6 +620,9 @@ export default function GamePlayPage() {
       const bots = lobbyBots.map(b => ({ id: b.id, name: b.name, isBot: true }))
       const initialState = init([...humans, ...bots])
       recordedResultRef.current = false   // fresh game — allow a new result to record
+      setNewAchievements([])
+      setGameOverDismissed(false)
+      touchParty(supabase, partyId)       // starting a game counts as activity
       setMonopolyState(initialState)
       setIsPlaying(true)
 
@@ -989,16 +997,14 @@ export default function GamePlayPage() {
                 </div>
               )}
 
-              {/* Game-over recap, confetti & rematch */}
-              {isPlaying && summary.isOver && (
-                <GameOverScreen
-                  gameName={gameData.name}
-                  summary={summary}
-                  newAchievements={newAchievements}
-                  canRematch={isHost && !isSpectator}
-                  onRematch={() => { setNewAchievements([]); handleStartGame() }}
-                  onLeave={() => router.push("/games")}
-                />
+              {/* Reopen the recap after peeking at the final board */}
+              {isPlaying && summary.isOver && gameOverDismissed && (
+                <button
+                  onClick={() => setGameOverDismissed(false)}
+                  className="absolute bottom-4 left-1/2 z-30 -translate-x-1/2 flex items-center gap-2 rounded-full bg-brand px-4 py-2 text-sm font-bold text-white shadow-lg hover:brightness-110"
+                >
+                  🏆 Show results
+                </button>
               )}
             </div>
 
@@ -1189,6 +1195,21 @@ export default function GamePlayPage() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Game-over recap — rendered at top level so its fixed overlay covers the
+          full viewport (a transformed ancestor would otherwise trap it). */}
+      {isPlaying && summary.isOver && !gameOverDismissed && (
+        <GameOverScreen
+          gameName={gameData.name}
+          summary={summary}
+          newAchievements={newAchievements}
+          canRematch={isHost && !isSpectator}
+          leaveLabel={inRealParty ? "Back to Party" : "Leave"}
+          onRematch={() => { setNewAchievements([]); setGameOverDismissed(false); handleStartGame() }}
+          onLeave={() => router.push(inRealParty ? `/party/${partyId}` : "/games")}
+          onClose={() => setGameOverDismissed(true)}
+        />
+      )}
 
       {/* Party voice chat — real parties only (skip solo / mock games) */}
       {partyId && partyId !== "mock-party-id" && currentUserId && !currentUserId.startsWith("local-player-") && (
