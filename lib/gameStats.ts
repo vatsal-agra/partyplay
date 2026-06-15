@@ -21,6 +21,24 @@ export async function recordGameResult(
   }
 }
 
+// The signed-in user's running totals (used for milestone badges). Returns
+// zeros if the row/table doesn't exist yet.
+export async function fetchUserStats(
+  client: SupabaseClient,
+  userId: string
+): Promise<{ wins: number; gamesPlayed: number }> {
+  try {
+    const { data } = await client
+      .from("game_stats")
+      .select("wins, games_played")
+      .eq("user_id", userId)
+      .single()
+    return { wins: data?.wins ?? 0, gamesPlayed: data?.games_played ?? 0 }
+  } catch {
+    return { wins: 0, gamesPlayed: 0 }
+  }
+}
+
 export interface LeaderboardRow {
   id: string
   username: string

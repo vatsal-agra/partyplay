@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 import { cleanupStaleParties } from "@/lib/partyActivity"
 import { fetchLeaderboard, type LeaderboardRow } from "@/lib/gameStats"
-import { ACHIEVEMENTS, fetchUserAchievements } from "@/lib/achievements"
+import { ACHIEVEMENTS, fetchUserAchievements, isKnownAchievement } from "@/lib/achievements"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Plus, RefreshCw, Trophy, Medal, Award } from "lucide-react"
@@ -259,7 +259,7 @@ export default function Dashboard() {
                 <Award className="h-5 w-5 text-grape-300" />
                 Your Badges
               </h2>
-              <span className="text-sm text-white/60">{myBadges.length} / {ACHIEVEMENTS.length}</span>
+              <span className="text-sm text-white/60">{myBadges.filter(isKnownAchievement).length} / {ACHIEVEMENTS.length}</span>
             </div>
             <div className="p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               {ACHIEVEMENTS.map((a) => {

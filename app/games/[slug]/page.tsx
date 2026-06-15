@@ -5,9 +5,9 @@ import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 import { touchParty } from "@/lib/partyActivity"
 import { getGameRules } from "@/lib/game-rules"
-import { recordGameResult } from "@/lib/gameStats"
+import { recordGameResult, fetchUserStats } from "@/lib/gameStats"
 import { getGameSummary } from "@/lib/gameSummary"
-import { evaluateAchievements, recordAchievements, fetchUserAchievements } from "@/lib/achievements"
+import { evaluateAchievements, recordAchievements } from "@/lib/achievements"
 import { GameOverScreen } from "@/components/GameOverScreen"
 import { VoiceChat } from "@/components/VoiceChat"
 import { playSfx, eventForLogLine, isSfxMuted, toggleSfxMuted, onSfxMutedChange } from "@/lib/sfx"
@@ -564,9 +564,10 @@ export default function GamePlayPage() {
     const gameName = gameData?.name || gameId
 
     ;(async () => {
+      // Record the result first so the milestone badges see up-to-date totals.
       await recordGameResult(supabase, { won: summary.youWon, gameName })
-      const already = await fetchUserAchievements(supabase, currentUserId)
-      const earned = evaluateAchievements({ gameId, state: monopolyState, summary, currentUserId, alreadyHave: already })
+      const stats = await fetchUserStats(supabase, currentUserId)
+      const earned = evaluateAchievements({ gameId, state: monopolyState, summary, currentUserId, stats })
       const newly = await recordAchievements(supabase, earned)
       if (newly.length) {
         setNewAchievements(newly)

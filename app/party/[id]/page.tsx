@@ -10,6 +10,7 @@ import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Image from "next/image";
 import { getGameById } from "@/lib/games-catalog";
 import { PartyInactivityWarning } from "@/components/PartyInactivityWarning";
+import { VoiceChat } from "@/components/VoiceChat";
 import { touchParty } from "@/lib/partyActivity";
 import type { Session } from "@supabase/auth-helpers-nextjs";
 import type { RealtimeChannel } from "@supabase/supabase-js";
@@ -722,6 +723,19 @@ export default function PartyPage() {
         isHost={isLeader}
         onClosed={() => router.push('/dashboard')}
       />
+
+      {/* Lobby voice — talk with the party before the game even starts */}
+      {partyId && session?.user?.id && (
+        <VoiceChat
+          client={supabase}
+          roomId={partyId}
+          userId={session.user.id}
+          members={members.map((m: any) => ({
+            user_id: m.user_id,
+            profile: { username: m.user?.username || m.user?.email, display_name: m.user?.username },
+          }))}
+        />
+      )}
     </div>
   )
 }
