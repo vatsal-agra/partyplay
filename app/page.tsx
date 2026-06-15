@@ -6,6 +6,7 @@ import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import Image from "next/image"
 import { Gamepad2, Users, MessageSquare, Zap, Trophy, Shield, Vote, Sparkles, ArrowRight } from "lucide-react"
+import { GAMES_CATALOG } from "@/lib/games-catalog"
 
 const fadeIn = {
   hidden: { opacity: 0, y: 24 },
@@ -104,7 +105,7 @@ export default function Home() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Gamepad2 className="h-4 w-4 text-aqua-400" />
-                  11 games & counting
+                  {GAMES_CATALOG.length} games & counting
                 </div>
               </motion.div>
             </motion.div>
