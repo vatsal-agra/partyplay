@@ -4,6 +4,8 @@ import { useEffect, useState, useRef, useCallback, useMemo } from "react"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 import { touchParty } from "@/lib/partyActivity"
+import { getGameRules } from "@/lib/game-rules"
+import { recordGameResult } from "@/lib/gameStats"
 import Image from "next/image"
 import { motion, AnimatePresence } from "framer-motion"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -108,6 +110,8 @@ export default function GamePlayPage() {
   
   const partyMembersRef = useRef(partyMembers)
   const activeChannelRef = useRef<any>(null)
+  // Guards against recording the same finished game more than once.
+  const recordedResultRef = useRef(false)
 
   useEffect(() => {
     partyMembersRef.current = partyMembers
@@ -459,6 +463,27 @@ export default function GamePlayPage() {
     }
   }, [partyId, currentUserId, supabase, refreshPartyDetails])
 
+  // When the current game reaches a terminal state, record the result for the
+  // signed-in player so it feeds the dashboard leaderboard. Works across every
+  // engine via a generic check (terminal phase or a resolved winner). Bots,
+  // guests, and not-yet-finished games are skipped; each human client records
+  // its own row exactly once.
+  useEffect(() => {
+    const s: any = monopolyState
+    if (!s || recordedResultRef.current) return
+    if (!currentUserId || currentUserId.startsWith("local-player-")) return
+
+    const phase = typeof s.phase === "string" ? s.phase.toUpperCase() : ""
+    const terminalPhase = ["GAME_OVER", "GAMEOVER", "ENDED", "FINISHED", "COMPLETE"].includes(phase)
+    const winnerId = s.winnerId ?? s.winner?.id ?? (typeof s.winner === "string" ? s.winner : null)
+    const isOver = terminalPhase || winnerId != null || s.gameOver === true || s.isGameOver === true
+    if (!isOver) return
+
+    recordedResultRef.current = true
+    const won = winnerId != null && winnerId === currentUserId
+    recordGameResult(supabase, { won, gameName: gameData?.name || (params.slug as string) })
+  }, [monopolyState, currentUserId, supabase, gameData, params.slug])
+
   
   // Handle starting a new game
   const handleStartGame = async () => {
@@ -486,6 +511,7 @@ export default function GamePlayPage() {
       }))
       const bots = lobbyBots.map(b => ({ id: b.id, name: b.name, isBot: true }))
       const initialState = init([...humans, ...bots])
+      recordedResultRef.current = false   // fresh game — allow a new result to record
       setMonopolyState(initialState)
       setIsPlaying(true)
 
@@ -998,39 +1024,18 @@ export default function GamePlayPage() {
               className="relative z-10 w-full max-w-lg bg-slate-900 border border-white/10 rounded-2xl p-6 shadow-2xl max-h-[80vh] overflow-y-auto"
             >
               <h3 className="text-lg font-black uppercase text-pink-400 tracking-wider mb-4 border-b border-white/10 pb-2">
-                Property Empire — How to Play
+                {getGameRules(gameData.id)?.title || `${gameData.name} — How to Play`}
               </h3>
-              
+
               <div className="space-y-4 text-xs text-slate-300 leading-relaxed font-sans">
-                <div>
-                  <h4 className="font-bold text-white uppercase text-[10px] tracking-wider mb-1">1. Object of the Game</h4>
-                  <p>The object of the game is to become the wealthiest player through buying, renting, and trading properties. Force all opponents into bankruptcy to claim victory!</p>
-                </div>
-                
-                <div>
-                  <h4 className="font-bold text-white uppercase text-[10px] tracking-wider mb-1">2. Turns and Rolling</h4>
-                  <p>Roll the dice to move your token around the board. If you roll doubles, you get another throw! However, rolling doubles three times in a row sends you directly to jail.</p>
-                </div>
-
-                <div>
-                  <h4 className="font-bold text-white uppercase text-[10px] tracking-wider mb-1">3. Buying & Rent</h4>
-                  <p>When you land on an unowned property, railroad, or utility, you may purchase it from the bank. If you pass on it, it remains unowned. If you land on another player's property, you must pay them rent!</p>
-                </div>
-
-                <div>
-                  <h4 className="font-bold text-white uppercase text-[10px] tracking-wider mb-1">4. Color Groups & Houses</h4>
-                  <p>Own all properties of a color group to double the base rent! Once a complete set is owned, you can construct houses and hotels on them to exponentially increase rent charges. Houses must be built evenly.</p>
-                </div>
-
-                <div>
-                  <h4 className="font-bold text-white uppercase text-[10px] tracking-wider mb-1">5. Mortgages & Selling</h4>
-                  <p>If you need cash to cover a debt or purchase, you can sell houses for a 50% refund, or mortgage properties to receive their mortgage value. Mortgaged properties do not collect rent.</p>
-                </div>
-
-                <div>
-                  <h4 className="font-bold text-white uppercase text-[10px] tracking-wider mb-1">6. Jail Rules</h4>
-                  <p>Get out of Jail by: (1) rolling doubles on your next turn, (2) paying a $50 fine, or (3) using a Get Out Of Jail Free card. After 3 turns, you are forced to pay the fine.</p>
-                </div>
+                {getGameRules(gameData.id)?.sections.map((section) => (
+                  <div key={section.heading}>
+                    <h4 className="font-bold text-white uppercase text-[10px] tracking-wider mb-1">{section.heading}</h4>
+                    <p>{section.body}</p>
+                  </div>
+                )) || (
+                  <p>{gameData.description}</p>
+                )}
               </div>
 
               <Button

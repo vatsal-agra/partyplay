@@ -167,9 +167,9 @@ export default function PartyDetailsPage({ params }: { params: { id: string } })
 
   if (loading) {
     return (
-      <div className="w-full min-h-screen bg-gradient-to-br from-cyan-500 via-purple-500 to-pink-500 flex items-center justify-center">
+      <div className="w-full min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <RefreshCw className="h-12 w-12 animate-spin text-white mx-auto mb-4" />
+          <RefreshCw className="h-12 w-12 animate-spin text-grape-400 mx-auto mb-4" />
           <h2 className="text-xl font-medium text-white">Loading party details...</h2>
         </div>
       </div>
@@ -177,7 +177,7 @@ export default function PartyDetailsPage({ params }: { params: { id: string } })
   }
 
   return (
-    <div className="w-full min-h-screen bg-gradient-to-br from-cyan-500 via-purple-500 to-pink-500 pt-16 pb-12">
+    <div className="w-full min-h-screen pb-12">
       <div className="max-w-4xl mx-auto px-4">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -219,13 +219,13 @@ export default function PartyDetailsPage({ params }: { params: { id: string } })
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
           >
-            <Card className="bg-background/50 backdrop-blur-sm border-foreground/10 shadow-xl">
+            <Card className="glass shadow-soft">
               <CardHeader>
                 <CardTitle className="text-xl text-white">Party Code</CardTitle>
                 <CardDescription className="text-white/70">Share this code with friends to invite them</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center justify-between p-4 bg-background/30 rounded-lg border border-foreground/10">
+                <div className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10">
                   <div className="text-3xl font-mono font-bold tracking-wider text-white">
                     {partyCode}
                   </div>
@@ -238,8 +238,8 @@ export default function PartyDetailsPage({ params }: { params: { id: string } })
                     <Copy className="h-5 w-5" />
                   </Button>
                 </div>
-                <Button 
-                  className="w-full mt-4 bg-gradient-to-r from-cyan-500 to-pink-500 hover:from-cyan-600 hover:to-pink-600 text-white"
+                <Button
+                  className="w-full mt-4 bg-brand hover:brightness-110 text-white"
                   onClick={shareParty}
                 >
                   <Share2 className="mr-2 h-4 w-4" />
@@ -255,7 +255,7 @@ export default function PartyDetailsPage({ params }: { params: { id: string } })
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
           >
-            <Card className="bg-background/50 backdrop-blur-sm border-foreground/10 shadow-xl">
+            <Card className="glass shadow-soft">
               <CardHeader>
                 <CardTitle className="text-xl text-white">Party Information</CardTitle>
                 <CardDescription className="text-white/70">Details about this gaming party</CardDescription>
@@ -306,7 +306,7 @@ export default function PartyDetailsPage({ params }: { params: { id: string } })
             transition={{ duration: 0.5, delay: 0.3 }}
             className="md:col-span-2"
           >
-            <Card className="bg-background/50 backdrop-blur-sm border-foreground/10 shadow-xl">
+            <Card className="glass shadow-soft">
               <CardHeader>
                 <CardTitle className="text-xl text-white">Party Members</CardTitle>
                 <CardDescription className="text-white/70">
@@ -324,9 +324,9 @@ export default function PartyDetailsPage({ params }: { params: { id: string } })
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: 0.1 * index }}
-                        className={`flex items-center p-3 bg-background/30 rounded-lg border ${member.is_host ? 'border-green-500/50' : 'border-foreground/10'}`}
+                        className={`flex items-center p-3 bg-white/5 rounded-lg border ${member.is_host ? 'border-green-500/50' : 'border-white/10'}`}
                       >
-                        <div className="h-8 w-8 rounded-full bg-gradient-to-br from-cyan-500 to-pink-500 flex items-center justify-center text-white font-bold mr-3">
+                        <div className="h-8 w-8 rounded-full bg-brand flex items-center justify-center text-white font-bold mr-3">
                           {member.profile?.username ? member.profile.username[0].toUpperCase() : 'U'}
                         </div>
                         <div>

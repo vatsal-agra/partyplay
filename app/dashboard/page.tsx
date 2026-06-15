@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 import { cleanupStaleParties } from "@/lib/partyActivity"
+import { fetchLeaderboard, type LeaderboardRow } from "@/lib/gameStats"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Plus, RefreshCw, Trophy, Medal, Award } from "lucide-react"
@@ -10,16 +11,7 @@ import PartyManager from "@/components/PartyManager"
 import { motion } from "framer-motion"
 import { Card } from "@/components/ui/card"
 
-// Define types for leaderboard data
-interface LeaderboardEntry {
-  id: string;
-  username: string;
-  display_name?: string;
-  avatar_url?: string;
-  wins: number;
-  games_played: number;
-  favorite_game?: string;
-}
+type LeaderboardEntry = LeaderboardRow
 
 export default function Dashboard() {
   const router = useRouter()
@@ -44,58 +36,12 @@ export default function Dashboard() {
     }
     getSession()
   }, [router, supabaseClient])
-  
-  // Mock function to fetch leaderboard data
-  // In a real implementation, this would fetch from your database
+
+  // Real leaderboard, sourced from the game_stats table (populated as games
+  // are played). Returns an empty list until anyone has finished a game.
   const fetchLeaderboardData = async () => {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 500))
-    
-    // Mock leaderboard data
-    const mockLeaderboard: LeaderboardEntry[] = [
-      {
-        id: '1',
-        username: 'gameMaster',
-        display_name: 'Game Master',
-        wins: 42,
-        games_played: 50,
-        favorite_game: 'Property Empire'
-      },
-      {
-        id: '2',
-        username: 'chessWizard',
-        display_name: 'Chess Wizard',
-        wins: 38,
-        games_played: 45,
-        favorite_game: 'Chess'
-      },
-      {
-        id: '3',
-        username: 'strategyKing',
-        display_name: 'Strategy King',
-        wins: 35,
-        games_played: 48,
-        favorite_game: 'Hexland'
-      },
-      {
-        id: '4',
-        username: 'pokerFace',
-        display_name: 'Poker Face',
-        wins: 30,
-        games_played: 40,
-        favorite_game: 'Poker'
-      },
-      {
-        id: '5',
-        username: 'unoChampion',
-        display_name: 'Uno Champion',
-        wins: 28,
-        games_played: 35,
-        favorite_game: 'Uno'
-      }
-    ]
-    
-    setLeaderboardData(mockLeaderboard)
+    const rows = await fetchLeaderboard(supabaseClient, 10)
+    setLeaderboardData(rows)
   }
 
   if (loading) {
@@ -259,9 +205,11 @@ export default function Dashboard() {
                         </div>
                         <div>
                           <p className="font-medium text-white">{player.display_name || player.username}</p>
-                          <p className="text-xs text-white/60">
-                            Favorite: {player.favorite_game}
-                          </p>
+                          {player.favorite_game && (
+                            <p className="text-xs text-white/60">
+                              Last played: {player.favorite_game}
+                            </p>
+                          )}
                         </div>
                       </div>
                     </div>
