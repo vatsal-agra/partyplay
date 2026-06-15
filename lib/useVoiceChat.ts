@@ -44,11 +44,23 @@ function iceServers(): RTCIceServer[] {
   ]
   const turnUrl = process.env.NEXT_PUBLIC_TURN_URL
   if (turnUrl) {
+    // Your own TURN relay (recommended for production).
     servers.push({
       urls: turnUrl,
       username: process.env.NEXT_PUBLIC_TURN_USERNAME,
       credential: process.env.NEXT_PUBLIC_TURN_CREDENTIAL,
     })
+  } else {
+    // Free public TURN fallback (Metered OpenRelay) so audio still relays
+    // across strict NATs / firewalls without any setup. STUN alone fails on a
+    // large fraction of real networks — which is why a mic can be "speaking"
+    // locally yet never reach the other peer. Swap in your own TURN via the
+    // NEXT_PUBLIC_TURN_* env vars for production reliability.
+    servers.push(
+      { urls: "turn:openrelay.metered.ca:80", username: "openrelayproject", credential: "openrelayproject" },
+      { urls: "turn:openrelay.metered.ca:443", username: "openrelayproject", credential: "openrelayproject" },
+      { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" }
+    )
   }
   return servers
 }
@@ -82,6 +94,9 @@ export function useVoiceChat(opts: {
   const analysersRef = useRef<Map<string, AnalyserNode>>(new Map())
   const speakingRef = useRef<Map<string, boolean>>(new Map())
   const meterRafRef = useRef<number | null>(null)
+  const makeOfferRef = useRef<((peerId: string) => void) | null>(null)
+  const unlockArmedRef = useRef(false)
+  const unlockCleanupRef = useRef<(() => void) | null>(null)
 
   // Keep a ref of participants so we can mutate-then-publish without stale reads.
   const participantsRef = useRef<Record<string, VoiceParticipant>>({})
@@ -163,6 +178,24 @@ export function useVoiceChat(opts: {
     meterRafRef.current = requestAnimationFrame(tick)
   }, [upsertParticipant])
 
+  // If the browser blocks programmatic audio playback, resume everything on the
+  // next user interaction (a tap/keypress is a valid gesture).
+  const armAutoplayUnlock = useCallback(() => {
+    if (unlockArmedRef.current) return
+    unlockArmedRef.current = true
+    const resume = () => {
+      audioCtxRef.current?.resume?.().catch(() => {})
+      audioElsRef.current.forEach((el) => { el.play().catch(() => {}) })
+    }
+    document.addEventListener("pointerdown", resume)
+    document.addEventListener("keydown", resume)
+    unlockCleanupRef.current = () => {
+      document.removeEventListener("pointerdown", resume)
+      document.removeEventListener("keydown", resume)
+      unlockArmedRef.current = false
+    }
+  }, [])
+
   // ---- Peer connection management ------------------------------------------
   const sendSignal = useCallback((event: string, payload: SignalMsg) => {
     channelRef.current?.send({ type: "broadcast", event, payload })
@@ -204,7 +237,8 @@ export function useVoiceChat(opts: {
           audioElsRef.current.set(peerId, el)
         }
         el.srcObject = remoteStream
-        el.play().catch(() => { /* will resume on user interaction */ })
+        el.volume = 1
+        el.play().catch(() => armAutoplayUnlock())
         attachAnalyser(peerId, remoteStream)
         startMeter()
       }
@@ -212,14 +246,22 @@ export function useVoiceChat(opts: {
       pc.onconnectionstatechange = () => {
         const st = pc.connectionState
         if (st === "connected") upsertParticipant(peerId, { connected: true })
-        if (st === "failed" || st === "closed") {
-          upsertParticipant(peerId, { connected: false })
+        else if (st === "failed" || st === "closed") upsertParticipant(peerId, { connected: false })
+      }
+
+      pc.oniceconnectionstatechange = () => {
+        if (pc.iceConnectionState === "failed") {
+          // The deterministic initiator recovers the link with an ICE restart.
+          if (userId && userId < peerId) {
+            try { pc.restartIce?.() } catch { /* older browsers */ }
+            makeOfferRef.current?.(peerId)
+          }
         }
       }
 
       return pc
     },
-    [userId, sendSignal, upsertParticipant, attachAnalyser, startMeter]
+    [userId, sendSignal, upsertParticipant, attachAnalyser, startMeter, armAutoplayUnlock]
   )
 
   const closePeer = useCallback((peerId: string) => {
@@ -228,6 +270,7 @@ export function useVoiceChat(opts: {
       pc.onicecandidate = null
       pc.ontrack = null
       pc.onconnectionstatechange = null
+      pc.oniceconnectionstatechange = null
       try { pc.close() } catch { /* noop */ }
       peersRef.current.delete(peerId)
     }
@@ -264,6 +307,10 @@ export function useVoiceChat(opts: {
     }
   }, [getOrCreatePeer, userId, sendSignal])
 
+  // Expose makeOffer to the (earlier-defined) ICE-restart handler without a
+  // declaration cycle.
+  useEffect(() => { makeOfferRef.current = makeOffer }, [makeOffer])
+
   // ---- Join / leave ---------------------------------------------------------
   const cleanup = useCallback(() => {
     joinedRef.current = false
@@ -279,6 +326,8 @@ export function useVoiceChat(opts: {
     localStreamRef.current = null
     if (channelRef.current) { client.removeChannel(channelRef.current); channelRef.current = null }
     if (audioCtxRef.current) { audioCtxRef.current.close().catch(() => {}); audioCtxRef.current = null }
+    unlockCleanupRef.current?.()
+    unlockCleanupRef.current = null
     participantsRef.current = {}
     setParticipants({})
     setSelfSpeaking(false)
@@ -300,6 +349,7 @@ export function useVoiceChat(opts: {
       setMuted(false)
       attachAnalyser("self", stream)
       startMeter()
+      armAutoplayUnlock()
 
       const channel = client.channel(`voice:${roomId}`, {
         config: { presence: { key: userId }, broadcast: { self: false } },
@@ -385,7 +435,7 @@ export function useVoiceChat(opts: {
       )
       cleanup()
     }
-  }, [roomId, userId, connecting, client, attachAnalyser, startMeter, getOrCreatePeer, flushPendingIce, sendSignal, makeOffer, upsertParticipant, closePeer, cleanup])
+  }, [roomId, userId, connecting, client, attachAnalyser, startMeter, getOrCreatePeer, flushPendingIce, sendSignal, makeOffer, upsertParticipant, closePeer, cleanup, armAutoplayUnlock])
 
   const leave = useCallback(() => {
     cleanup()

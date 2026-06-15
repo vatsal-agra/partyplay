@@ -10,8 +10,9 @@ import { getGameSummary } from "@/lib/gameSummary"
 import { evaluateAchievements, recordAchievements, fetchUserAchievements } from "@/lib/achievements"
 import { GameOverScreen } from "@/components/GameOverScreen"
 import { VoiceChat } from "@/components/VoiceChat"
+import { playSfx, eventForLogLine, isSfxMuted, toggleSfxMuted, onSfxMutedChange } from "@/lib/sfx"
 import { toast } from "sonner"
-import { Eye } from "lucide-react"
+import { Eye, Volume2, VolumeX } from "lucide-react"
 import Image from "next/image"
 import { motion, AnimatePresence } from "framer-motion"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -139,6 +140,50 @@ export default function GamePlayPage() {
     if (!isPlaying || !monopolyState?.players || !currentUserId) return false
     return !monopolyState.players.some((p: any) => p.id === currentUserId)
   }, [isPlaying, monopolyState, currentUserId])
+
+  // ---- Sound effects + floating event animations ---------------------------
+  const [sfxMuted, setSfxMutedState] = useState(false)
+  const [eventFx, setEventFx] = useState<{ id: number; emoji: string; x: number }[]>([])
+  const prevLogLenRef = useRef<number | null>(null)
+  const fxIdRef = useRef(0)
+  const gameOverSfxRef = useRef(false)
+
+  useEffect(() => {
+    setSfxMutedState(isSfxMuted())
+    return onSfxMutedChange(setSfxMutedState)
+  }, [])
+
+  // Watch the engine log: each newly-appended line carries a leading emoji that
+  // identifies the event (🎲 dice, 💰 cash, ✅ correct, 💥 hit, 🏆 win …). Play
+  // its mapped sound and pop the emoji on screen. Big jumps (a full state sync)
+  // are skipped so reconnecting doesn't replay the whole history at once.
+  useEffect(() => {
+    const log: string[] = monopolyState?.log
+    if (!Array.isArray(log)) return
+    const prev = prevLogLenRef.current
+    prevLogLenRef.current = log.length
+    if (prev === null || log.length <= prev || log.length - prev > 4) return
+
+    log.slice(prev).slice(-2).forEach((line, i) => {
+      const ev = eventForLogLine(line)
+      if (!ev) return
+      setTimeout(() => {
+        playSfx(ev.sound)
+        const id = ++fxIdRef.current
+        const x = Math.round((Math.random() - 0.5) * 120)
+        setEventFx((q) => [...q, { id, emoji: ev.emoji, x }])
+        setTimeout(() => setEventFx((q) => q.filter((f) => f.id !== id)), 1400)
+      }, i * 140)
+    })
+  }, [monopolyState])
+
+  // Victory / defeat stinger when the game ends (re-arms on rematch).
+  useEffect(() => {
+    if (!summary.isOver) { gameOverSfxRef.current = false; return }
+    if (gameOverSfxRef.current) return
+    gameOverSfxRef.current = true
+    playSfx(summary.youWon ? "win" : "lose")
+  }, [summary])
 
   useEffect(() => {
     partyMembersRef.current = partyMembers
@@ -917,6 +962,25 @@ export default function GamePlayPage() {
                 </>
               )}
 
+              {/* Floating event emojis — popped in sync with the sound effects */}
+              <div className="pointer-events-none absolute inset-x-0 top-12 z-30 flex justify-center">
+                <AnimatePresence>
+                  {eventFx.map((f) => (
+                    <motion.div
+                      key={f.id}
+                      initial={{ opacity: 0, y: 24, scale: 0.4 }}
+                      animate={{ opacity: 1, y: -34, scale: 1.35 }}
+                      exit={{ opacity: 0, y: -70, scale: 0.8 }}
+                      transition={{ duration: 1.3, ease: "easeOut" }}
+                      style={{ x: f.x }}
+                      className="absolute text-4xl drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]"
+                    >
+                      {f.emoji}
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+
               {/* Spectator banner — late joiners watch until the next game */}
               {isSpectator && !summary.isOver && (
                 <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 rounded-full border border-white/15 bg-black/70 px-4 py-1.5 text-sm text-white shadow-lg backdrop-blur">
@@ -948,14 +1012,24 @@ export default function GamePlayPage() {
                     Duration: {gameData.duration}
                   </p>
                 </div>
-                <Button
-                  onClick={() => setShowRules(true)}
-                  variant="outline"
-                  className="text-white border-white/20 hover:bg-white/10 flex items-center gap-1.5 self-start sm:self-auto shrink-0"
-                >
-                  <BookOpen className="w-4 h-4 text-pink-400" />
-                  Game Rules
-                </Button>
+                <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+                  <Button
+                    onClick={() => toggleSfxMuted()}
+                    variant="outline"
+                    title={sfxMuted ? "Unmute sound effects" : "Mute sound effects"}
+                    className="text-white border-white/20 hover:bg-white/10 px-2.5"
+                  >
+                    {sfxMuted ? <VolumeX className="w-4 h-4 text-white/60" /> : <Volume2 className="w-4 h-4 text-aqua-400" />}
+                  </Button>
+                  <Button
+                    onClick={() => setShowRules(true)}
+                    variant="outline"
+                    className="text-white border-white/20 hover:bg-white/10 flex items-center gap-1.5"
+                  >
+                    <BookOpen className="w-4 h-4 text-pink-400" />
+                    Game Rules
+                  </Button>
+                </div>
               </div>
             </div>
           </motion.div>
