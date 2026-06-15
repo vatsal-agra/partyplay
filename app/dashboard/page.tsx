@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 import { cleanupStaleParties } from "@/lib/partyActivity"
 import { fetchLeaderboard, type LeaderboardRow } from "@/lib/gameStats"
+import { ACHIEVEMENTS, fetchUserAchievements } from "@/lib/achievements"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Plus, RefreshCw, Trophy, Medal, Award } from "lucide-react"
@@ -19,6 +20,7 @@ export default function Dashboard() {
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([])
+  const [myBadges, setMyBadges] = useState<string[]>([])
 
   useEffect(() => {
     const getSession = async () => {
@@ -32,6 +34,8 @@ export default function Dashboard() {
         cleanupStaleParties(supabaseClient, session.user.id)
         // Fetch leaderboard data
         fetchLeaderboardData()
+        // Fetch the player's earned badges
+        fetchUserAchievements(supabaseClient, session.user.id).then(setMyBadges)
       }
     }
     getSession()
@@ -241,6 +245,46 @@ export default function Dashboard() {
             </Card>
           </motion.div>
         </div>
+
+        {/* Badges */}
+        <motion.div
+          className="mt-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6, duration: 0.5 }}
+        >
+          <Card className="bg-white/5 backdrop-blur-md border border-white/10 overflow-hidden shadow-lg">
+            <div className="p-4 border-b border-white/10 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <Award className="h-5 w-5 text-grape-300" />
+                Your Badges
+              </h2>
+              <span className="text-sm text-white/60">{myBadges.length} / {ACHIEVEMENTS.length}</span>
+            </div>
+            <div className="p-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {ACHIEVEMENTS.map((a) => {
+                const earned = myBadges.includes(a.id)
+                return (
+                  <div
+                    key={a.id}
+                    title={a.description}
+                    className={`flex items-center gap-3 rounded-xl border p-3 transition-colors ${
+                      earned
+                        ? "border-grape-400/30 bg-grape-500/10"
+                        : "border-white/5 bg-white/[0.02] opacity-50"
+                    }`}
+                  >
+                    <span className={`text-2xl ${earned ? "" : "grayscale"}`}>{a.emoji}</span>
+                    <div className="min-w-0">
+                      <p className="font-medium text-white text-sm truncate">{a.name}</p>
+                      <p className="text-xs text-white/50 truncate">{earned ? a.description : "Locked"}</p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </Card>
+        </motion.div>
       </div>
     </div>
   )

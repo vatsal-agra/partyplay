@@ -38,20 +38,20 @@ export function MainNav() {
           </span>
         </Link>
 
-        {/* Center nav */}
-        <nav className="hidden md:flex items-center gap-1">
+        {/* Center nav — icons stay visible on mobile so pages remain reachable */}
+        <nav className="flex items-center gap-1">
           {navLinks.map(({ href, label, icon: Icon }) => (
             <Link key={href} href={href}>
               <span
                 className={cn(
-                  "relative flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors",
+                  "relative flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors sm:px-4",
                   isActive(href)
                     ? "text-white"
                     : "text-muted-foreground hover:text-white"
                 )}
               >
                 <Icon className="h-4 w-4" />
-                {label}
+                <span className="hidden sm:inline">{label}</span>
                 {isActive(href) && (
                   <span className="absolute inset-0 -z-10 rounded-xl bg-white/10 ring-1 ring-white/15" />
                 )}

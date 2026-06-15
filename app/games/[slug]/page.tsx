@@ -6,6 +6,11 @@ import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 import { touchParty } from "@/lib/partyActivity"
 import { getGameRules } from "@/lib/game-rules"
 import { recordGameResult } from "@/lib/gameStats"
+import { getGameSummary } from "@/lib/gameSummary"
+import { evaluateAchievements, recordAchievements, fetchUserAchievements } from "@/lib/achievements"
+import { GameOverScreen } from "@/components/GameOverScreen"
+import { toast } from "sonner"
+import { Eye } from "lucide-react"
 import Image from "next/image"
 import { motion, AnimatePresence } from "framer-motion"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -112,6 +117,27 @@ export default function GamePlayPage() {
   const activeChannelRef = useRef<any>(null)
   // Guards against recording the same finished game more than once.
   const recordedResultRef = useRef(false)
+  const persistTimerRef = useRef<any>(null)
+
+  // Badges earned in the just-finished game (shown on the game-over screen).
+  const [newAchievements, setNewAchievements] = useState<string[]>([])
+
+  const isHost = useMemo(
+    () => partyMembers.some((m) => m.user_id === currentUserId && m.is_host),
+    [partyMembers, currentUserId]
+  )
+
+  // Normalized end-of-game view of whatever engine is running.
+  const summary = useMemo(
+    () => getGameSummary(gameData?.id || "", monopolyState, currentUserId || undefined),
+    [gameData?.id, monopolyState, currentUserId]
+  )
+
+  // A late-joiner who isn't one of the seated players watches instead of plays.
+  const isSpectator = useMemo(() => {
+    if (!isPlaying || !monopolyState?.players || !currentUserId) return false
+    return !monopolyState.players.some((p: any) => p.id === currentUserId)
+  }, [isPlaying, monopolyState, currentUserId])
 
   useEffect(() => {
     partyMembersRef.current = partyMembers
@@ -442,47 +468,78 @@ export default function GamePlayPage() {
       })
       .subscribe()
 
-    // Request sync from host when guest player enters the page
-    const timer = setTimeout(() => {
+    // Reconnect: a guest entering (or refreshing into) the page asks the host
+    // to re-send state. Retries a few times in case the host isn't ready yet,
+    // then falls back to the state the host persisted to the DB — so a refresh
+    // or dropped connection rejoins the same game instead of breaking it.
+    let attempts = 0
+    const timers: any[] = []
+    const askForSync = () => {
       const currentMembers = partyMembersRef.current
-      const isHost = currentMembers.some(m => m.user_id === currentUserId && m.is_host)
-      if (!isHost) {
-        channel.send({
-          type: 'broadcast',
-          event: 'request_sync',
-          payload: {}
-        })
+      const amHost = currentMembers.some(m => m.user_id === currentUserId && m.is_host)
+      if (amHost || monopolyStateRef.current) return   // host has the truth, or we already synced
+      channel.send({ type: 'broadcast', event: 'request_sync', payload: {} })
+      if (++attempts < 4) timers.push(setTimeout(askForSync, 2000))
+      else if (partyId !== 'mock-party-id') {
+        // Last resort — restore from the host's persisted snapshot.
+        supabase.from('parties').select('game_state').eq('id', partyId).single()
+          .then(({ data }: any) => {
+            if (data?.game_state && !monopolyStateRef.current) {
+              setMonopolyState(data.game_state)
+              setIsPlaying(true)
+            }
+          })
       }
-    }, 1500)
+    }
+    timers.push(setTimeout(askForSync, 1500))
 
     return () => {
       activeChannelRef.current = null
       supabase.removeChannel(channel)
       supabase.removeChannel(dbChannel)
-      clearTimeout(timer)
+      timers.forEach(clearTimeout)
     }
   }, [partyId, currentUserId, supabase, refreshPartyDetails])
 
-  // When the current game reaches a terminal state, record the result for the
-  // signed-in player so it feeds the dashboard leaderboard. Works across every
-  // engine via a generic check (terminal phase or a resolved winner). Bots,
-  // guests, and not-yet-finished games are skipped; each human client records
-  // its own row exactly once.
+  // When the current game reaches a terminal state, record the result + award
+  // badges for the signed-in player. Driven by the normalized summary so it
+  // works across every engine (incl. poker's last-one-standing and codenames'
+  // team win). Spectators, bots and guests are skipped; each human client
+  // records its own row exactly once per game.
   useEffect(() => {
-    const s: any = monopolyState
-    if (!s || recordedResultRef.current) return
-    if (!currentUserId || currentUserId.startsWith("local-player-")) return
-
-    const phase = typeof s.phase === "string" ? s.phase.toUpperCase() : ""
-    const terminalPhase = ["GAME_OVER", "GAMEOVER", "ENDED", "FINISHED", "COMPLETE"].includes(phase)
-    const winnerId = s.winnerId ?? s.winner?.id ?? (typeof s.winner === "string" ? s.winner : null)
-    const isOver = terminalPhase || winnerId != null || s.gameOver === true || s.isGameOver === true
-    if (!isOver) return
-
+    if (!summary.isOver || recordedResultRef.current) return
+    if (!currentUserId || currentUserId.startsWith("local-player-") || isSpectator) return
     recordedResultRef.current = true
-    const won = winnerId != null && winnerId === currentUserId
-    recordGameResult(supabase, { won, gameName: gameData?.name || (params.slug as string) })
-  }, [monopolyState, currentUserId, supabase, gameData, params.slug])
+
+    const gameId = gameData?.id || (params.slug as string)
+    const gameName = gameData?.name || gameId
+
+    ;(async () => {
+      await recordGameResult(supabase, { won: summary.youWon, gameName })
+      const already = await fetchUserAchievements(supabase, currentUserId)
+      const earned = evaluateAchievements({ gameId, state: monopolyState, summary, currentUserId, alreadyHave: already })
+      const newly = await recordAchievements(supabase, earned)
+      if (newly.length) {
+        setNewAchievements(newly)
+        toast.success(`🏅 ${newly.length} badge${newly.length > 1 ? "s" : ""} unlocked!`)
+      }
+    })()
+  }, [summary, currentUserId, isSpectator, supabase, gameData, monopolyState, params.slug])
+
+  // Reconnect — host persists the latest state to the DB (debounced) so anyone
+  // who refreshes or drops can restore the game even if the host has left.
+  useEffect(() => {
+    if (!isHost || !isPlaying || !monopolyState || !partyId || partyId === "mock-party-id") return
+    clearTimeout(persistTimerRef.current)
+    persistTimerRef.current = setTimeout(() => {
+      supabase
+        .from("parties")
+        .update({ game_state: monopolyState })
+        .eq("id", partyId)
+        .then(({ error }: any) => { if (error) console.warn("persist game_state failed:", error.message) })
+    }, 1200)
+    return () => clearTimeout(persistTimerRef.current)
+  }, [isHost, isPlaying, monopolyState, partyId, supabase])
 
   
   // Handle starting a new game
@@ -858,22 +915,42 @@ export default function GamePlayPage() {
                   </div>
                 </>
               )}
+
+              {/* Spectator banner — late joiners watch until the next game */}
+              {isSpectator && !summary.isOver && (
+                <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 rounded-full border border-white/15 bg-black/70 px-4 py-1.5 text-sm text-white shadow-lg backdrop-blur">
+                  <Eye className="h-4 w-4 text-aqua-400" />
+                  Spectating — you&apos;ll join the next game
+                </div>
+              )}
+
+              {/* Game-over recap, confetti & rematch */}
+              {isPlaying && summary.isOver && (
+                <GameOverScreen
+                  gameName={gameData.name}
+                  summary={summary}
+                  newAchievements={newAchievements}
+                  canRematch={isHost && !isSpectator}
+                  onRematch={() => { setNewAchievements([]); handleStartGame() }}
+                  onLeave={() => router.push("/games")}
+                />
+              )}
             </div>
-            
+
             {/* Game controls would go here */}
-            <div className="p-4 bg-black/30 border-t border-white/5">
-              <div className="flex justify-between items-center">
+            <div className="p-3 sm:p-4 bg-black/30 border-t border-white/5">
+              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
                 <div>
-                  <p className="text-white/70 text-sm">
-                    Players: {gameData.minPlayers}-{gameData.maxPlayers} • 
-                    Complexity: {gameData.complexity} • 
+                  <p className="text-white/70 text-xs sm:text-sm">
+                    Players: {gameData.minPlayers}-{gameData.maxPlayers} •
+                    Complexity: {gameData.complexity} •
                     Duration: {gameData.duration}
                   </p>
                 </div>
-                <Button 
+                <Button
                   onClick={() => setShowRules(true)}
-                  variant="outline" 
-                  className="text-white border-white/20 hover:bg-white/10 flex items-center gap-1.5"
+                  variant="outline"
+                  className="text-white border-white/20 hover:bg-white/10 flex items-center gap-1.5 self-start sm:self-auto shrink-0"
                 >
                   <BookOpen className="w-4 h-4 text-pink-400" />
                   Game Rules
