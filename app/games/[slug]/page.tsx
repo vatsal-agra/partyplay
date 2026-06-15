@@ -17,6 +17,16 @@ import MysteryBoard from "../cluedo/components/MysteryBoard"
 import { initializeGame as initializeMystery } from "../cluedo/lib/mysteryEngine"
 import BattleshipBoard from "../battleship/components/BattleshipBoard"
 import { initializeGame as initializeBattleship } from "../battleship/lib/battleshipEngine"
+import PictionaryBoard, { LiveEvent } from "../pictionary/components/PictionaryBoard"
+import { initializeGame as initializePictionary } from "../pictionary/lib/pictionaryEngine"
+import UnoBoard from "../uno/components/UnoBoard"
+import { initializeGame as initializeUno } from "../uno/lib/unoEngine"
+import PokerBoard from "../poker/components/PokerBoard"
+import { initializeGame as initializePoker } from "../poker/lib/pokerEngine"
+import SpymasterBoard from "../codenames/components/SpymasterBoard"
+import { initializeGame as initializeSpymaster } from "../codenames/lib/spymasterEngine"
+import DoodleDashBoard from "../scribbleio/components/DoodleDashBoard"
+import { initializeGame as initializeDoodle } from "../scribbleio/lib/doodleEngine"
 
 
 // Define types
@@ -79,6 +89,7 @@ export default function GamePlayPage() {
   }
 
   const [isPlaying, setIsPlaying] = useState(false)
+  const [liveEvent, setLiveEvent] = useState<LiveEvent | null>(null)
   const [showRules, setShowRules] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
   
@@ -181,26 +192,6 @@ export default function GamePlayPage() {
       maxPlayers: 8,
       duration: '15-30 min',
       complexity: 'Easy'
-    },
-    terramystica: {
-      id: 'terramystica',
-      name: 'Mystic Realms',
-      description: 'Strategic game of terrain building and resource management',
-      image: '/images/terra mystica thumbnail.png',
-      minPlayers: 2,
-      maxPlayers: 5,
-      duration: '90-120 min',
-      complexity: 'Hard'
-    },
-    '7wonders': {
-      id: '7wonders',
-      name: 'Ancient Wonders',
-      description: 'Build an ancient civilization and lead it to greatness',
-      image: '/images/7wonders thumbnail.png',
-      minPlayers: 3,
-      maxPlayers: 7,
-      duration: '30-60 min',
-      complexity: 'Medium'
     }
   }
 
@@ -429,6 +420,12 @@ export default function GamePlayPage() {
         setMonopolyState(payload)
         setIsPlaying(true)
       })
+      .on('broadcast', { event: 'draw' }, ({ payload }) => {
+        setLiveEvent({ type: 'draw', payload, t: Date.now() })
+      })
+      .on('broadcast', { event: 'clear' }, () => {
+        setLiveEvent({ type: 'clear', t: Date.now() })
+      })
       .on('broadcast', { event: 'request_sync' }, () => {
         console.log('Received request_sync from player. monopolyStateRef.current:', monopolyStateRef.current)
         const currentMembers = partyMembersRef.current
@@ -600,6 +597,144 @@ export default function GamePlayPage() {
       }
 
       const initialState = initializeBattleship(playersData)
+      setMonopolyState(initialState)
+      setIsPlaying(true)
+
+      if (partyId && activeChannelRef.current) {
+        activeChannelRef.current.send({
+          type: 'broadcast',
+          event: 'game_start',
+          payload: initialState
+        })
+      }
+      return
+    }
+
+    if (gameData.id === 'pictionary') {
+      // Multiplayer-only — every party member is a player; no bots.
+      const playersData = partyMembers.map(m => ({
+        id: m.user_id,
+        name: m.profile?.display_name || m.profile?.username || "You",
+        isBot: false
+      }))
+
+      const initialState = initializePictionary(playersData)
+      setMonopolyState(initialState)
+      setIsPlaying(true)
+
+      if (partyId && activeChannelRef.current) {
+        activeChannelRef.current.send({
+          type: 'broadcast',
+          event: 'game_start',
+          payload: initialState
+        })
+      }
+      return
+    }
+
+    if (gameData.id === 'uno') {
+      const isMock = !partyId || partyId === 'mock-party-id'
+      const humanMembers = isMock
+        ? partyMembers.filter(m => m.user_id === currentUserId)
+        : partyMembers
+
+      const playersData = humanMembers.slice(0, 10).map(m => ({
+        id: m.user_id,
+        name: m.profile?.display_name || m.profile?.username || "You",
+        isBot: false
+      }))
+
+      // Solo / single human — fill the table with AI players.
+      if (playersData.length < 2) {
+        const botNames = ['Card Shark', 'Wild Bot', 'Skip Bot', 'Reverso']
+        let bi = 0
+        while (playersData.length < 4) {
+          playersData.push({ id: `bot-${bi + 1}`, name: botNames[bi], isBot: true })
+          bi++
+        }
+      }
+
+      const initialState = initializeUno(playersData)
+      setMonopolyState(initialState)
+      setIsPlaying(true)
+
+      if (partyId && activeChannelRef.current) {
+        activeChannelRef.current.send({
+          type: 'broadcast',
+          event: 'game_start',
+          payload: initialState
+        })
+      }
+      return
+    }
+
+    if (gameData.id === 'poker') {
+      const isMock = !partyId || partyId === 'mock-party-id'
+      const humanMembers = isMock
+        ? partyMembers.filter(m => m.user_id === currentUserId)
+        : partyMembers
+
+      const playersData = humanMembers.slice(0, 8).map(m => ({
+        id: m.user_id,
+        name: m.profile?.display_name || m.profile?.username || "You",
+        isBot: false
+      }))
+
+      // Solo / single human — seat AI players at the table.
+      if (playersData.length < 2) {
+        const botNames = ['Ace Bot', 'Bluff Bot', 'Chip Bot', 'River Bot']
+        let bi = 0
+        while (playersData.length < 4) {
+          playersData.push({ id: `bot-${bi + 1}`, name: botNames[bi], isBot: true })
+          bi++
+        }
+      }
+
+      const initialState = initializePoker(playersData)
+      setMonopolyState(initialState)
+      setIsPlaying(true)
+
+      if (partyId && activeChannelRef.current) {
+        activeChannelRef.current.send({
+          type: 'broadcast',
+          event: 'game_start',
+          payload: initialState
+        })
+      }
+      return
+    }
+
+    if (gameData.id === 'codenames') {
+      // Team game — every party member is seated; pass-and-play covers solo.
+      const playersData = partyMembers.slice(0, 8).map(m => ({
+        id: m.user_id,
+        name: m.profile?.display_name || m.profile?.username || "You",
+        isBot: false
+      }))
+
+      const initialState = initializeSpymaster(playersData)
+      setMonopolyState(initialState)
+      setIsPlaying(true)
+
+      if (partyId && activeChannelRef.current) {
+        activeChannelRef.current.send({
+          type: 'broadcast',
+          event: 'game_start',
+          payload: initialState
+        })
+      }
+      return
+    }
+
+    if (gameData.id === 'scribbleio') {
+      // Free-for-all draw & guess — multiplayer-only; every member plays.
+      const playersData = partyMembers.map(m => ({
+        id: m.user_id,
+        name: m.profile?.display_name || m.profile?.username || "You",
+        isBot: false
+      }))
+
+      const initialState = initializeDoodle(playersData)
       setMonopolyState(initialState)
       setIsPlaying(true)
 
@@ -819,6 +954,94 @@ export default function GamePlayPage() {
                 <BattleshipBoard
                   state={monopolyState}
                   currentPlayerId={currentUserId || ''}
+                  onStateChange={(nextState) => {
+                    setMonopolyState(nextState)
+                  }}
+                  onBroadcastAction={(event, payload) => {
+                    if (partyId && activeChannelRef.current) {
+                      activeChannelRef.current.send({
+                        type: 'broadcast',
+                        event: event,
+                        payload: payload
+                      })
+                    }
+                  }}
+                />
+              ) : isPlaying && gameData.id === 'pictionary' && monopolyState ? (
+                <PictionaryBoard
+                  state={monopolyState}
+                  currentPlayerId={currentUserId || ''}
+                  liveEvent={liveEvent}
+                  onStateChange={(nextState) => {
+                    setMonopolyState(nextState)
+                  }}
+                  onBroadcastAction={(event, payload) => {
+                    if (partyId && activeChannelRef.current) {
+                      activeChannelRef.current.send({
+                        type: 'broadcast',
+                        event: event,
+                        payload: payload
+                      })
+                    }
+                  }}
+                />
+              ) : isPlaying && gameData.id === 'uno' && monopolyState ? (
+                <UnoBoard
+                  state={monopolyState}
+                  currentPlayerId={currentUserId || ''}
+                  onStateChange={(nextState) => {
+                    setMonopolyState(nextState)
+                  }}
+                  onBroadcastAction={(event, payload) => {
+                    if (partyId && activeChannelRef.current) {
+                      activeChannelRef.current.send({
+                        type: 'broadcast',
+                        event: event,
+                        payload: payload
+                      })
+                    }
+                  }}
+                />
+              ) : isPlaying && gameData.id === 'poker' && monopolyState ? (
+                <PokerBoard
+                  state={monopolyState}
+                  currentPlayerId={currentUserId || ''}
+                  onStateChange={(nextState) => {
+                    setMonopolyState(nextState)
+                  }}
+                  onBroadcastAction={(event, payload) => {
+                    if (partyId && activeChannelRef.current) {
+                      activeChannelRef.current.send({
+                        type: 'broadcast',
+                        event: event,
+                        payload: payload
+                      })
+                    }
+                  }}
+                />
+              ) : isPlaying && gameData.id === 'codenames' && monopolyState ? (
+                <SpymasterBoard
+                  state={monopolyState}
+                  currentPlayerId={currentUserId || ''}
+                  passAndPlay={!partyId || partyId === 'mock-party-id'}
+                  onStateChange={(nextState) => {
+                    setMonopolyState(nextState)
+                  }}
+                  onBroadcastAction={(event, payload) => {
+                    if (partyId && activeChannelRef.current) {
+                      activeChannelRef.current.send({
+                        type: 'broadcast',
+                        event: event,
+                        payload: payload
+                      })
+                    }
+                  }}
+                />
+              ) : isPlaying && gameData.id === 'scribbleio' && monopolyState ? (
+                <DoodleDashBoard
+                  state={monopolyState}
+                  currentPlayerId={currentUserId || ''}
+                  liveEvent={liveEvent}
                   onStateChange={(nextState) => {
                     setMonopolyState(nextState)
                   }}

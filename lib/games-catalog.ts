@@ -105,28 +105,6 @@ export const GAMES_CATALOG: Game[] = [
     complexity: 'Easy',
     category: ['Party', 'Word Game'],
   },
-  {
-    id: 'terramystica',
-    name: 'Mystic Realms',
-    description: 'Shape the land and develop your civilization in this deep strategy game.',
-    image: '/images/terra mystica thumbnail.png',
-    minPlayers: 2,
-    maxPlayers: 5,
-    duration: '60-150 min',
-    complexity: 'Hard',
-    category: ['Strategy', 'Eurogame'],
-  },
-  {
-    id: '7wonders',
-    name: 'Ancient Wonders',
-    description: 'Lead an ancient civilization as it rises from its barbaric roots to become a world power.',
-    image: '/images/7wonders thumbnail.png',
-    minPlayers: 3,
-    maxPlayers: 7,
-    duration: '30 min',
-    complexity: 'Medium',
-    category: ['Strategy', 'Card Game'],
-  },
 ]
 
 export function getGameById(id: string | null | undefined): Game | undefined {
