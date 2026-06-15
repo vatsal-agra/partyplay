@@ -616,7 +616,7 @@ export default function GamePlayPage() {
         <div className="flex flex-col md:flex-row h-full w-full overflow-y-auto md:overflow-hidden">
           {/* Game screen - Left side */}
           <motion.div 
-            className="w-full md:w-[calc(100%-300px)] xl:w-[calc(100%-550px)] h-[72vh] md:h-full bg-black/20 backdrop-blur-md overflow-hidden shadow-xl border-r border-white/10 flex flex-col flex-shrink-0"
+            className="w-full md:w-[calc(100%-300px)] h-[72vh] md:h-full bg-black/20 backdrop-blur-md overflow-hidden shadow-xl border-r border-white/10 flex flex-col flex-shrink-0"
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5 }}
@@ -998,17 +998,6 @@ export default function GamePlayPage() {
               </TabsContent>
             </Tabs>
           </motion.div>
-          
-          {/* Ad Space - Right side */}
-          <div className="hidden xl:block w-[250px] h-full bg-black/10 backdrop-blur-sm p-4 overflow-hidden border-l border-white/10">
-            <div className="text-center text-white/70 mb-4 text-sm">Advertisement</div>
-            <div className="bg-white/5 rounded-lg p-4 h-[calc(100%-2rem)] flex items-center justify-center border border-dashed border-white/20">
-              <div className="text-center">
-                <span className="text-white/50">Ad Space</span>
-                <p className="text-xs text-white/30 mt-2">300x600</p>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
       
