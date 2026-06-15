@@ -9,6 +9,7 @@ import { recordGameResult } from "@/lib/gameStats"
 import { getGameSummary } from "@/lib/gameSummary"
 import { evaluateAchievements, recordAchievements, fetchUserAchievements } from "@/lib/achievements"
 import { GameOverScreen } from "@/components/GameOverScreen"
+import { VoiceChat } from "@/components/VoiceChat"
 import { toast } from "sonner"
 import { Eye } from "lucide-react"
 import Image from "next/image"
@@ -1114,6 +1115,11 @@ export default function GamePlayPage() {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Party voice chat — real parties only (skip solo / mock games) */}
+      {partyId && partyId !== "mock-party-id" && currentUserId && !currentUserId.startsWith("local-player-") && (
+        <VoiceChat client={supabase} roomId={partyId} userId={currentUserId} members={partyMembers} />
+      )}
     </div>
   )
 }
