@@ -217,12 +217,12 @@ export function getReachable(state: MysteryState, idx: number): Reachable {
   }
 
   const cells: Reachable['cells'] = []
-  for (const [k, d] of dist) {
+  Array.from(dist.entries()).forEach(([k, d]) => {
     if (d >= 1 && d <= state.movesLeft) {
       const [x, y] = k.split(',').map(Number)
       cells.push({ x, y, dist: d })
     }
-  }
+  })
 
   const rooms: Reachable['rooms'] = []
   for (const room of ROOMS) {

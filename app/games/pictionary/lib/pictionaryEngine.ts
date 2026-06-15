@@ -136,7 +136,7 @@ export function endRound(state: PictionaryState): PictionaryState {
   s.phase = 'ROUND_END'
   s.roundEndsAt = null
   s.chat = [...s.chat, {
-    id: `sys-${Date.now()}`, playerId: 'system', name: 'system', kind: 'system',
+    id: `sys-${Date.now()}`, playerId: 'system', name: 'system', kind: 'system' as const,
     text: `The word was "${s.word}".`,
   }].slice(-80)
   pushLog(s, `⏱️ Round over — the word was "${s.word}".`)
@@ -163,7 +163,7 @@ export function submitGuess(state: PictionaryState, playerId: string, text: stri
     s.correctCount += 1
     s.players[s.drawerIndex].score += 20                // drawer reward per correct guess
     s.chat = [...s.chat, {
-      id: `c-${Date.now()}-${playerId}`, playerId, name: me.name, kind: 'correct',
+      id: `c-${Date.now()}-${playerId}`, playerId, name: me.name, kind: 'correct' as const,
       text: `${me.name} guessed the word! (+${points})`,
     }].slice(-80)
     pushLog(s, `✅ ${me.name} guessed it (+${points}).`)
@@ -175,7 +175,7 @@ export function submitGuess(state: PictionaryState, playerId: string, text: stri
     }
   } else {
     s.chat = [...s.chat, {
-      id: `c-${Date.now()}-${playerId}`, playerId, name: me.name, kind: 'guess',
+      id: `c-${Date.now()}-${playerId}`, playerId, name: me.name, kind: 'guess' as const,
       text: text.slice(0, 60),
     }].slice(-80)
   }

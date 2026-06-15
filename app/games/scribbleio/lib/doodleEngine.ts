@@ -162,7 +162,7 @@ export function endRound(state: DoodleState): DoodleState {
   const s = clone(state)
   s.phase = 'ROUND_END'
   s.roundEndsAt = null
-  s.chat = [...s.chat, { id: `sys-${Date.now()}`, name: 'system', kind: 'system', text: `The word was "${s.word}".` }].slice(-80)
+  s.chat = [...s.chat, { id: `sys-${Date.now()}`, name: 'system', kind: 'system' as const, text: `The word was "${s.word}".` }].slice(-80)
   pushLog(s, `⏱️ Round over — the word was "${s.word}".`)
   return s
 }
@@ -186,12 +186,12 @@ export function submitGuess(state: DoodleState, playerId: string, text: string):
     me.guessedThisRound = true
     s.correctCount += 1
     s.players[s.drawerIndex].score += 20
-    s.chat = [...s.chat, { id: `c-${Date.now()}-${playerId}`, name: me.name, kind: 'correct', text: `${me.name} guessed it! (+${points})` }].slice(-80)
+    s.chat = [...s.chat, { id: `c-${Date.now()}-${playerId}`, name: me.name, kind: 'correct' as const, text: `${me.name} guessed it! (+${points})` }].slice(-80)
     pushLog(s, `✅ ${me.name} guessed the word (+${points}).`)
     const guessers = s.players.filter((p, i) => i !== s.drawerIndex)
     if (guessers.every((p) => p.guessedThisRound)) return endRound(s)
   } else {
-    s.chat = [...s.chat, { id: `c-${Date.now()}-${playerId}`, name: me.name, kind: 'guess', text: text.slice(0, 60) }].slice(-80)
+    s.chat = [...s.chat, { id: `c-${Date.now()}-${playerId}`, name: me.name, kind: 'guess' as const, text: text.slice(0, 60) }].slice(-80)
   }
   return s
 }

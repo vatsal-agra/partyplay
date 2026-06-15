@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
-  MysteryState, MoveDest, RoomId as EngineRoomId,
+  MysteryState, MoveDest,
   rollDice, moveTo, takeSecretPassage, stayAndSuggest, makeSuggestion,
   respondDisprove, makeAccusation, endTurn, playBotStep,
   getReachable, cardName, getPlayerName,
