@@ -201,6 +201,27 @@ export function getGameSummary(gameId: string, state: any, currentUserId?: strin
         }),
       }
     }
+    case "manhunt": {
+      const isOver = state.phase === "GAME_OVER" || !!state.winner
+      const mrxWon = state.winner === "mrx"
+      const winnerIds = mrxWon
+        ? players.filter((p) => p.role === "mrx").map((p) => p.id)
+        : players.filter((p) => p.role === "detective").map((p) => p.id)
+      const youWon = !!currentUserId && winnerIds.includes(currentUserId)
+      return {
+        isOver,
+        winnerIds,
+        winnerLabel: mrxWon ? `Mr X (${players.find((p) => p.role === "mrx")?.name || "fugitive"})` : "The Detectives",
+        youWon,
+        standings: build(players, {
+          winnerIds,
+          detail: (p) =>
+            p.role === "mrx"
+              ? (mrxWon ? "Escaped!" : "Caught")
+              : (p.id === state.winnerId ? "Caught Mr X" : "Detective"),
+        }),
+      }
+    }
     default: {
       // Best-effort generic fallback for any future game.
       const isOver =

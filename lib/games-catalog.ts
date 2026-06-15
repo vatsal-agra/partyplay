@@ -95,6 +95,17 @@ export const GAMES_CATALOG: Game[] = [
     category: ['Online', 'Drawing'],
   },
   {
+    id: 'manhunt',
+    name: 'Manhunt',
+    description: 'One player is the fugitive moving in secret across the city; the rest are detectives hunting them down by taxi, bus, and underground.',
+    image: '/images/games/manhunt.png',
+    minPlayers: 2,
+    maxPlayers: 6,
+    duration: '20-40 min',
+    complexity: 'Medium',
+    category: ['Strategy', 'Deduction'],
+  },
+  {
     id: 'codenames',
     name: 'Spymaster',
     description: 'Give one-word clues to help your team identify agents while avoiding the assassin.',

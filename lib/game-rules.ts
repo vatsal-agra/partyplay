@@ -97,6 +97,16 @@ export const GAME_RULES: Record<string, GameRules> = {
       { heading: "5. Winning", body: "Everyone takes turns as the drawer. The player with the most points at the end wins." },
     ],
   },
+  manhunt: {
+    title: "Manhunt — How to Play",
+    sections: [
+      { heading: "1. Object of the Game", body: "One player is Mr X, the fugitive. The detectives win if one of them lands on Mr X's station; Mr X wins by staying free until the rounds run out." },
+      { heading: "2. Moving", body: "On your turn, travel to a connected station using a matching ticket — Taxi (yellow), Bus (cyan), or Underground (pink). No ticket, no trip." },
+      { heading: "3. Mr X is hidden", body: "Only Mr X sees his own location. Detectives see the transport he used each round (the travel log) — and his exact spot only when he surfaces on the reveal rounds." },
+      { heading: "4. Black tickets", body: "Mr X also has black tickets that work on any line and hide which transport he took — perfect for slipping away right after surfacing." },
+      { heading: "5. The hunt", body: "Spent detective tickets are handed to Mr X, so detectives can't move forever. Corner Mr X — or trap him with no legal move — to win." },
+    ],
+  },
   codenames: {
     title: "Spymaster — How to Play",
     sections: [

@@ -37,6 +37,8 @@ import SpymasterBoard from "../codenames/components/SpymasterBoard"
 import { initializeGame as initializeSpymaster } from "../codenames/lib/spymasterEngine"
 import DoodleDashBoard from "../scribbleio/components/DoodleDashBoard"
 import { initializeGame as initializeDoodle } from "../scribbleio/lib/doodleEngine"
+import ManhuntBoard from "../manhunt/components/ManhuntBoard"
+import { initializeGame as initializeManhunt } from "../manhunt/lib/manhuntEngine"
 
 
 // Define types
@@ -82,6 +84,7 @@ const BOT_SUPPORT: Record<string, string[]> = {
   battleship: ['Admiral Bot', 'Captain AI', 'Commodore', 'Cmdr. Salvo', 'First Mate'],
   uno:        ['Card Shark', 'Wild Bot', 'Skip Bot', 'Reverso', 'Draw Two'],
   poker:      ['Ace Bot', 'Bluff Bot', 'Chip Bot', 'River Bot', 'All-in Al'],
+  manhunt:    ['Det. Vox', 'Det. Cyan', 'Det. Onyx', 'Det. Vale', 'Det. Sigma'],
 }
 
 export default function GamePlayPage() {
@@ -284,6 +287,16 @@ export default function GamePlayPage() {
       maxPlayers: 8,
       duration: '15-30 min',
       complexity: 'Easy'
+    },
+    manhunt: {
+      id: 'manhunt',
+      name: 'Manhunt',
+      description: 'Hunt the hidden fugitive across the city — or be the one who gets away',
+      image: '/images/games/manhunt.png',
+      minPlayers: 2,
+      maxPlayers: 6,
+      duration: '20-40 min',
+      complexity: 'Medium'
     }
   }
 
@@ -609,6 +622,7 @@ export default function GamePlayPage() {
       poker: initializePoker,
       codenames: initializeSpymaster,
       scribbleio: initializeDoodle,
+      manhunt: initializeManhunt,
     }
 
     const init = initializers[gameData.id]
@@ -889,6 +903,23 @@ export default function GamePlayPage() {
                   state={monopolyState}
                   currentPlayerId={currentUserId || ''}
                   liveEvent={liveEvent}
+                  onStateChange={(nextState) => {
+                    setMonopolyState(nextState)
+                  }}
+                  onBroadcastAction={(event, payload) => {
+                    if (partyId && activeChannelRef.current) {
+                      activeChannelRef.current.send({
+                        type: 'broadcast',
+                        event: event,
+                        payload: payload
+                      })
+                    }
+                  }}
+                />
+              ) : isPlaying && gameData.id === 'manhunt' && monopolyState ? (
+                <ManhuntBoard
+                  state={monopolyState}
+                  currentPlayerId={currentUserId || ''}
                   onStateChange={(nextState) => {
                     setMonopolyState(nextState)
                   }}

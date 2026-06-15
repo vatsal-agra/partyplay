@@ -66,6 +66,10 @@ export const ACHIEVEMENTS: Achievement[] = [
   // ---- Spymaster ------------------------------------------------------------
   { id: "big_brain", name: "Big Brain Energy", description: "Win Spymaster.", emoji: "🧠", game: "codenames" },
   { id: "assassin", name: "Touched the Assassin", description: "Lose Spymaster by hitting the assassin.", emoji: "🔪", game: "codenames" },
+
+  // ---- Manhunt --------------------------------------------------------------
+  { id: "the_untouchable", name: "The Untouchable", description: "Escape as Mr X in Manhunt.", emoji: "🕶️", game: "manhunt" },
+  { id: "bloodhound", name: "Bloodhound", description: "Catch Mr X as a detective.", emoji: "🐕", game: "manhunt" },
 ]
 
 const BY_ID: Record<string, Achievement> = Object.fromEntries(ACHIEVEMENTS.map((a) => [a.id, a]))
@@ -182,6 +186,10 @@ export function evaluateAchievements(opts: {
     case "codenames":
       if (won) earned.add("big_brain")
       else earned.add("assassin")
+      break
+    case "manhunt":
+      if (won && me?.role === "mrx") earned.add("the_untouchable")
+      if (won && me?.role === "detective") earned.add("bloodhound")
       break
   }
 
