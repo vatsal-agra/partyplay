@@ -21,21 +21,26 @@ export async function recordGameResult(
   }
 }
 
-// The signed-in user's running totals (used for milestone badges). Returns
-// zeros if the row/table doesn't exist yet.
+// The signed-in user's running totals (used for milestone badges, XP/level, and
+// the daily streak). Returns zeros if the row/table doesn't exist yet.
 export async function fetchUserStats(
   client: SupabaseClient,
   userId: string
-): Promise<{ wins: number; gamesPlayed: number }> {
+): Promise<{ wins: number; gamesPlayed: number; xp: number; streak: number }> {
   try {
     const { data } = await client
       .from("game_stats")
-      .select("wins, games_played")
+      .select("wins, games_played, xp, streak")
       .eq("user_id", userId)
       .single()
-    return { wins: data?.wins ?? 0, gamesPlayed: data?.games_played ?? 0 }
+    return {
+      wins: data?.wins ?? 0,
+      gamesPlayed: data?.games_played ?? 0,
+      xp: data?.xp ?? 0,
+      streak: data?.streak ?? 0,
+    }
   } catch {
-    return { wins: 0, gamesPlayed: 0 }
+    return { wins: 0, gamesPlayed: 0, xp: 0, streak: 0 }
   }
 }
 
@@ -44,8 +49,11 @@ export interface LeaderboardRow {
   username: string
   display_name?: string
   avatar_url?: string
+  avatar_emoji?: string | null
+  avatar_color?: string | null
   wins: number
   games_played: number
+  xp: number
   favorite_game?: string
 }
 
@@ -59,9 +67,9 @@ export async function fetchLeaderboard(
   try {
     const { data, error } = await client
       .from("game_stats")
-      .select("user_id, wins, games_played, favorite_game, profiles ( username, display_name, avatar_url )")
+      .select("user_id, wins, games_played, xp, favorite_game, profiles ( username, display_name, avatar_url, avatar_emoji, avatar_color )")
       .order("wins", { ascending: false })
-      .order("games_played", { ascending: false })
+      .order("xp", { ascending: false })
       .limit(limit)
 
     if (error || !data) {
@@ -77,8 +85,11 @@ export async function fetchLeaderboard(
         username: profile?.username || `User ${String(row.user_id).slice(0, 6)}`,
         display_name: profile?.display_name,
         avatar_url: profile?.avatar_url,
+        avatar_emoji: profile?.avatar_emoji,
+        avatar_color: profile?.avatar_color,
         wins: row.wins ?? 0,
         games_played: row.games_played ?? 0,
+        xp: row.xp ?? 0,
         favorite_game: row.favorite_game || undefined,
       }
     })

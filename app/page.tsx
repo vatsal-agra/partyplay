@@ -7,6 +7,7 @@ import { motion } from "framer-motion"
 import Image from "next/image"
 import { Gamepad2, Users, MessageSquare, Zap, Trophy, Shield, Vote, Sparkles, ArrowRight } from "lucide-react"
 import { GAMES_CATALOG } from "@/lib/games-catalog"
+import { FloatingPieces } from "@/components/FloatingPieces"
 
 const fadeIn = {
   hidden: { opacity: 0, y: 24 },
@@ -54,7 +55,8 @@ export default function Home() {
     <main className="relative min-h-screen overflow-hidden">
       {/* Hero */}
       <section className="relative">
-        <div className="container mx-auto px-4 pt-16 pb-20 lg:pt-24">
+        <FloatingPieces />
+        <div className="container relative z-10 mx-auto px-4 pt-16 pb-20 lg:pt-24">
           <motion.div
             className="flex flex-col lg:flex-row items-center justify-between gap-14"
             initial="hidden"
