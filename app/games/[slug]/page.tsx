@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from "react"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
+import { touchParty } from "@/lib/partyActivity"
 import Image from "next/image"
 import { motion, AnimatePresence } from "framer-motion"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -63,6 +64,17 @@ interface ChatMessage {
   display_name?: string
 }
 
+// Games that support AI bots, with their bot name pools. Multiplayer-only
+// games (pictionary, codenames, scribbleio) are intentionally absent.
+const BOT_SUPPORT: Record<string, string[]> = {
+  monopoly:   ['Mr. Mogul', 'Tycoon Bot', 'Richie Rich', 'Goldman AI', 'Capitalist'],
+  catan:      ['Settler Bot', 'Golden Bot', 'Frontier AI', 'Harbor Bot', 'Trader Bot'],
+  cluedo:     ['Inspector Vox', 'Detective Cyan', 'Sleuth Sigma', 'Agent Onyx', 'Constable Vale'],
+  battleship: ['Admiral Bot', 'Captain AI', 'Commodore', 'Cmdr. Salvo', 'First Mate'],
+  uno:        ['Card Shark', 'Wild Bot', 'Skip Bot', 'Reverso', 'Draw Two'],
+  poker:      ['Ace Bot', 'Bluff Bot', 'Chip Bot', 'River Bot', 'All-in Al'],
+}
+
 export default function GamePlayPage() {
   const params = useParams()
   const router = useRouter()
@@ -90,6 +102,7 @@ export default function GamePlayPage() {
 
   const [isPlaying, setIsPlaying] = useState(false)
   const [liveEvent, setLiveEvent] = useState<LiveEvent | null>(null)
+  const [lobbyBots, setLobbyBots] = useState<{ id: string; name: string }[]>([])
   const [showRules, setShowRules] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
   
@@ -107,7 +120,7 @@ export default function GamePlayPage() {
       id: 'monopoly',
       name: 'Property Empire',
       description: 'Classic real estate trading game',
-      image: '/images/monopoly thumbnail.png',
+      image: '/images/games/property-empire.png',
       minPlayers: 2,
       maxPlayers: 6,
       duration: '60-180 min',
@@ -117,7 +130,7 @@ export default function GamePlayPage() {
       id: 'battleship',
       name: 'Naval Clash',
       description: 'Naval combat game',
-      image: '/images/Battleship thumbnail.png',
+      image: '/images/games/naval-clash.jpg',
       minPlayers: 2,
       maxPlayers: 2,
       duration: '15-30 min',
@@ -127,7 +140,7 @@ export default function GamePlayPage() {
       id: 'catan',
       name: 'Hexland',
       description: 'Build and trade to settle the island',
-      image: '/images/catan thumbnail.png',
+      image: '/images/games/hexland.jpg',
       minPlayers: 3,
       maxPlayers: 4,
       duration: '60-120 min',
@@ -137,7 +150,7 @@ export default function GamePlayPage() {
       id: 'uno',
       name: 'Color Clash',
       description: 'Classic card game of matching colors and numbers',
-      image: '/images/uno final thumbnail.png',
+      image: '/images/games/color-clash.png',
       minPlayers: 2,
       maxPlayers: 10,
       duration: '15-30 min',
@@ -157,7 +170,7 @@ export default function GamePlayPage() {
       id: 'cluedo',
       name: 'Mystery Manor',
       description: 'Solve the mystery of who committed the murder',
-      image: '/images/cluedo thumbnail.png',
+      image: '/images/games/mystery-manor.png',
       minPlayers: 3,
       maxPlayers: 6,
       duration: '45-60 min',
@@ -167,7 +180,7 @@ export default function GamePlayPage() {
       id: 'pictionary',
       name: 'Quick Draw',
       description: 'Draw and guess words against the clock',
-      image: '/images/pictionary thumbnail.png',
+      image: '/images/games/quick-draw.png',
       minPlayers: 4,
       maxPlayers: 8,
       duration: '30-60 min',
@@ -177,7 +190,7 @@ export default function GamePlayPage() {
       id: 'scribbleio',
       name: 'Doodle Dash',
       description: 'Online drawing and guessing game',
-      image: '/images/scribbleio thumbnail.png',
+      image: '/images/games/doodle-dash.png',
       minPlayers: 2,
       maxPlayers: 16,
       duration: '15-30 min',
@@ -187,7 +200,7 @@ export default function GamePlayPage() {
       id: 'codenames',
       name: 'Spymaster',
       description: 'Give one-word clues to help your team guess the right words',
-      image: '/images/codenames thumbnal.png',
+      image: '/images/games/spymaster.png',
       minPlayers: 4,
       maxPlayers: 8,
       duration: '15-30 min',
@@ -342,6 +355,7 @@ export default function GamePlayPage() {
           // Mock party data for now (when no partyId query param is provided)
           setPartyId("mock-party-id")
           
+          // Solo play: just you. Bots are added explicitly via the lobby button.
           setPartyMembers([
             {
               id: "member-1",
@@ -352,45 +366,9 @@ export default function GamePlayPage() {
                 username: activeUser.user_metadata?.username || "You",
                 display_name: activeUser.user_metadata?.username || "You"
               }
-            },
-            {
-              id: "member-2",
-              user_id: "user-2",
-              joined_at: new Date().toISOString(),
-              profile: {
-                username: "player2",
-                display_name: "Player 2"
-              }
-            },
-            {
-              id: "member-3",
-              user_id: "user-3",
-              joined_at: new Date().toISOString(),
-              profile: {
-                username: "player3",
-                display_name: "Player 3"
-              }
             }
           ])
-          
-          setChatMessages([
-            {
-              id: "msg-1",
-              user_id: "user-2",
-              content: "Hey everyone, ready to play?",
-              created_at: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-              username: "player2",
-              display_name: "Player 2"
-            },
-            {
-              id: "msg-2",
-              user_id: activeUser.id,
-              content: "Yes, let's start!",
-              created_at: new Date(Date.now() - 1000 * 60 * 2).toISOString(),
-              username: activeUser.user_metadata?.username || "You",
-              display_name: activeUser.user_metadata?.username || "You"
-            }
-          ])
+          setChatMessages([])
         }
       } catch (error) {
         console.error("Error fetching game data:", error)
@@ -485,308 +463,38 @@ export default function GamePlayPage() {
   // Handle starting a new game
   const handleStartGame = async () => {
     if (!gameData || !currentUserId) return
-    
-    if (gameData.id === 'monopoly') {
-      const playersData = partyMembers.map(m => ({
-        id: m.user_id,
-        name: m.profile?.display_name || m.profile?.username || "You",
-        isBot: false
-      }))
-      
-      // Standalone/Single-player fallback: Add 2 bots if playing alone
-      if (playersData.length === 1) {
-        playersData.push({ id: 'bot-1', name: 'Mr. Mogul', isBot: true })
-        playersData.push({ id: 'bot-2', name: 'Tycoon Bot', isBot: true })
-      }
-      
-      const initialState = initializeGame(playersData)
-      setMonopolyState(initialState)
-      setIsPlaying(true)
-      
-      // Broadcast to other players in the party
-      if (partyId && activeChannelRef.current) {
-        activeChannelRef.current.send({
-          type: 'broadcast',
-          event: 'game_start',
-          payload: initialState
-        })
-      }
-      return
+
+    // Build the player list: real party members + any AI bots added in the lobby.
+    const initializers: Record<string, (players: { id: string; name: string; isBot: boolean }[]) => any> = {
+      monopoly: initializeGame,
+      catan: initializeCatan,
+      cluedo: initializeMystery,
+      battleship: initializeBattleship,
+      pictionary: initializePictionary,
+      uno: initializeUno,
+      poker: initializePoker,
+      codenames: initializeSpymaster,
+      scribbleio: initializeDoodle,
     }
 
-    if (gameData.id === 'catan') {
-      const playersData = partyMembers.map(m => ({
+    const init = initializers[gameData.id]
+    if (init) {
+      const humans = partyMembers.map(m => ({
         id: m.user_id,
         name: m.profile?.display_name || m.profile?.username || "You",
-        isBot: false
+        isBot: false,
       }))
-      
-      // Standalone/Single-player fallback: Add 3 bots if playing alone
-      if (playersData.length === 1) {
-        playersData.push({ id: 'bot-1', name: 'Tycoon Bot', isBot: true })
-        playersData.push({ id: 'bot-2', name: 'Settler Bot', isBot: true })
-        playersData.push({ id: 'bot-3', name: 'Golden Bot', isBot: true })
-      }
-      
-      const initialState = initializeCatan(playersData)
-      setMonopolyState(initialState)
-      setIsPlaying(true)
-
-      // Broadcast to other players in the party
-      if (partyId && activeChannelRef.current) {
-        activeChannelRef.current.send({
-          type: 'broadcast',
-          event: 'game_start',
-          payload: initialState
-        })
-      }
-      return
-    }
-
-    if (gameData.id === 'cluedo') {
-      // In mock / no-party mode, the route injects placeholder members; play
-      // solo against bots instead of stalling on members who never respond.
-      const isMock = !partyId || partyId === 'mock-party-id'
-      const humanMembers = isMock
-        ? partyMembers.filter(m => m.user_id === currentUserId)
-        : partyMembers
-
-      const playersData = humanMembers.map(m => ({
-        id: m.user_id,
-        name: m.profile?.display_name || m.profile?.username || "You",
-        isBot: false
-      }))
-
-      // Fill the manor with AI sleuths so there are at least 4 investigators.
-      const botNames = ['Inspector Vox', 'Detective Cyan', 'Sleuth Sigma', 'Agent Onyx', 'Constable Vale']
-      let bi = 0
-      while (playersData.length < 4) {
-        playersData.push({ id: `bot-${bi + 1}`, name: botNames[bi], isBot: true })
-        bi++
-      }
-
-      const initialState = initializeMystery(playersData)
+      const bots = lobbyBots.map(b => ({ id: b.id, name: b.name, isBot: true }))
+      const initialState = init([...humans, ...bots])
       setMonopolyState(initialState)
       setIsPlaying(true)
 
       if (partyId && activeChannelRef.current) {
-        activeChannelRef.current.send({
-          type: 'broadcast',
-          event: 'game_start',
-          payload: initialState
-        })
+        activeChannelRef.current.send({ type: 'broadcast', event: 'game_start', payload: initialState })
       }
       return
     }
 
-    if (gameData.id === 'battleship') {
-      const isMock = !partyId || partyId === 'mock-party-id'
-      const humanMembers = isMock
-        ? partyMembers.filter(m => m.user_id === currentUserId)
-        : partyMembers
-
-      const playersData = humanMembers.slice(0, 2).map(m => ({
-        id: m.user_id,
-        name: m.profile?.display_name || m.profile?.username || "You",
-        isBot: false
-      }))
-
-      // Naval Clash is 1v1 — add an AI admiral if there's no second human.
-      if (playersData.length < 2) {
-        playersData.push({ id: 'bot-1', name: 'Admiral Bot', isBot: true })
-      }
-
-      const initialState = initializeBattleship(playersData)
-      setMonopolyState(initialState)
-      setIsPlaying(true)
-
-      if (partyId && activeChannelRef.current) {
-        activeChannelRef.current.send({
-          type: 'broadcast',
-          event: 'game_start',
-          payload: initialState
-        })
-      }
-      return
-    }
-
-    if (gameData.id === 'pictionary') {
-      // Multiplayer-only — every party member is a player; no bots.
-      const playersData = partyMembers.map(m => ({
-        id: m.user_id,
-        name: m.profile?.display_name || m.profile?.username || "You",
-        isBot: false
-      }))
-
-      const initialState = initializePictionary(playersData)
-      setMonopolyState(initialState)
-      setIsPlaying(true)
-
-      if (partyId && activeChannelRef.current) {
-        activeChannelRef.current.send({
-          type: 'broadcast',
-          event: 'game_start',
-          payload: initialState
-        })
-      }
-      return
-    }
-
-    if (gameData.id === 'uno') {
-      const isMock = !partyId || partyId === 'mock-party-id'
-      const humanMembers = isMock
-        ? partyMembers.filter(m => m.user_id === currentUserId)
-        : partyMembers
-
-      const playersData = humanMembers.slice(0, 10).map(m => ({
-        id: m.user_id,
-        name: m.profile?.display_name || m.profile?.username || "You",
-        isBot: false
-      }))
-
-      // Solo / single human — fill the table with AI players.
-      if (playersData.length < 2) {
-        const botNames = ['Card Shark', 'Wild Bot', 'Skip Bot', 'Reverso']
-        let bi = 0
-        while (playersData.length < 4) {
-          playersData.push({ id: `bot-${bi + 1}`, name: botNames[bi], isBot: true })
-          bi++
-        }
-      }
-
-      const initialState = initializeUno(playersData)
-      setMonopolyState(initialState)
-      setIsPlaying(true)
-
-      if (partyId && activeChannelRef.current) {
-        activeChannelRef.current.send({
-          type: 'broadcast',
-          event: 'game_start',
-          payload: initialState
-        })
-      }
-      return
-    }
-
-    if (gameData.id === 'poker') {
-      const isMock = !partyId || partyId === 'mock-party-id'
-      const humanMembers = isMock
-        ? partyMembers.filter(m => m.user_id === currentUserId)
-        : partyMembers
-
-      const playersData = humanMembers.slice(0, 8).map(m => ({
-        id: m.user_id,
-        name: m.profile?.display_name || m.profile?.username || "You",
-        isBot: false
-      }))
-
-      // Solo / single human — seat AI players at the table.
-      if (playersData.length < 2) {
-        const botNames = ['Ace Bot', 'Bluff Bot', 'Chip Bot', 'River Bot']
-        let bi = 0
-        while (playersData.length < 4) {
-          playersData.push({ id: `bot-${bi + 1}`, name: botNames[bi], isBot: true })
-          bi++
-        }
-      }
-
-      const initialState = initializePoker(playersData)
-      setMonopolyState(initialState)
-      setIsPlaying(true)
-
-      if (partyId && activeChannelRef.current) {
-        activeChannelRef.current.send({
-          type: 'broadcast',
-          event: 'game_start',
-          payload: initialState
-        })
-      }
-      return
-    }
-
-    if (gameData.id === 'codenames') {
-      // Team game — every party member is seated; pass-and-play covers solo.
-      const playersData = partyMembers.slice(0, 8).map(m => ({
-        id: m.user_id,
-        name: m.profile?.display_name || m.profile?.username || "You",
-        isBot: false
-      }))
-
-      const initialState = initializeSpymaster(playersData)
-      setMonopolyState(initialState)
-      setIsPlaying(true)
-
-      if (partyId && activeChannelRef.current) {
-        activeChannelRef.current.send({
-          type: 'broadcast',
-          event: 'game_start',
-          payload: initialState
-        })
-      }
-      return
-    }
-
-    if (gameData.id === 'scribbleio') {
-      // Free-for-all draw & guess — multiplayer-only; every member plays.
-      const playersData = partyMembers.map(m => ({
-        id: m.user_id,
-        name: m.profile?.display_name || m.profile?.username || "You",
-        isBot: false
-      }))
-
-      const initialState = initializeDoodle(playersData)
-      setMonopolyState(initialState)
-      setIsPlaying(true)
-
-      if (partyId && activeChannelRef.current) {
-        activeChannelRef.current.send({
-          type: 'broadcast',
-          event: 'game_start',
-          payload: initialState
-        })
-      }
-      return
-    }
-
-    try {
-      // Create a new party for this game
-      const { data: party, error: partyError } = await supabase
-        .from('parties')
-        .insert([
-          { 
-            name: `${gameData.name} Party`,
-            game: gameData.name,
-            game_id: gameData.id,
-            game_image: gameData.image,
-            max_players: gameData.maxPlayers,
-            created_by: currentUserId,
-            status: 'waiting'
-          }
-        ])
-        .select()
-        .single()
-      
-      if (partyError) throw partyError
-      
-      // Add the creator as the first member
-      const { error: memberError } = await supabase
-        .from('party_members')
-        .insert([
-          {
-            party_id: party.id,
-            user_id: currentUserId,
-            role: 'leader'
-          }
-        ])
-      
-      if (memberError) throw memberError
-      
-      // Redirect to the party page
-      router.push(`/party/${party.id}`)
-    } catch (error) {
-      console.error('Error creating party:', error)
-      alert('Failed to create party. Please try again.')
-    }
   }
 
   // Handle sending a chat message
@@ -810,6 +518,7 @@ export default function GamePlayPage() {
             }
           ])
         if (error) throw error
+        touchParty(supabase, partyId)
       } else {
         // In a mock implementation, save locally
         const newMessage: ChatMessage = {
@@ -1069,15 +778,56 @@ export default function GamePlayPage() {
                       <h2 className="text-3xl font-black text-white mb-2 uppercase tracking-wide bg-clip-text bg-gradient-to-r from-pink-400 to-rose-400">
                         {gameData.name}
                       </h2>
-                      <p className="text-white/85 text-xs mb-6 leading-relaxed">
-                        {gameData.description}. Complete board spaces, custom tokens, and smart AI bot fallbacks ready to play.
+                      <p className="text-white/85 text-xs mb-5 leading-relaxed">
+                        {gameData.description}
                       </p>
-                      <Button 
+
+                      {BOT_SUPPORT[gameData.id] && (
+                        <div className="mb-5 rounded-xl border border-white/10 bg-white/5 p-3">
+                          <p className="text-[11px] uppercase tracking-wider text-white/50 font-bold mb-2">
+                            Players: {partyMembers.length + lobbyBots.length} / {gameData.maxPlayers}
+                          </p>
+                          <div className="flex items-center justify-center gap-3">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setLobbyBots(prev => prev.slice(0, -1))}
+                              disabled={lobbyBots.length === 0}
+                              className="text-white border-white/20 hover:bg-white/10 disabled:opacity-40"
+                            >
+                              − Bot
+                            </Button>
+                            <span className="text-white font-mono text-sm">{lobbyBots.length} bot{lobbyBots.length === 1 ? '' : 's'}</span>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setLobbyBots(prev => {
+                                const pool = BOT_SUPPORT[gameData.id] || []
+                                return [...prev, { id: `bot-${prev.length + 1}`, name: pool[prev.length] || `Bot ${prev.length + 1}` }]
+                              })}
+                              disabled={partyMembers.length + lobbyBots.length >= gameData.maxPlayers}
+                              className="text-white border-white/20 hover:bg-white/10 disabled:opacity-40"
+                            >
+                              + Add AI Bot
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      <Button
                         onClick={handleStartGame}
-                        className="bg-brand hover:brightness-110 font-bold px-8 py-5 rounded-xl shadow-lg"
+                        disabled={!!BOT_SUPPORT[gameData.id] && (partyMembers.length + lobbyBots.length) < gameData.minPlayers}
+                        className="bg-brand hover:brightness-110 font-bold px-8 py-5 rounded-xl shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Start Game Lobby
                       </Button>
+                      {!!BOT_SUPPORT[gameData.id] && (partyMembers.length + lobbyBots.length) < gameData.minPlayers && (
+                        <p className="text-[11px] text-amber-300 mt-2">
+                          Add {gameData.minPlayers - (partyMembers.length + lobbyBots.length)} more {gameData.minPlayers - (partyMembers.length + lobbyBots.length) === 1 ? 'player/bot' : 'players/bots'} to start.
+                        </p>
+                      )}
                     </div>
                   </div>
                 </>

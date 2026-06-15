@@ -6,9 +6,11 @@ import { Input } from "@/components/ui/input"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 import { Copy, Share2, ArrowLeft, Crown, Trophy, Vote as VoteIcon, Rocket } from "lucide-react"
 import { useRouter, useParams } from "next/navigation"
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Image from "next/image";
 import { getGameById } from "@/lib/games-catalog";
+import { PartyInactivityWarning } from "@/components/PartyInactivityWarning";
+import { touchParty } from "@/lib/partyActivity";
 import type { Session } from "@supabase/auth-helpers-nextjs";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import type { Party, PartyMember, Message, Vote, UserProfile } from "@/app/types";
@@ -57,6 +59,7 @@ export default function PartyPage() {
   const [newMessage, setNewMessage] = useState<string>('');
   const [selectedWinnerId, setSelectedWinnerId] = useState<string | null>(null);
   const [launching, setLaunching] = useState(false);
+  const launchChannelRef = useRef<RealtimeChannel | null>(null);
   const supabase = getSupabaseBrowserClient()
 
   // Aggregate the party's votes into a per-game tally.
@@ -299,6 +302,17 @@ export default function PartyPage() {
           })
           .subscribe()
       }
+
+      // Shared launch channel — same one the games page uses, so a launch from
+      // either screen reliably moves every member into the game.
+      if (!launchChannelRef.current) {
+        launchChannelRef.current = supabase
+          .channel(`party-launch-${partyId}`)
+          .on('broadcast', { event: 'launch' }, ({ payload }) => {
+            router.push(`/games/${payload?.gameId || 'monopoly'}?partyId=${partyId}`)
+          })
+          .subscribe()
+      }
     } catch (err) {
       setError(err.message)
     } finally {
@@ -313,8 +327,12 @@ export default function PartyPage() {
         window.partyChannel.unsubscribe()
         delete window.partyChannel
       }
+      if (launchChannelRef.current) {
+        supabase.removeChannel(launchChannelRef.current)
+        launchChannelRef.current = null
+      }
     }
-  }, [])
+  }, [supabase])
 
   // Host launches the winning game (or their chosen game on a tie).
   const launchGame = async (gameId: string) => {
@@ -330,13 +348,8 @@ export default function PartyPage() {
       }).eq('id', partyId)
 
       // Tell everyone (party page + games page voters) to jump into the game.
-      if (window.partyChannel) {
-        window.partyChannel.send({
-          type: 'broadcast',
-          event: 'game_launch',
-          payload: { gameId },
-        })
-      }
+      window.partyChannel?.send({ type: 'broadcast', event: 'game_launch', payload: { gameId } })
+      launchChannelRef.current?.send({ type: 'broadcast', event: 'launch', payload: { gameId } })
 
       router.push(`/games/${gameId}?partyId=${partyId}`)
     } catch (error) {
@@ -627,6 +640,7 @@ export default function PartyPage() {
                           created_at: new Date().toISOString()
                         }
                       ])
+                      touchParty(supabase, partyId)
 
                       setNewMessage('')
                     }}
@@ -702,6 +716,12 @@ export default function PartyPage() {
           </div>
         </div>
       </div>
+
+      <PartyInactivityWarning
+        partyId={partyId}
+        isHost={isLeader}
+        onClosed={() => router.push('/dashboard')}
+      />
     </div>
   )
 }

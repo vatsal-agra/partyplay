@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
-import { Search, Filter, Gamepad2, Vote as VoteIcon, ArrowRight } from "lucide-react"
+import { Search, Filter, Gamepad2, Vote as VoteIcon, ArrowRight, Rocket } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 
 import { GameCard } from "@/components/games/GameCard"
@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { PartiesSidebar } from "@/components/PartiesSidebar"
 import { GAMES_CATALOG } from "@/lib/games-catalog"
+import { PartyInactivityWarning } from "@/components/PartyInactivityWarning"
+import { touchParty, cleanupStaleParties } from "@/lib/partyActivity"
 
 // The party the current viewer belongs to (host or member).
 interface ActiveParty {
@@ -33,6 +35,7 @@ interface VoteRow {
 export default function GamesPage() {
   const router = useRouter()
   const supabaseClient = getSupabaseBrowserClient()
+  const launchChannelRef = useRef<any>(null)
 
   const [session, setSession] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -114,6 +117,15 @@ export default function GamesPage() {
     return `${leaders.slice(0, -1).join(", ")} & ${leaders[leaders.length - 1]} (tie)`
   }, [tally, maxVotes, games])
 
+  // The single game the host will launch (first leader on a tie).
+  const leadingGameId = useMemo(() => {
+    if (maxVotes === 0) return null
+    const leaders = Object.entries(tally)
+      .filter(([, t]) => t.count === maxVotes)
+      .map(([gameId]) => gameId)
+    return leaders[0] ?? null
+  }, [tally, maxVotes])
+
   // ----- Data fetching ------------------------------------------------------
   const fetchVotes = useCallback(
     async (partyId: string) => {
@@ -130,6 +142,9 @@ export default function GamesPage() {
   const fetchActiveParty = useCallback(
     async (userId: string) => {
       try {
+        // Remove the user's own parties that have gone idle past the TTL.
+        await cleanupStaleParties(supabaseClient, userId)
+
         // Parties this user is a member of
         const { data: memberships } = await supabaseClient
           .from("party_members")
@@ -221,12 +236,42 @@ export default function GamesPage() {
           }
         }
       )
+      // Party ended/deleted → stop showing the voting UI.
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "parties", filter: `id=eq.${partyId}` },
+        () => {
+          setActiveParty(null)
+          setVotes([])
+        }
+      )
+      // Membership changed (you left / were kicked) → re-resolve the active party.
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "party_members", filter: `party_id=eq.${partyId}` },
+        () => {
+          const uid = session?.user?.id
+          if (uid) fetchActiveParty(uid)
+        }
+      )
       .subscribe()
+
+    // Shared launch channel — reliable redirect for every party member,
+    // independent of postgres realtime config (works from games or party page).
+    const launchChannel = supabaseClient
+      .channel(`party-launch-${partyId}`)
+      .on("broadcast", { event: "launch" }, ({ payload }) => {
+        router.push(`/games/${payload?.gameId || "monopoly"}?partyId=${partyId}`)
+      })
+      .subscribe()
+    launchChannelRef.current = launchChannel
 
     return () => {
       supabaseClient.removeChannel(channel)
+      supabaseClient.removeChannel(launchChannel)
+      launchChannelRef.current = null
     }
-  }, [activeParty?.id, supabaseClient, fetchVotes, router])
+  }, [activeParty?.id, supabaseClient, fetchVotes, fetchActiveParty, router, session])
 
   // ----- Voting -------------------------------------------------------------
   const handleVote = useCallback(
@@ -234,6 +279,7 @@ export default function GamesPage() {
       if (!session?.user?.id || !activeParty) return
       const userId = session.user.id
       const partyId = activeParty.id
+      touchParty(supabaseClient, partyId)
 
       // Toggle off if voting for the game you already chose
       if (myVoteGameId === game.id) {
@@ -265,6 +311,23 @@ export default function GamesPage() {
     },
     [session, activeParty, myVoteGameId, displayName, supabaseClient, fetchVotes]
   )
+
+  // Host launches the most-voted game directly from the games screen.
+  const handleHostLaunch = useCallback(async () => {
+    if (!activeParty?.isHost || !leadingGameId) return
+    const game = games.find((g) => g.id === leadingGameId)
+    await supabaseClient
+      .from("parties")
+      .update({
+        game: game?.name || leadingGameId,
+        game_id: leadingGameId,
+        game_image: game?.image || null,
+        status: "ready",
+      })
+      .eq("id", activeParty.id)
+    launchChannelRef.current?.send({ type: "broadcast", event: "launch", payload: { gameId: leadingGameId } })
+    router.push(`/games/${leadingGameId}?partyId=${activeParty.id}`)
+  }, [activeParty, leadingGameId, games, supabaseClient, router])
 
   if (loading) {
     return (
@@ -315,17 +378,28 @@ export default function GamesPage() {
                           </p>
                         </div>
                       </div>
-                      <Button
-                        onClick={() => router.push(`/party/${activeParty?.id}`)}
-                        className="bg-white/15 hover:bg-white/25 text-white border border-white/20 whitespace-nowrap"
-                      >
-                        Back to party
-                        <ArrowRight className="ml-2 h-4 w-4" />
-                      </Button>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        {activeParty?.isHost && leadingGameId && (
+                          <Button
+                            onClick={handleHostLaunch}
+                            className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold whitespace-nowrap"
+                          >
+                            <Rocket className="mr-2 h-4 w-4" />
+                            Start {games.find((g) => g.id === leadingGameId)?.name || "game"}
+                          </Button>
+                        )}
+                        <Button
+                          onClick={() => router.push(`/party/${activeParty?.id}`)}
+                          className="bg-white/15 hover:bg-white/25 text-white border border-white/20 whitespace-nowrap"
+                        >
+                          Back to party
+                          <ArrowRight className="ml-2 h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                     <p className="mt-3 text-xs text-white/60">
                       {totalVotes} {totalVotes === 1 ? "vote" : "votes"} cast so far
-                      {activeParty?.isHost && " · As host, head back to the party to launch the winning game."}
+                      {activeParty?.isHost && " · As host, you can start the winning game right here."}
                     </p>
                   </motion.div>
                 )}
@@ -472,6 +546,12 @@ export default function GamesPage() {
           <PartiesSidebar />
         </div>
       </div>
+
+      <PartyInactivityWarning
+        partyId={activeParty?.id ?? null}
+        isHost={!!activeParty?.isHost}
+        onClosed={() => { setActiveParty(null); setVotes([]) }}
+      />
     </div>
   )
 }

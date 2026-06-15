@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
+import { cleanupStaleParties } from "@/lib/partyActivity"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Plus, RefreshCw, Trophy, Medal, Award } from "lucide-react"
@@ -35,6 +36,8 @@ export default function Dashboard() {
         router.push('/auth/sign-in')
       } else {
         setLoading(false)
+        // Sweep away any of the user's parties that have gone idle.
+        cleanupStaleParties(supabaseClient, session.user.id)
         // Fetch leaderboard data
         fetchLeaderboardData()
       }
