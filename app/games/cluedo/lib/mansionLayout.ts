@@ -96,16 +96,16 @@ export const SUSPECTS: SuspectDef[] = [
   { id: 'pearl',      name: 'Madame Pearl',        color: '#e5e7eb', start: { x: 8,  y: 0  } },
 ]
 
-export interface WeaponDef { id: string; name: string; icon: string }
+export interface WeaponDef { id: string; name: string; icon: string; image: string }
 
 // Generic objects — not protected.
 export const WEAPONS: WeaponDef[] = [
-  { id: 'candlestick', name: 'Candlestick', icon: '🕯️' },
-  { id: 'dagger',      name: 'Dagger',      icon: '🗡️' },
-  { id: 'pipe',        name: 'Lead Pipe',   icon: '🩹' },
-  { id: 'revolver',    name: 'Revolver',    icon: '🔫' },
-  { id: 'rope',        name: 'Rope',        icon: '🪢' },
-  { id: 'wrench',      name: 'Wrench',      icon: '🔧' },
+  { id: 'candlestick', name: 'Candlestick', icon: '🕯️', image: '/images/weapons/candlestick.png' },
+  { id: 'dagger',      name: 'Dagger',      icon: '🗡️', image: '/images/weapons/dagger.png' },
+  { id: 'pipe',        name: 'Lead Pipe',   icon: '🩹', image: '/images/weapons/pipe.png' },
+  { id: 'revolver',    name: 'Revolver',    icon: '🔫', image: '/images/weapons/revolver.png' },
+  { id: 'rope',        name: 'Rope',        icon: '🪢', image: '/images/weapons/rope.png' },
+  { id: 'wrench',      name: 'Wrench',      icon: '🔧', image: '/images/weapons/wrench.png' },
 ]
 
 export const ROOM_CARDS = ROOMS.map((r) => ({ id: r.id, name: r.name }))

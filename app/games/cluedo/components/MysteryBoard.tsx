@@ -375,7 +375,7 @@ export default function MysteryBoard({ state, currentPlayerId, onStateChange, on
         {showSuggest && inRoomNow && (
           <Dialog onClose={() => setShowSuggest(false)} title={`Suggest — in the ${getRoom(me!.inRoom!).name}`}>
             <Picker label="Suspect" options={SUSPECTS.map(s => ({ id: s.id, name: s.name, color: s.color }))} value={sgSuspect} onChange={setSgSuspect} />
-            <Picker label="Weapon" options={WEAPONS.map(w => ({ id: w.id, name: `${w.icon} ${w.name}` }))} value={sgWeapon} onChange={setSgWeapon} />
+            <Picker label="Weapon" options={WEAPONS.map(w => ({ id: w.id, name: w.name, image: w.image }))} value={sgWeapon} onChange={setSgWeapon} />
             <p className="text-[10px] text-slate-400 text-center">Room is fixed to where you stand.</p>
             <button onClick={() => { commit(makeSuggestion(state, sgSuspect, sgWeapon)); setShowSuggest(false) }}
               className="w-full py-2 bg-gradient-to-r from-pink-500 to-rose-500 text-white font-black text-xs uppercase rounded-xl mt-1">
@@ -391,7 +391,7 @@ export default function MysteryBoard({ state, currentPlayerId, onStateChange, on
           <Dialog onClose={() => setShowAccuse(false)} title="Final Accusation" danger>
             <p className="text-[10px] text-red-300 text-center -mt-1">Wrong and you're out of the game. Choose carefully.</p>
             <Picker label="Suspect" options={SUSPECTS.map(s => ({ id: s.id, name: s.name, color: s.color }))} value={acSuspect} onChange={setAcSuspect} />
-            <Picker label="Weapon" options={WEAPONS.map(w => ({ id: w.id, name: `${w.icon} ${w.name}` }))} value={acWeapon} onChange={setAcWeapon} />
+            <Picker label="Weapon" options={WEAPONS.map(w => ({ id: w.id, name: w.name, image: w.image }))} value={acWeapon} onChange={setAcWeapon} />
             <Picker label="Room" options={ROOMS.map(r => ({ id: r.id, name: r.name }))} value={acRoom} onChange={(v) => setAcRoom(v as RoomId)} />
             <button onClick={() => { commit(makeAccusation(state, acSuspect, acWeapon, acRoom)); setShowAccuse(false) }}
               className="w-full py-2 bg-gradient-to-r from-red-600 to-rose-600 text-white font-black text-xs uppercase rounded-xl mt-1">
@@ -421,7 +421,7 @@ function Dialog({ title, children, onClose, danger }: { title: string; children:
 
 function Picker({ label, options, value, onChange }: {
   label: string
-  options: { id: string; name: string; color?: string }[]
+  options: { id: string; name: string; color?: string; image?: string }[]
   value: string
   onChange: (v: string) => void
 }) {
@@ -432,7 +432,9 @@ function Picker({ label, options, value, onChange }: {
         {options.map((o) => (
           <button key={o.id} onClick={() => onChange(o.id)}
             className={`px-2 py-1.5 rounded-lg text-[10px] font-bold text-left flex items-center gap-1.5 border transition ${value === o.id ? 'bg-pink-500/20 border-pink-500/40 text-white' : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10'}`}>
-            {o.color && <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: o.color }} />}
+            {o.image
+              ? <img src={o.image} alt="" className="w-8 h-8 rounded object-cover flex-shrink-0 border border-white/10" />
+              : o.color && <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: o.color }} />}
             <span className="truncate">{o.name}</span>
           </button>
         ))}

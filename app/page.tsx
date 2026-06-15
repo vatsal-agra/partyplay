@@ -18,17 +18,15 @@ const staggerContainer = {
 }
 
 const gameImages = [
-  '/images/monopoly thumbnail.png',
-  '/images/Battleship thumbnail.png',
-  '/images/catan thumbnail.png',
-  '/images/uno final thumbnail.png',
+  '/images/games/property-empire.png',
+  '/images/games/naval-clash.jpg',
+  '/images/games/hexland.jpg',
+  '/images/games/color-clash.png',
   '/images/poker thumbnail.png',
-  '/images/cluedo thumbnail.png',
-  '/images/pictionary thumbnail.png',
-  '/images/scribbleio thumbnail.png',
-  '/images/codenames thumbnal.png',
-  '/images/terra mystica thumbnail.png',
-  '/images/7wonders thumbnail.png',
+  '/images/games/mystery-manor.png',
+  '/images/games/quick-draw.png',
+  '/images/games/doodle-dash.png',
+  '/images/games/spymaster.png',
 ]
 
 const features = [

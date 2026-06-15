@@ -318,9 +318,13 @@ export function makeSuggestion(state: MysteryState, suspectId: string, weaponId:
   const room = p.inRoom
   const s = clone(state)
 
-  // Drag the accused suspect + weapon into this room.
-  s.suspectLocations[suspectId] = room
-  s.players.forEach((q) => { if (q.suspectId === suspectId) placeInRoom(q, room) })
+  // Move the named weapon into this room. Players are NEVER teleported by a
+  // suggestion — the disprover (and everyone else) stays exactly where they
+  // are and reveals their card from there. An *unplayed* suspect's marker is
+  // moved to the room (a board prop); player-controlled suspects don't move.
+  if (!s.players.some((q) => q.suspectId === suspectId)) {
+    s.suspectLocations[suspectId] = room
+  }
   s.weaponLocations[weaponId] = room
 
   s.pending = { suspect: suspectId, weapon: weaponId, room, suggesterId: p.id, askIndex: nextOpponentIndex(s, s.currentPlayerIndex) }
