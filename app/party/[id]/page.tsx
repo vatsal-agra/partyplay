@@ -11,6 +11,7 @@ import Image from "next/image";
 import { getGameById } from "@/lib/games-catalog";
 import { PartyInactivityWarning } from "@/components/PartyInactivityWarning";
 import { VoiceChat } from "@/components/VoiceChat";
+import { playAsGuest } from "@/lib/guest";
 import { touchParty } from "@/lib/partyActivity";
 import type { Session } from "@supabase/auth-helpers-nextjs";
 import type { RealtimeChannel } from "@supabase/supabase-js";
@@ -60,8 +61,19 @@ export default function PartyPage() {
   const [newMessage, setNewMessage] = useState<string>('');
   const [selectedWinnerId, setSelectedWinnerId] = useState<string | null>(null);
   const [launching, setLaunching] = useState(false);
+  const [guestName, setGuestName] = useState("");
+  const [guestLoading, setGuestLoading] = useState(false);
+  const [guestError, setGuestError] = useState<string | null>(null);
   const launchChannelRef = useRef<RealtimeChannel | null>(null);
   const supabase = getSupabaseBrowserClient()
+
+  const handleGuestJoin = async () => {
+    setGuestLoading(true);
+    setGuestError(null);
+    const { error } = await playAsGuest(supabase, guestName);
+    if (error) { setGuestError(error); setGuestLoading(false); return; }
+    // onAuthStateChange picks up the new session and loads the party.
+  };
 
   // Aggregate the party's votes into a per-game tally.
   const voteTally = useMemo(() => {
@@ -124,6 +136,10 @@ export default function PartyPage() {
       if (!session) {
         setError('Authentication required')
         setLoading(false)
+      } else {
+        // e.g. a guest just signed in — load the party for them.
+        setError(null)
+        getParty(session)
       }
     })
 
@@ -361,6 +377,35 @@ export default function PartyPage() {
 
   if (loading) {
     return <LoadingSpinner />
+  }
+
+  // No account? Join the party as a guest — just pick a name.
+  if (!session) {
+    return (
+      <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-4">
+        <div className="glass-strong w-full max-w-sm p-6 text-center shadow-soft">
+          <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-brand text-2xl shadow-glow-grape">🎉</div>
+          <h2 className="text-xl font-black text-white">You're invited to a party!</h2>
+          <p className="mt-1 text-sm text-white/60">Pick a name and jump straight in — no sign-up needed.</p>
+          <Input
+            placeholder="Your name"
+            value={guestName}
+            onChange={(e) => setGuestName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleGuestJoin()}
+            maxLength={24}
+            className="mt-4"
+          />
+          {guestError && <p className="mt-2 text-xs text-red-300">{guestError}</p>}
+          <Button variant="brand" className="mt-3 w-full" onClick={handleGuestJoin} disabled={guestLoading}>
+            {guestLoading ? "Joining…" : "Join the party"}
+          </Button>
+          <p className="mt-3 text-xs text-white/45">
+            Want to keep your progress?{" "}
+            <a href="/auth/sign-up" className="text-grape-300 hover:underline">Create an account</a>
+          </p>
+        </div>
+      </div>
+    )
   }
 
   if (error) {

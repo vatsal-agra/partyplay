@@ -36,6 +36,9 @@ export function MainNav() {
           <span className="font-display text-xl font-bold tracking-tight text-gradient">
             PartyPlay
           </span>
+          <span className="rounded-full border border-aqua-400/40 bg-aqua-400/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-aqua-300">
+            Beta
+          </span>
         </Link>
 
         {/* Center nav — icons stay visible on mobile so pages remain reachable */}

@@ -6,15 +6,27 @@ import { Label } from "../../../components/ui/label"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
+import { playAsGuest } from "@/lib/guest"
 
 export default function SignInPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [guestName, setGuestName] = useState("")
+  const [guestLoading, setGuestLoading] = useState(false)
   const router = useRouter()
 
   const supabaseClient = getSupabaseBrowserClient()
+
+  const handleGuest = async () => {
+    setGuestLoading(true)
+    setError(null)
+    const { error } = await playAsGuest(supabaseClient, guestName)
+    if (error) { setError(error); setGuestLoading(false); return }
+    await new Promise((r) => setTimeout(r, 600))
+    router.push("/dashboard")
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -96,6 +108,23 @@ export default function SignInPage() {
         >
           Continue with Google
         </Button>
+
+        {/* Guest play — no signup needed */}
+        <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+          <p className="mb-2 text-xs font-medium text-white/70">In a hurry? Jump in as a guest — just pick a name.</p>
+          <div className="flex gap-2">
+            <Input
+              placeholder="Your name"
+              value={guestName}
+              onChange={(e) => setGuestName(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleGuest()}
+              maxLength={24}
+            />
+            <Button type="button" variant="brand" onClick={handleGuest} disabled={guestLoading} className="shrink-0">
+              {guestLoading ? "…" : "Play as guest"}
+            </Button>
+          </div>
+        </div>
       </div>
   )
 }
