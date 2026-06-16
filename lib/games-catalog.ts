@@ -94,17 +94,10 @@ export const GAMES_CATALOG: Game[] = [
     complexity: 'Easy',
     category: ['Online', 'Drawing'],
   },
-  {
-    id: 'manhunt',
-    name: 'Manhunt',
-    description: 'One player is the fugitive moving in secret across the city; the rest are detectives hunting them down by taxi, bus, and underground.',
-    image: '/images/games/manhunt.png',
-    minPlayers: 2,
-    maxPlayers: 6,
-    duration: '20-40 min',
-    complexity: 'Medium',
-    category: ['Strategy', 'Deduction'],
-  },
+  // NOTE: 'manhunt' (Scotland Yard) is intentionally hidden from the store for
+  // now — it still needs work. The engine/board/map live in app/games/manhunt/
+  // and the route wiring remains, so it's playable at /games/manhunt for WIP.
+  // To relist it, restore this catalog entry (and its two badges in achievements.ts).
   {
     id: 'codenames',
     name: 'Spymaster',
