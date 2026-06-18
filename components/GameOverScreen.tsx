@@ -25,10 +25,10 @@ export function GameOverScreen({ gameName, summary, newAchievements, canRematch,
 
   const shareResult = async () => {
     const top = summary.standings.slice(0, 3).map((s, i) => `${medals[i] || `${i + 1}.`} ${s.name}${s.detail ? ` — ${s.detail}` : ""}`).join("\n")
-    const text = `🎲 ${gameName} on PartyPlay\n🏆 ${summary.winnerLabel} wins!\n\n${top}\n\nPlay free at PartyPlay`
+    const text = `🎲 ${gameName} on Dice Alley\n🏆 ${summary.winnerLabel} wins!\n\n${top}\n\nPlay free at Dice Alley`
     try {
       if (typeof navigator !== "undefined" && navigator.share) {
-        await navigator.share({ title: `${gameName} — PartyPlay`, text })
+        await navigator.share({ title: `${gameName} — Dice Alley`, text })
       } else {
         await navigator.clipboard.writeText(text)
       }

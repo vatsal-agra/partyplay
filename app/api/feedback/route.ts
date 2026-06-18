@@ -44,9 +44,9 @@ export async function POST(req: Request) {
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({
           access_key: accessKey,
-          subject: "🎲 New PartyPlay beta feedback",
-          from_name: "PartyPlay Beta",
-          message: `${message}\n\n— from ${path || "PartyPlay"}\n${userAgent}`,
+          subject: "🎲 New Dice Alley beta feedback",
+          from_name: "Dice Alley Beta",
+          message: `${message}\n\n— from ${path || "Dice Alley"}\n${userAgent}`,
         }),
       })
       emailed = res.ok

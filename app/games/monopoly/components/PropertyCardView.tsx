@@ -89,7 +89,7 @@ export function PropertyCardView({ space, propertyState, onClose, isCardDraw = f
                   <p className="text-xs text-white/75 mt-1 font-mono">Click to reveal card</p>
                 </div>
                 <div className="w-full border-t border-white/20 pt-2 text-center text-[10px] text-white/50 font-mono">
-                  PartyPlay Classic Edition
+                  Dice Alley Classic Edition
                 </div>
               </div>
 

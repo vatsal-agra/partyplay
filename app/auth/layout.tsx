@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Dice5 } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "PartyPlay — Sign In",
+  title: "Dice Alley — Sign In",
   description: "Sign in or create an account to start playing games with friends",
 };
 
@@ -20,7 +20,7 @@ export default function AuthLayout({
           <span className="grid h-10 w-10 place-items-center rounded-xl bg-brand shadow-glow-grape transition-transform duration-300 group-hover:rotate-12">
             <Dice5 className="h-5 w-5 text-white" />
           </span>
-          <span className="font-display text-2xl font-bold text-gradient">PartyPlay</span>
+          <span className="font-display text-2xl font-bold text-gradient">Dice Alley</span>
         </Link>
 
         {/* Panel */}

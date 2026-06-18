@@ -1,11 +1,11 @@
 import { ImageResponse } from "next/og"
 
 // Branded social-share card, generated in code (no image asset needed). This is
-// what shows when a PartyPlay link is pasted into WhatsApp / Discord / iMessage
+// what shows when a Dice Alley link is pasted into WhatsApp / Discord / iMessage
 // / Twitter, so every shared link doubles as an ad.
 
 export const runtime = "edge"
-export const alt = "PartyPlay — Game night, anywhere"
+export const alt = "Dice Alley — Game night, anywhere"
 export const size = { width: 1200, height: 630 }
 export const contentType = "image/png"
 
@@ -34,7 +34,7 @@ export default function OpengraphImage() {
           <div style={{ width: 96, height: 96, borderRadius: 28, background: "linear-gradient(135deg,#7c5cff,#ff4d9d)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 60 }}>
             🎲
           </div>
-          <div style={{ fontSize: 84, fontWeight: 800, letterSpacing: -2 }}>PartyPlay</div>
+          <div style={{ fontSize: 84, fontWeight: 800, letterSpacing: -2 }}>Dice Alley</div>
         </div>
 
         <div style={{ fontSize: 58, fontWeight: 800, display: "flex" }}>Game night, anywhere.</div>

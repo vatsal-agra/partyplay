@@ -87,7 +87,7 @@ export default function Home() {
                 variants={fadeIn}
               >
                 Create a party, invite the crew, and <span className="text-white font-medium">vote on what to play</span>.
-                PartyPlay brings everyone together for the board games you love — live, in your browser.
+                Dice Alley brings everyone together for the board games you love — live, in your browser.
               </motion.p>
 
               <motion.div className="mt-9 flex flex-col sm:flex-row gap-4 justify-center lg:justify-start" variants={fadeIn}>

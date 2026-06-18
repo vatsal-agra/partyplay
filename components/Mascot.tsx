@@ -4,7 +4,7 @@ import { motion } from "framer-motion"
 
 type Mood = "idle" | "happy" | "think" | "cheer"
 
-// Rolly — PartyPlay's dice mascot. A friendly cube with a face that bobs,
+// Rolly — Dice Alley's dice mascot. A friendly cube with a face that bobs,
 // tilts, and reacts. Pure SVG + framer-motion, no assets.
 export function Mascot({
   mood = "idle",

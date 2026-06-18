@@ -53,7 +53,7 @@ export function FeedbackWidget() {
             <div className="mb-2 flex items-start justify-between">
               <div>
                 <p className="flex items-center gap-2 font-bold text-white">
-                  Help shape PartyPlay
+                  Help shape Dice Alley
                   <span className="rounded-full border border-aqua-400/40 bg-aqua-400/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-aqua-300">Beta</span>
                 </p>
                 <p className="text-xs text-white/55">We're in beta — tell us what to build, fix, or change. No sign-up needed.</p>

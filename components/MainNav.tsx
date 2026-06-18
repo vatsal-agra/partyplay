@@ -34,7 +34,7 @@ export function MainNav() {
             <Dice5 className="h-5 w-5 text-white" />
           </span>
           <span className="font-display text-xl font-bold tracking-tight text-gradient">
-            PartyPlay
+            Dice Alley
           </span>
           <span className="rounded-full border border-aqua-400/40 bg-aqua-400/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-aqua-300">
             Beta

@@ -1,10 +1,10 @@
-# App Blueprint: PartyPlay
+# App Blueprint: Dice Alley
 
 ## 1. Project Breakdown
 
-**App Name:** PartyPlay  
+**App Name:** Dice Alley  
 **Platform:** Web  
-**Summary:** PartyPlay is a next-generation party gaming platform that connects people to play games together in real-time. Unlike traditional gaming sites, PartyPlay focuses on the social aspect of gaming by allowing users to create or join "parties" where they collectively decide which game to play through a democratic voting system. The platform will feature a curated selection of multiplayer games designed specifically for this social experience.
+**Summary:** Dice Alley is a next-generation party gaming platform that connects people to play games together in real-time. Unlike traditional gaming sites, Dice Alley focuses on the social aspect of gaming by allowing users to create or join "parties" where they collectively decide which game to play through a democratic voting system. The platform will feature a curated selection of multiplayer games designed specifically for this social experience.
 
 **Primary Use Case:**  
 - Users create or join virtual gaming parties  
@@ -191,4 +191,4 @@
 2. Set environment variables  
 3. Enable automatic deployments on push  
 
-This blueprint provides a comprehensive foundation for building PartyPlay using the specified tech stack while focusing on the unique social gaming experience at its core.
+This blueprint provides a comprehensive foundation for building Dice Alley using the specified tech stack while focusing on the unique social gaming experience at its core.
