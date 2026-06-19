@@ -5,6 +5,9 @@ import { createClient } from "@supabase/supabase-js"
 // and (2) stores it in the feedback table as a durable backup. No auth, no name
 // required — just the message. Both sinks are best-effort: as long as one
 // succeeds we report success so a visitor's feedback is never silently lost.
+//
+// The JSON response also reports stored/emailed + a diagnostic string so the
+// owner can curl this endpoint to see exactly why email isn't arriving.
 
 export async function POST(req: Request) {
   let message = ""
@@ -22,7 +25,9 @@ export async function POST(req: Request) {
 
   const userAgent = req.headers.get("user-agent") || ""
   let stored = false
+  let storeDetail = "no supabase env"
   let emailed = false
+  let emailDetail = "no WEB3FORMS_ACCESS_KEY set"
 
   // 1) Durable backup in Supabase (anonymous insert allowed by RLS).
   try {
@@ -32,10 +37,12 @@ export async function POST(req: Request) {
       const supabase = createClient(url, key)
       const { error } = await supabase.from("feedback").insert({ message, user_agent: userAgent, path })
       stored = !error
+      storeDetail = error ? `db: ${error.message}` : "stored"
     }
-  } catch { /* table may not exist yet — ignore */ }
+  } catch (e: any) { storeDetail = `db error: ${e?.message || e}` }
 
-  // 2) Email via Web3Forms (sends to the address the access key is registered to).
+  // 2) Email via Web3Forms. NOTE: Web3Forms returns HTTP 200 even on failure
+  // (e.g. an unverified access key) and signals the real result in `success`.
   try {
     const accessKey = process.env.WEB3FORMS_ACCESS_KEY
     if (accessKey) {
@@ -46,13 +53,20 @@ export async function POST(req: Request) {
           access_key: accessKey,
           subject: "🎲 New Dice Alley beta feedback",
           from_name: "Dice Alley Beta",
+          name: "Dice Alley Beta",
+          email: "feedback@dice-alley.app",
           message: `${message}\n\n— from ${path || "Dice Alley"}\n${userAgent}`,
         }),
       })
-      emailed = res.ok
+      const data = await res.json().catch(() => ({} as any))
+      emailed = res.ok && data?.success === true
+      emailDetail = emailed ? "sent" : `web3forms: ${data?.message || `HTTP ${res.status}`}`
     }
-  } catch { /* network/email issue — the Supabase copy still has it */ }
+  } catch (e: any) { emailDetail = `email error: ${e?.message || e}` }
 
-  if (stored || emailed) return NextResponse.json({ ok: true })
-  return NextResponse.json({ error: "Could not record feedback" }, { status: 500 })
+  const ok = stored || emailed
+  return NextResponse.json(
+    { ok, stored, emailed, store: storeDetail, email: emailDetail },
+    { status: ok ? 200 : 500 }
+  )
 }
