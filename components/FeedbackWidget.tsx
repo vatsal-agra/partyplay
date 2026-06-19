@@ -5,7 +5,13 @@ import { AnimatePresence, motion } from "framer-motion"
 import { MessageSquarePlus, X, Send, Loader2, Check } from "lucide-react"
 
 // A no-friction beta feedback box: open, type, send. No sign-in, no name, no
-// email — just the message. It posts to /api/feedback which emails the owner.
+// email — just the message.
+//
+// Email goes straight to Web3Forms FROM THE BROWSER — their free tier blocks
+// server-side calls, and the access key is a public form id (safe in client
+// code). We also POST to /api/feedback as a durable Supabase backup.
+const WEB3FORMS_KEY = process.env.NEXT_PUBLIC_WEB3FORMS_KEY || "c3a9ba4d-4b40-4081-ab6a-be14e172e088"
+
 export function FeedbackWidget() {
   const [open, setOpen] = useState(false)
   const [text, setText] = useState("")
@@ -15,17 +21,40 @@ export function FeedbackWidget() {
     const message = text.trim()
     if (!message || state === "sending") return
     setState("sending")
+    const path = typeof window !== "undefined" ? window.location.pathname : ""
+    let ok = false
+
+    // 1) Email via Web3Forms (must be a browser request on the free plan).
+    try {
+      const res = await fetch("https://api.web3forms.com/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          access_key: WEB3FORMS_KEY,
+          subject: "🎲 New Dice Alley beta feedback",
+          from_name: "Dice Alley Beta",
+          message: `${message}\n\n— from ${path || "Dice Alley"}`,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (data?.success) ok = true
+    } catch { /* fall through to the backup */ }
+
+    // 2) Durable backup in Supabase (best-effort).
     try {
       const res = await fetch("/api/feedback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, path: typeof window !== "undefined" ? window.location.pathname : "" }),
+        body: JSON.stringify({ message, path }),
       })
-      if (!res.ok) throw new Error()
+      if (res.ok) ok = true
+    } catch { /* ignore */ }
+
+    if (ok) {
       setState("sent")
       setText("")
       setTimeout(() => { setOpen(false); setState("idle") }, 1600)
-    } catch {
+    } else {
       setState("error")
     }
   }
