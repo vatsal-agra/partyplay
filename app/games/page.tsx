@@ -11,7 +11,7 @@ import { Game, Filters } from "@/app/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { PartiesSidebar } from "@/components/PartiesSidebar"
-import { GAMES_CATALOG } from "@/lib/games-catalog"
+import { GAMES_CATALOG, gamePath } from "@/lib/games-catalog"
 import { PartyInactivityWarning } from "@/components/PartyInactivityWarning"
 import { touchParty, cleanupStaleParties } from "@/lib/partyActivity"
 
@@ -232,7 +232,7 @@ export default function GamesPage() {
         (payload) => {
           const updated = payload.new as any
           if (updated?.status === "ready") {
-            router.push(`/games/${updated.game_id || "monopoly"}?partyId=${partyId}`)
+            router.push(gamePath(updated.game_id || "monopoly", `?partyId=${partyId}`))
           }
         }
       )
@@ -261,7 +261,7 @@ export default function GamesPage() {
     const launchChannel = supabaseClient
       .channel(`party-launch-${partyId}`)
       .on("broadcast", { event: "launch" }, ({ payload }) => {
-        router.push(`/games/${payload?.gameId || "monopoly"}?partyId=${partyId}`)
+        router.push(gamePath(payload?.gameId || "monopoly", `?partyId=${partyId}`))
       })
       .subscribe()
     launchChannelRef.current = launchChannel
@@ -326,7 +326,7 @@ export default function GamesPage() {
       })
       .eq("id", activeParty.id)
     launchChannelRef.current?.send({ type: "broadcast", event: "launch", payload: { gameId: leadingGameId } })
-    router.push(`/games/${leadingGameId}?partyId=${activeParty.id}`)
+    router.push(gamePath(leadingGameId, `?partyId=${activeParty.id}`))
   }, [activeParty, leadingGameId, games, supabaseClient, router])
 
   if (loading) {
@@ -523,7 +523,7 @@ export default function GamesPage() {
                       <GameCard
                         key={game.id}
                         game={game}
-                        onPlay={() => router.push(`/games/${game.id}`)}
+                        onPlay={() => router.push(gamePath(game.id))}
                         isInParty={activeParty?.game_id === game.id}
                         isCreatingParty={false}
                         votingEnabled={votingEnabled}

@@ -115,3 +115,23 @@ export function getGameById(id: string | null | undefined): Game | undefined {
   if (!id) return undefined
   return GAMES_CATALOG.find((g) => g.id === id)
 }
+
+// Public URL slugs — the route shows the rebranded name, not the original game.
+// The internal id (and the engine/board behind it) stays the same; next.config
+// rewrites map these pretty slugs back to the internal route, so links and the
+// address bar never expose a trademarked name. Games not listed keep their id.
+export const PUBLIC_SLUG: Record<string, string> = {
+  monopoly: 'property-empire',
+  battleship: 'naval-clash',
+  catan: 'hexland',
+  uno: 'color-clash',
+  cluedo: 'mystery-manor',
+  pictionary: 'quick-draw',
+  scribbleio: 'doodle-dash',
+  codenames: 'spymaster',
+}
+
+// Build a public game URL from an internal id (+ optional query like "?partyId=x").
+export function gamePath(id: string, query = ''): string {
+  return `/games/${PUBLIC_SLUG[id] || id}${query}`
+}

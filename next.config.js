@@ -55,6 +55,22 @@ const nextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }]
   },
+  // Pretty, rebranded game URLs → internal routes. beforeFiles so they resolve
+  // before the /games/[slug] dynamic route. Query strings are preserved.
+  async rewrites() {
+    return {
+      beforeFiles: [
+        { source: "/games/property-empire", destination: "/games/monopoly" },
+        { source: "/games/naval-clash", destination: "/games/battleship" },
+        { source: "/games/hexland", destination: "/games/catan" },
+        { source: "/games/color-clash", destination: "/games/uno" },
+        { source: "/games/mystery-manor", destination: "/games/cluedo" },
+        { source: "/games/quick-draw", destination: "/games/pictionary" },
+        { source: "/games/doodle-dash", destination: "/games/scribbleio" },
+        { source: "/games/spymaster", destination: "/games/codenames" },
+      ],
+    }
+  },
 }
 
 module.exports = nextConfig

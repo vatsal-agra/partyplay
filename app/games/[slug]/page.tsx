@@ -1120,6 +1120,23 @@ export default function GamePlayPage() {
                       </div>
                     </div>
                   ))}
+                  {/* AI bots added in the lobby — shown so it's clear they're playing too */}
+                  {lobbyBots.map((bot) => (
+                    <div key={bot.id} className="flex items-center p-3 mb-2 rounded-lg bg-bubble-500/10 border border-bubble-500/20">
+                      <div className="h-8 w-8 rounded-full bg-gradient-to-br from-bubble-500 to-grape-500 flex items-center justify-center text-white font-bold mr-3">
+                        🤖
+                      </div>
+                      <div>
+                        <p className="font-medium text-white flex items-center">
+                          {bot.name}
+                          <span className="ml-2 text-xs bg-bubble-500/20 text-bubble-300 px-1.5 py-0.5 rounded-full">AI</span>
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                  {partyMembers.length + lobbyBots.length === 0 && (
+                    <p className="p-3 text-sm text-white/50">No players yet.</p>
+                  )}
                 </div>
                 <div className="p-3 border-t border-white/10">
                   <Button 

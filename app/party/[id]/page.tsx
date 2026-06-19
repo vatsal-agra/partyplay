@@ -8,7 +8,7 @@ import { Copy, Share2, ArrowLeft, Crown, Trophy, Vote as VoteIcon, Rocket } from
 import { useRouter, useParams } from "next/navigation"
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Image from "next/image";
-import { getGameById } from "@/lib/games-catalog";
+import { getGameById, gamePath } from "@/lib/games-catalog";
 import { PartyInactivityWarning } from "@/components/PartyInactivityWarning";
 import { VoiceChat } from "@/components/VoiceChat";
 import { playAsGuest } from "@/lib/guest";
@@ -165,7 +165,7 @@ export default function PartyPage() {
 
       // Auto-redirect if party is ready
       if (partyData && partyData.status === 'ready') {
-        router.push(`/games/${partyData.game_id || 'monopoly'}?partyId=${partyId}`)
+        router.push(gamePath(partyData.game_id || 'monopoly', `?partyId=${partyId}`))
         return
       }
       
@@ -300,7 +300,7 @@ export default function PartyPage() {
             console.log('Party updated real-time:', payload.new)
             const updated = payload.new as any
             if (updated && updated.status === 'ready') {
-              router.push(`/games/${updated.game_id || 'monopoly'}?partyId=${partyId}`)
+              router.push(gamePath(updated.game_id || 'monopoly', `?partyId=${partyId}`))
             } else {
               getParty(session)
             }
@@ -315,7 +315,7 @@ export default function PartyPage() {
           })
           .on('broadcast', { event: 'game_launch' }, ({ payload }) => {
             console.log('Received game_launch broadcast:', payload)
-            router.push(`/games/${payload.gameId || 'monopoly'}?partyId=${partyId}`)
+            router.push(gamePath(payload.gameId || 'monopoly', `?partyId=${partyId}`))
           })
           .subscribe()
       }
@@ -326,7 +326,7 @@ export default function PartyPage() {
         launchChannelRef.current = supabase
           .channel(`party-launch-${partyId}`)
           .on('broadcast', { event: 'launch' }, ({ payload }) => {
-            router.push(`/games/${payload?.gameId || 'monopoly'}?partyId=${partyId}`)
+            router.push(gamePath(payload?.gameId || 'monopoly', `?partyId=${partyId}`))
           })
           .subscribe()
       }
@@ -368,7 +368,7 @@ export default function PartyPage() {
       window.partyChannel?.send({ type: 'broadcast', event: 'game_launch', payload: { gameId } })
       launchChannelRef.current?.send({ type: 'broadcast', event: 'launch', payload: { gameId } })
 
-      router.push(`/games/${gameId}?partyId=${partyId}`)
+      router.push(gamePath(gameId, `?partyId=${partyId}`))
     } catch (error) {
       console.error('Error launching game:', error)
       setLaunching(false)
