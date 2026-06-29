@@ -5,54 +5,54 @@
 @layer base {
   /* Dark "neon game night" is the default theme. */
   :root {
-    --background: 252 44% 6%;
-    --foreground: 250 30% 96%;
-    --card: 250 34% 11%;
-    --card-foreground: 250 30% 96%;
-    --popover: 250 38% 9%;
-    --popover-foreground: 250 30% 96%;
-    --primary: 258 90% 68%;            /* grape / electric violet */
+    --background: 221 48% 11%;          /* deep royal blue (no black) */
+    --foreground: 213 32% 96%;
+    --card: 220 40% 15%;
+    --card-foreground: 213 32% 96%;
+    --popover: 221 44% 13%;
+    --popover-foreground: 213 32% 96%;
+    --primary: 217 91% 60%;            /* royal blue */
     --primary-foreground: 0 0% 100%;
-    --secondary: 250 26% 18%;
-    --secondary-foreground: 250 30% 96%;
-    --muted: 250 24% 16%;
-    --muted-foreground: 250 16% 68%;
-    --accent: 250 30% 22%;             /* subtle hover surface */
-    --accent-foreground: 250 30% 98%;
-    --destructive: 350 80% 58%;
+    --secondary: 220 30% 21%;
+    --secondary-foreground: 213 32% 96%;
+    --muted: 220 26% 18%;
+    --muted-foreground: 215 18% 70%;
+    --accent: 220 32% 25%;             /* subtle hover surface */
+    --accent-foreground: 213 32% 98%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 255 30% 22%;
-    --input: 255 25% 20%;
-    --ring: 258 90% 68%;
+    --border: 220 30% 25%;
+    --input: 220 28% 23%;
+    --ring: 217 91% 60%;
     --radius: 0.9rem;
-    --chart-1: 258 90% 68%;
-    --chart-2: 330 85% 62%;
-    --chart-3: 188 84% 53%;
-    --chart-4: 43 96% 56%;
-    --chart-5: 158 70% 54%;
+    --chart-1: 217 91% 60%;            /* blue */
+    --chart-2: 192 95% 60%;            /* sky cyan */
+    --chart-3: 172 66% 50%;            /* teal */
+    --chart-4: 152 64% 54%;            /* green */
+    --chart-5: 0 84% 60%;              /* red */
   }
 
   /* Keep .dark identical so an explicit dark class never regresses the theme. */
   .dark {
-    --background: 252 44% 6%;
-    --foreground: 250 30% 96%;
-    --card: 250 34% 11%;
-    --card-foreground: 250 30% 96%;
-    --popover: 250 38% 9%;
-    --popover-foreground: 250 30% 96%;
-    --primary: 258 90% 68%;
+    --background: 221 48% 11%;
+    --foreground: 213 32% 96%;
+    --card: 220 40% 15%;
+    --card-foreground: 213 32% 96%;
+    --popover: 221 44% 13%;
+    --popover-foreground: 213 32% 96%;
+    --primary: 217 91% 60%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 250 26% 18%;
-    --secondary-foreground: 250 30% 96%;
-    --muted: 250 24% 16%;
-    --muted-foreground: 250 16% 68%;
-    --accent: 250 30% 22%;
-    --accent-foreground: 250 30% 98%;
-    --destructive: 350 80% 58%;
+    --secondary: 220 30% 21%;
+    --secondary-foreground: 213 32% 96%;
+    --muted: 220 26% 18%;
+    --muted-foreground: 215 18% 70%;
+    --accent: 220 32% 25%;
+    --accent-foreground: 213 32% 98%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 255 30% 22%;
-    --input: 255 25% 20%;
-    --ring: 258 90% 68%;
+    --border: 220 30% 25%;
+    --input: 220 28% 23%;
+    --ring: 217 91% 60%;
   }
 }
 
@@ -65,19 +65,19 @@
     @apply bg-background text-foreground antialiased font-sans;
   }
   ::selection {
-    background: rgba(124, 92, 255, 0.35);
+    background: rgba(59, 130, 246, 0.35);
   }
   /* Themed scrollbars */
   * {
     scrollbar-width: thin;
-    scrollbar-color: rgba(124, 92, 255, 0.45) transparent;
+    scrollbar-color: rgba(59, 130, 246, 0.45) transparent;
   }
   *::-webkit-scrollbar {
     width: 9px;
     height: 9px;
   }
   *::-webkit-scrollbar-thumb {
-    background: linear-gradient(rgba(124, 92, 255, 0.55), rgba(255, 77, 157, 0.45));
+    background: linear-gradient(rgba(59, 130, 246, 0.55), rgba(45, 212, 191, 0.45));
     border-radius: 9999px;
   }
   *::-webkit-scrollbar-track {
@@ -97,19 +97,19 @@
   /* Brand gradient text */
   .text-gradient {
     @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(110deg, #a78bfa 0%, #ff79c6 45%, #22d3ee 100%);
+    background-image: linear-gradient(110deg, #60a5fa 0%, #38d4ff 50%, #2dd4bf 100%);
   }
   .text-gradient-warm {
     @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(110deg, #fbbf24 0%, #ff4d9d 60%, #a78bfa 100%);
+    background-image: linear-gradient(110deg, #ef4444 0%, #38d4ff 60%, #3b82f6 100%);
   }
 
   /* Brand gradient fill (buttons / pills) */
   .bg-brand {
-    background-image: linear-gradient(110deg, #7c5cff 0%, #b14dff 45%, #ff4d9d 100%);
+    background-image: linear-gradient(110deg, #3b82f6 0%, #2b9eff 50%, #2dd4bf 100%);
   }
   .bg-brand-soft {
-    background-image: linear-gradient(110deg, rgba(124,92,255,0.18), rgba(255,77,157,0.18));
+    background-image: linear-gradient(110deg, rgba(59,130,246,0.18), rgba(45,212,191,0.18));
   }
 
   /* Card hover lift */
@@ -124,8 +124,8 @@
     z-index: -1;
     overflow: hidden;
     background:
-      radial-gradient(1200px 600px at 100% -10%, rgba(124,92,255,0.12), transparent 60%),
-      radial-gradient(900px 500px at -10% 110%, rgba(255,77,157,0.10), transparent 55%);
+      radial-gradient(1200px 600px at 100% -10%, rgba(59,130,246,0.14), transparent 60%),
+      radial-gradient(900px 500px at -10% 110%, rgba(45,212,191,0.10), transparent 55%);
     pointer-events: none;
   }
   .aurora::before,
@@ -141,13 +141,13 @@
   .aurora::before {
     top: -10%;
     left: -5%;
-    background: radial-gradient(circle, #7c5cff 0%, transparent 70%);
+    background: radial-gradient(circle, #3b82f6 0%, transparent 70%);
     animation: aurora 18s ease-in-out infinite;
   }
   .aurora::after {
     bottom: -15%;
     right: -10%;
-    background: radial-gradient(circle, #22d3ee 0%, transparent 70%);
+    background: radial-gradient(circle, #2dd4bf 0%, transparent 70%);
     animation: aurora 22s ease-in-out infinite reverse;
   }
 }

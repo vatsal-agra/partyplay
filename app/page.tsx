@@ -92,7 +92,7 @@ export default function Home() {
 
               <motion.div className="mt-9 flex flex-col sm:flex-row gap-4 justify-center lg:justify-start" variants={fadeIn}>
                 <Button variant="brand" size="lg" className="gap-2" onClick={() => router.push("/auth/sign-up")}>
-                  Start Playing Free
+                  Start Playing
                   <ArrowRight className="h-5 w-5" />
                 </Button>
                 <Button variant="outline" size="lg" onClick={() => router.push("/games")}>
