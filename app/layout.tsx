@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import Script from "next/script"
-import { Plus_Jakarta_Sans, Space_Grotesk } from "next/font/google"
+import { Plus_Jakarta_Sans, Playfair_Display } from "next/font/google"
 import "./globals.css"
 import { Providers } from "./providers"
 import { MainNav } from "@/components/MainNav"
@@ -13,7 +13,7 @@ const jakarta = Plus_Jakarta_Sans({
   display: "swap",
 })
 
-const grotesk = Space_Grotesk({
+const grotesk = Playfair_Display({
   subsets: ["latin"],
   variable: "--font-display",
   display: "swap",

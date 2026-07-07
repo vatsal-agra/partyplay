@@ -3,56 +3,56 @@
 @tailwind utilities;
 
 @layer base {
-  /* Dark "neon game night" is the default theme. */
+  /* "Warm oak" — clean, smooth wood tones with a single honey-gold accent. */
   :root {
-    --background: 221 48% 11%;          /* deep royal blue (no black) */
-    --foreground: 213 32% 96%;
-    --card: 220 40% 15%;
-    --card-foreground: 213 32% 96%;
-    --popover: 221 44% 13%;
-    --popover-foreground: 213 32% 96%;
-    --primary: 217 91% 60%;            /* royal blue */
-    --primary-foreground: 0 0% 100%;
-    --secondary: 220 30% 21%;
-    --secondary-foreground: 213 32% 96%;
-    --muted: 220 26% 18%;
-    --muted-foreground: 215 18% 70%;
-    --accent: 220 32% 25%;             /* subtle hover surface */
-    --accent-foreground: 213 32% 98%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 220 30% 25%;
-    --input: 220 28% 23%;
-    --ring: 217 91% 60%;
+    --background: 32 26% 13%;           /* smooth warm oak */
+    --foreground: 38 40% 91%;           /* soft cream */
+    --card: 32 22% 18%;                 /* clean wood panel */
+    --card-foreground: 38 40% 91%;
+    --popover: 32 24% 15%;
+    --popover-foreground: 38 40% 91%;
+    --primary: 152 52% 39%;             /* forest emerald */
+    --primary-foreground: 150 30% 97%;  /* light on green */
+    --secondary: 32 18% 24%;
+    --secondary-foreground: 38 40% 91%;
+    --muted: 32 16% 21%;
+    --muted-foreground: 36 20% 73%;
+    --accent: 32 20% 27%;               /* subtle hover surface */
+    --accent-foreground: 38 40% 93%;
+    --destructive: 4 55% 50%;
+    --destructive-foreground: 38 40% 93%;
+    --border: 36 18% 30%;
+    --input: 36 16% 26%;
+    --ring: 152 52% 39%;
     --radius: 0.9rem;
-    --chart-1: 217 91% 60%;            /* blue */
-    --chart-2: 192 95% 60%;            /* sky cyan */
-    --chart-3: 172 66% 50%;            /* teal */
-    --chart-4: 152 64% 54%;            /* green */
-    --chart-5: 0 84% 60%;              /* red */
+    --chart-1: 40 58% 60%;              /* honey gold */
+    --chart-2: 95 22% 52%;              /* sage */
+    --chart-3: 28 42% 52%;              /* caramel */
+    --chart-4: 38 62% 58%;              /* amber */
+    --chart-5: 200 24% 56%;             /* muted blue */
   }
 
   /* Keep .dark identical so an explicit dark class never regresses the theme. */
   .dark {
-    --background: 221 48% 11%;
-    --foreground: 213 32% 96%;
-    --card: 220 40% 15%;
-    --card-foreground: 213 32% 96%;
-    --popover: 221 44% 13%;
-    --popover-foreground: 213 32% 96%;
-    --primary: 217 91% 60%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 220 30% 21%;
-    --secondary-foreground: 213 32% 96%;
-    --muted: 220 26% 18%;
-    --muted-foreground: 215 18% 70%;
-    --accent: 220 32% 25%;
-    --accent-foreground: 213 32% 98%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 220 30% 25%;
-    --input: 220 28% 23%;
-    --ring: 217 91% 60%;
+    --background: 32 26% 13%;
+    --foreground: 38 40% 91%;
+    --card: 32 22% 18%;
+    --card-foreground: 38 40% 91%;
+    --popover: 32 24% 15%;
+    --popover-foreground: 38 40% 91%;
+    --primary: 40 58% 60%;
+    --primary-foreground: 32 45% 12%;
+    --secondary: 32 18% 24%;
+    --secondary-foreground: 38 40% 91%;
+    --muted: 32 16% 21%;
+    --muted-foreground: 36 20% 73%;
+    --accent: 32 20% 27%;
+    --accent-foreground: 38 40% 93%;
+    --destructive: 4 55% 50%;
+    --destructive-foreground: 38 40% 93%;
+    --border: 36 18% 30%;
+    --input: 36 16% 26%;
+    --ring: 152 52% 39%;
   }
 }
 
@@ -65,19 +65,19 @@
     @apply bg-background text-foreground antialiased font-sans;
   }
   ::selection {
-    background: rgba(59, 130, 246, 0.35);
+    background: rgba(214, 168, 92, 0.35);
   }
   /* Themed scrollbars */
   * {
     scrollbar-width: thin;
-    scrollbar-color: rgba(59, 130, 246, 0.45) transparent;
+    scrollbar-color: rgba(214, 168, 92, 0.45) transparent;
   }
   *::-webkit-scrollbar {
     width: 9px;
     height: 9px;
   }
   *::-webkit-scrollbar-thumb {
-    background: linear-gradient(rgba(59, 130, 246, 0.55), rgba(45, 212, 191, 0.45));
+    background: linear-gradient(rgba(214, 168, 92, 0.55), rgba(138, 161, 122, 0.4));
     border-radius: 9999px;
   }
   *::-webkit-scrollbar-track {
@@ -86,30 +86,36 @@
 }
 
 @layer components {
-  /* Frosted-glass panel */
+  /* Clean wood-panel surface */
   .glass {
-    @apply bg-white/[0.04] backdrop-blur-xl border border-white/10 rounded-2xl;
+    background: rgba(54, 42, 30, 0.5);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(214, 168, 92, 0.14);
+    border-radius: 1rem;
   }
   .glass-strong {
-    @apply bg-white/[0.07] backdrop-blur-xl border border-white/15 rounded-2xl;
+    background: rgba(54, 42, 30, 0.68);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(214, 168, 92, 0.2);
+    border-radius: 1rem;
   }
 
-  /* Brand gradient text */
+  /* Brand gradient text — smooth honey gold */
   .text-gradient {
     @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(110deg, #60a5fa 0%, #38d4ff 50%, #2dd4bf 100%);
+    background-image: linear-gradient(110deg, #efd9a4 0%, #d6a85c 55%, #c08f45 100%);
   }
   .text-gradient-warm {
     @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(110deg, #ef4444 0%, #38d4ff 60%, #3b82f6 100%);
+    background-image: linear-gradient(110deg, #e8c987 0%, #d6a85c 60%, #b98a4a 100%);
   }
 
-  /* Brand gradient fill (buttons / pills) */
+  /* Brand gradient fill (buttons / pills) — forest emerald */
   .bg-brand {
-    background-image: linear-gradient(110deg, #3b82f6 0%, #2b9eff 50%, #2dd4bf 100%);
+    background-image: linear-gradient(110deg, #38a87a 0%, #2f9468 50%, #257a55 100%);
   }
   .bg-brand-soft {
-    background-image: linear-gradient(110deg, rgba(59,130,246,0.18), rgba(45,212,191,0.18));
+    background-image: linear-gradient(110deg, rgba(47,148,104,0.18), rgba(214,168,92,0.12));
   }
 
   /* Card hover lift */
@@ -117,38 +123,21 @@
     @apply transition-all duration-300 ease-out hover:-translate-y-1.5;
   }
 
-  /* Animated full-page aurora backdrop */
+  /* Real wood-grain backdrop (procedural /wood.svg) + soft glow + vignette */
   .aurora {
     position: fixed;
     inset: 0;
     z-index: -1;
     overflow: hidden;
-    background:
-      radial-gradient(1200px 600px at 100% -10%, rgba(59,130,246,0.14), transparent 60%),
-      radial-gradient(900px 500px at -10% 110%, rgba(45,212,191,0.10), transparent 55%);
+    background-color: #2b2118;
+    background-image:
+      radial-gradient(1100px 700px at 50% -12%, rgba(224,181,107,0.12), transparent 60%),
+      radial-gradient(130% 120% at 50% 38%, transparent 52%, rgba(0,0,0,0.42) 100%),
+      url('/wood.svg');
+    background-size: cover, cover, 720px 720px;
+    background-position: center, center, center;
+    background-repeat: no-repeat, no-repeat, repeat;
     pointer-events: none;
-  }
-  .aurora::before,
-  .aurora::after {
-    content: "";
-    position: absolute;
-    width: 45vw;
-    height: 45vw;
-    border-radius: 9999px;
-    filter: blur(110px);
-    opacity: 0.5;
-  }
-  .aurora::before {
-    top: -10%;
-    left: -5%;
-    background: radial-gradient(circle, #3b82f6 0%, transparent 70%);
-    animation: aurora 18s ease-in-out infinite;
-  }
-  .aurora::after {
-    bottom: -15%;
-    right: -10%;
-    background: radial-gradient(circle, #2dd4bf 0%, transparent 70%);
-    animation: aurora 22s ease-in-out infinite reverse;
   }
 }
 

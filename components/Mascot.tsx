@@ -39,9 +39,9 @@ export function Mascot({
     >
       <defs>
         <linearGradient id="rolly-face" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#60a5fa" />
-          <stop offset="55%" stopColor="#3b82f6" />
-          <stop offset="100%" stopColor="#2dd4bf" />
+          <stop offset="0%" stopColor="#e8c987" />
+          <stop offset="55%" stopColor="#d6a85c" />
+          <stop offset="100%" stopColor="#b98a4a" />
         </linearGradient>
         <filter id="rolly-shadow" x="-30%" y="-30%" width="160%" height="160%">
           <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="#000" floodOpacity="0.35" />

@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="900" viewBox="0 0 900 900">
+  <defs>
+    <linearGradient id="base" x1="0" y1="0" x2="1" y2="0.04">
+      <stop offset="0" stop-color="#3a2c19"/>
+      <stop offset="0.5" stop-color="#2d2114"/>
+      <stop offset="1" stop-color="#352716"/>
+    </linearGradient>
+    <!-- long vertical grain streaks -->
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.022 0.0045" numOctaves="6" seed="9" stitchTiles="stitch"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0.75 0.75 0.75 0 0"/>
+      <feComponentTransfer><feFuncA type="gamma" amplitude="1.25" exponent="3.2" offset="0"/></feComponentTransfer>
+    </filter>
+    <!-- finer figure / chatoyance -->
+    <filter id="fine" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.05 0.012" numOctaves="4" seed="31" stitchTiles="stitch"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0.6 0.6 0.6 0 0"/>
+      <feComponentTransfer><feFuncA type="gamma" amplitude="0.5" exponent="4" offset="0"/></feComponentTransfer>
+    </filter>
+  </defs>
+
+  <rect width="900" height="900" fill="url(#base)"/>
+  <rect width="900" height="900" fill="#14100a" filter="url(#grain)"/>
+  <rect width="900" height="900" fill="#5b4528" filter="url(#fine)" opacity="0.5"/>
+
+  <!-- plank seams -->
+  <g stroke="#15100a" stroke-opacity="0.55" stroke-width="2">
+    <line x1="225" y1="0" x2="225" y2="900"/>
+    <line x1="525" y1="0" x2="525" y2="900"/>
+    <line x1="750" y1="0" x2="750" y2="900"/>
+  </g>
+  <g stroke="#6b5230" stroke-opacity="0.18" stroke-width="1">
+    <line x1="226.5" y1="0" x2="226.5" y2="900"/>
+    <line x1="526.5" y1="0" x2="526.5" y2="900"/>
+    <line x1="751.5" y1="0" x2="751.5" y2="900"/>
+  </g>
+</svg>

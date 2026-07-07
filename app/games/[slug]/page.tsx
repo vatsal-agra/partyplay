@@ -736,7 +736,7 @@ export default function GamePlayPage() {
   }
   
   return (
-    <div className="h-screen bg-gradient-to-br from-[#0b1424] via-[#0f1d38] to-[#16284d] p-0 m-0 overflow-hidden">
+    <div className="h-screen bg-gradient-to-br from-[#2b2118] via-[#32271b] to-[#3c2f20] p-0 m-0 overflow-hidden">
       <div className="h-full p-0 flex w-full">
         {/* Main content - Game and Sidebar */}
         <div className="flex flex-col md:flex-row h-full w-full overflow-y-auto md:overflow-hidden">

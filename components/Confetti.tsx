@@ -14,7 +14,7 @@ export function Confetti({ fire = true, durationMs = 4000 }: { fire?: boolean; d
     const ctx = canvas.getContext("2d")
     if (!ctx) return
 
-    const colors = ["#3b82f6", "#38d4ff", "#2dd4bf", "#34e0a1", "#ef4444", "#60a5fa"]
+    const colors = ["#d6a85c", "#e0b56b", "#8aa17a", "#c08f4a", "#efd9a4", "#b98a4a"]
     let w = (canvas.width = canvas.offsetWidth)
     let h = (canvas.height = canvas.offsetHeight)
 
