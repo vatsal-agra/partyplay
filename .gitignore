@@ -35,3 +35,8 @@ next-env.d.ts
 # netlify
 .netlify/
 .netlify
+
+# local logs / tooling
+build.log
+dev-network.log
+.claude/
