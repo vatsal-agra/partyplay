@@ -1,10 +1,10 @@
-// Mystery Manor — board UI. An atmospheric detective mansion: warm wood floor,
-// parchment rooms with brass labels, glossy character pawns that glide, weapon
-// tokens, a dice-roll flourish and a parchment case notebook. All engine hooks
-// are unchanged — this is the presentation layer.
+// Mystery Manor — board container. Renders the real-time 3D mansion (loaded
+// client-only) plus the detective HUD. All game logic flows through the pure
+// engine; this component only wires interaction and presentation.
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import dynamic from "next/dynamic"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   MysteryState,
@@ -12,26 +12,24 @@ import {
   respondDisprove, makeAccusation, endTurn, playBotStep,
   getReachable, cardName, getPlayerName,
 } from "../lib/mysteryEngine"
-import {
-  ROOMS, SUSPECTS, WEAPONS, CELLAR_RECT, RoomId, getRoom, cellKey, isCorridor,
-  BOARD_W, BOARD_H,
-} from "../lib/mansionLayout"
+import { ROOMS, SUSPECTS, WEAPONS, RoomId, getRoom, cellKey } from "../lib/mansionLayout"
 import { Confetti } from "@/components/Confetti"
-import { Dices, KeyRound, Search, Megaphone, ChevronRight, NotebookPen, ScrollText, Trophy, Skull } from "lucide-react"
+import { Dices, KeyRound, Search, Megaphone, ChevronRight, NotebookPen, ScrollText, Trophy, Skull, Loader2 } from "lucide-react"
 
-const CELL = 10
-const W = BOARD_W * CELL
-const H = BOARD_H * CELL
 const SERIF = "var(--font-display), Georgia, serif"
 
-const ROOM_ICON: Record<RoomId, string> = {
-  kitchen: "🍳", ballroom: "🎭", conservatory: "🪴", dining: "🍷",
-  billiard: "🎱", library: "📚", lounge: "🛋️", hall: "🏛️", study: "📜",
-}
-const ROOM_TINT: Record<RoomId, string> = {
-  kitchen: "#c0522d", ballroom: "#c9a227", conservatory: "#2f6b4f", dining: "#7d2b2b",
-  billiard: "#1f6b4a", library: "#6b4a2a", lounge: "#2a6b6b", hall: "#b08d3a", study: "#4a3b6b",
-}
+// The Three.js scene must never render on the server.
+const MansionScene3D = dynamic(() => import("./MansionScene3D"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-full w-full items-center justify-center bg-[#140d07]">
+      <div className="flex flex-col items-center gap-3 text-[#d6a85c]">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <p className="text-xs font-bold uppercase tracking-widest" style={{ fontFamily: SERIF }}>Lighting the manor…</p>
+      </div>
+    </div>
+  ),
+})
 
 interface Props {
   state: MysteryState
@@ -39,8 +37,6 @@ interface Props {
   onStateChange: (s: MysteryState) => void
   onBroadcastAction?: (event: string, payload: any) => void
 }
-
-type TokenPos = { type: "room"; room: RoomId } | { type: "cell"; x: number; y: number }
 
 export default function MysteryBoard({ state, currentPlayerId, onStateChange, onBroadcastAction }: Props) {
   const [showSuggest, setShowSuggest] = useState(false)
@@ -53,7 +49,6 @@ export default function MysteryBoard({ state, currentPlayerId, onStateChange, on
   const [notes, setNotes] = useState<Record<string, boolean>>({})
   const [tab, setTab] = useState<"notebook" | "log">("notebook")
   const [rolling, setRolling] = useState(false)
-  const [dieFace, setDieFace] = useState(1)
 
   const commit = (next: MysteryState) => {
     onStateChange(next)
@@ -64,15 +59,10 @@ export default function MysteryBoard({ state, currentPlayerId, onStateChange, on
   const isMyTurn = cur.id === currentPlayerId && !state.winnerId
   const me = state.players.find((p) => p.id === currentPlayerId)
 
-  // Dice-roll flourish: tumble faces, then apply the engine roll.
   const doRoll = () => {
     if (rolling) return
     setRolling(true)
-    let ticks = 0
-    const iv = setInterval(() => {
-      setDieFace(1 + Math.floor(Math.random() * 6))
-      if (++ticks > 7) { clearInterval(iv); setRolling(false); commit(rollDice(state)) }
-    }, 90)
+    setTimeout(() => { setRolling(false); commit(rollDice(state)) }, 850)
   }
 
   // ---- Bot driver -----------------------------------------------------------
@@ -80,71 +70,22 @@ export default function MysteryBoard({ state, currentPlayerId, onStateChange, on
     if (state.winnerId) return
     if (!cur.isBot) return
     if (!["ROLL", "MOVE", "ACTION"].includes(state.phase)) return
-    const t = setTimeout(() => commit(playBotStep(state)), 950)
+    const t = setTimeout(() => commit(playBotStep(state)), 1000)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.currentPlayerIndex, state.phase, state.suggestionMade, state.winnerId, state.pending])
 
-  // ---- Reachable set --------------------------------------------------------
+  // ---- Reachable set (feeds the 3D board's clickable tiles/rooms) -----------
   const reach = useMemo(() => {
     if (!isMyTurn || state.phase !== "MOVE") return null
     return getReachable(state, state.currentPlayerIndex)
   }, [state, isMyTurn])
-  const reachableCells = useMemo(() => {
+  const reachCellKeys = useMemo(() => {
     const s = new Set<string>()
     reach?.cells.forEach((c) => s.add(cellKey(c.x, c.y)))
     return s
   }, [reach])
-  const reachableRooms = useMemo(() => new Set(reach?.rooms.map((r) => r.room)), [reach])
-
-  // ---- Token positions ------------------------------------------------------
-  const suspectPositions = useMemo(() => {
-    const map: Record<string, TokenPos> = {}
-    SUSPECTS.forEach((s) => {
-      const owner = state.players.find((p) => p.suspectId === s.id)
-      if (owner) {
-        if (owner.inRoom) map[s.id] = { type: "room", room: owner.inRoom }
-        else if (owner.cell) map[s.id] = { type: "cell", x: owner.cell.x, y: owner.cell.y }
-      } else {
-        const loc = state.suspectLocations[s.id]
-        map[s.id] = loc ? { type: "room", room: loc } : { type: "cell", x: s.start.x, y: s.start.y }
-      }
-    })
-    return map
-  }, [state])
-
-  // Ordered occupants per room for tidy, non-overlapping slots.
-  const { roomSuspects, roomWeapons } = useMemo(() => {
-    const rs: Record<string, string[]> = {}
-    const rw: Record<string, string[]> = {}
-    ROOMS.forEach((r) => { rs[r.id] = []; rw[r.id] = [] })
-    SUSPECTS.forEach((s) => {
-      const pos = suspectPositions[s.id]
-      if (pos?.type === "room") rs[pos.room].push(s.id)
-    })
-    WEAPONS.forEach((w) => {
-      const room = state.weaponLocations[w.id]
-      if (room) rw[room].push(w.id)
-    })
-    return { roomSuspects: rs, roomWeapons: rw }
-  }, [state, suspectPositions])
-
-  const roomSlot = (room: RoomId, i: number, row: "top" | "bottom") => {
-    const r = getRoom(room).rect
-    const wCells = r.x2 - r.x1 + 1
-    const perRow = Math.max(2, wCells - 2)
-    const col = i % perRow
-    const cx = (r.x1 + 1.2 + col * ((wCells - 2.2) / Math.max(1, perRow - 1 || 1))) * CELL
-    const cy = row === "bottom" ? (r.y2 - 0.3) * CELL : (r.y1 + 2.0) * CELL
-    return { cx, cy }
-  }
-
-  const suspectTarget = (id: string) => {
-    const pos = suspectPositions[id]
-    if (!pos) return { cx: 0, cy: 0 }
-    if (pos.type === "cell") return { cx: pos.x * CELL + CELL / 2, cy: pos.y * CELL + CELL / 2 }
-    return roomSlot(pos.room, roomSuspects[pos.room].indexOf(id), "bottom")
-  }
+  const reachRoomIds = useMemo(() => new Set<string>(reach?.rooms.map((r) => r.room) ?? []), [reach])
 
   const knownToMe = new Set(me?.known ?? [])
   const toggleNote = (id: string) => setNotes((n) => ({ ...n, [id]: !n[id] }))
@@ -157,141 +98,25 @@ export default function MysteryBoard({ state, currentPlayerId, onStateChange, on
   const inRoomNow = isMyTurn && me?.inRoom
 
   return (
-    <div className="flex w-full h-full overflow-hidden select-none p-2 gap-3"
-      style={{ background: "radial-gradient(1200px 800px at 50% 0%, #2c2013, #1a120a)" }}>
-      {/* BOARD */}
-      <div className="relative flex items-center justify-center p-2 rounded-2xl border border-[#6b5230]/30 shadow-2xl"
-        style={{ background: "linear-gradient(160deg,#2a1e12,#1c140b)" }}>
+    <div className="flex h-full w-full overflow-hidden select-none" style={{ background: "#140d07" }}>
+      {/* 3D BOARD */}
+      <div className="relative h-full flex-1 min-w-0">
+        <MansionScene3D
+          state={state}
+          currentPlayerId={currentPlayerId}
+          reachCellKeys={reachCellKeys}
+          reachRoomIds={reachRoomIds}
+          rolling={rolling}
+          onMoveCell={(x, y) => commit(moveTo(state, { kind: "cell", x, y }))}
+          onMoveRoom={(room) => commit(moveTo(state, { kind: "room", room }))}
+        />
         <Confetti fire={!!state.winnerId} />
-        <svg
-          viewBox={`0 0 ${W} ${H}`}
-          style={{ width: "min(84vh, 740px)", height: "min(84vh, 740px)" }}
-          className="rounded-xl border-[3px] border-[#0f0a05]"
-        >
-          <defs>
-            <linearGradient id="floor" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stopColor="#2a1d10" />
-              <stop offset="1" stopColor="#1b130a" />
-            </linearGradient>
-            <linearGradient id="parch" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stopColor="#3a2d1b" />
-              <stop offset="1" stopColor="#2c2113" />
-            </linearGradient>
-            <radialGradient id="lamp" cx="50%" cy="46%" r="55%">
-              <stop offset="0" stopColor="#d6a85c" stopOpacity="0.16" />
-              <stop offset="70%" stopColor="#d6a85c" stopOpacity="0" />
-            </radialGradient>
-            <radialGradient id="vig" cx="50%" cy="46%" r="72%">
-              <stop offset="58%" stopColor="#000" stopOpacity="0" />
-              <stop offset="100%" stopColor="#000" stopOpacity="0.5" />
-            </radialGradient>
-            <filter id="tok" x="-50%" y="-50%" width="200%" height="200%">
-              <feDropShadow dx="0" dy="1.4" stdDeviation="1.1" floodColor="#000" floodOpacity="0.55" />
-            </filter>
-          </defs>
 
-          {/* wood floor + plank lines */}
-          <rect x="0" y="0" width={W} height={H} fill="url(#floor)" />
-          {Array.from({ length: 12 }).map((_, i) => (
-            <line key={i} x1="0" x2={W} y1={(i + 1) * (H / 13)} y2={(i + 1) * (H / 13)} stroke="#000" strokeOpacity="0.14" strokeWidth="0.6" />
-          ))}
-          <rect x="0" y="0" width={W} height={H} fill="url(#lamp)" />
+        {/* orbit hint */}
+        <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-white/10 bg-black/40 px-3 py-1 text-[10px] text-white/40 backdrop-blur">
+          drag to orbit · scroll to zoom
+        </div>
 
-          {/* corridor cells */}
-          {Array.from({ length: BOARD_H }).map((_, y) =>
-            Array.from({ length: BOARD_W }).map((_, x) => {
-              if (!isCorridor(x, y)) return null
-              const k = cellKey(x, y)
-              const hot = reachableCells.has(k)
-              return (
-                <rect
-                  key={k}
-                  x={x * CELL + 0.4} y={y * CELL + 0.4} width={CELL - 0.8} height={CELL - 0.8} rx={1.2}
-                  className={hot ? "cursor-pointer" : ""}
-                  fill={hot ? "#d6a85c" : "#3a2c1b"}
-                  fillOpacity={hot ? 0.5 : 1}
-                  stroke={hot ? "#f0d9a4" : "#4a3826"} strokeWidth={hot ? 0.7 : 0.4}
-                  onClick={hot ? () => commit(moveTo(state, { kind: "cell", x, y })) : undefined}
-                >
-                  {hot && <animate attributeName="fill-opacity" values="0.35;0.7;0.35" dur="1.3s" repeatCount="indefinite" />}
-                </rect>
-              )
-            })
-          )}
-
-          {/* cellar / solution vault */}
-          <rect
-            x={CELLAR_RECT.x1 * CELL} y={CELLAR_RECT.y1 * CELL}
-            width={(CELLAR_RECT.x2 - CELLAR_RECT.x1 + 1) * CELL}
-            height={(CELLAR_RECT.y2 - CELLAR_RECT.y1 + 1) * CELL}
-            rx={3} fill="#0f0a05" stroke="#3a2c1b" strokeWidth={1}
-          />
-          <text x={(CELLAR_RECT.x1 + CELLAR_RECT.x2 + 1) / 2 * CELL} y={(CELLAR_RECT.y1 + CELLAR_RECT.y2 + 1) / 2 * CELL}
-            textAnchor="middle" dominantBaseline="middle" fontSize={6.5} fill="#6b5230" fontWeight="bold"
-            letterSpacing="1" style={{ fontFamily: SERIF }}>THE CELLAR</text>
-
-          {/* rooms */}
-          {ROOMS.map((room) => {
-            const r = room.rect
-            const enter = reachableRooms.has(room.id)
-            const x = r.x1 * CELL, y = r.y1 * CELL
-            const w = (r.x2 - r.x1 + 1) * CELL, h = (r.y2 - r.y1 + 1) * CELL
-            return (
-              <g key={room.id}>
-                <rect x={x} y={y} width={w} height={h} rx={3} fill="url(#parch)"
-                  stroke={enter ? "#f0d9a4" : "#6b5230"} strokeWidth={enter ? 2 : 1.2}
-                  className={enter ? "cursor-pointer" : ""}
-                  onClick={enter ? () => commit(moveTo(state, { kind: "room", room: room.id })) : undefined} />
-                <rect x={x} y={y} width={w} height={h} rx={3} fill={ROOM_TINT[room.id]} fillOpacity={enter ? 0.2 : 0.12} pointerEvents="none" />
-                {/* big faded room icon */}
-                <text x={x + w / 2} y={y + h / 2 + 3} textAnchor="middle" dominantBaseline="middle"
-                  fontSize={Math.min(w, h) * 0.42} opacity={0.14} pointerEvents="none">{ROOM_ICON[room.id]}</text>
-                {/* brass label */}
-                <text x={x + w / 2} y={y + 7.5} textAnchor="middle" fontSize={6} fill="#f0d9a4"
-                  fontWeight="bold" letterSpacing="0.3" style={{ fontFamily: SERIF }} pointerEvents="none">{room.name}</text>
-                {room.secret && (
-                  <text x={x + w - 4.5} y={y + h - 2.5} textAnchor="middle" fontSize={5.5} pointerEvents="none" opacity={0.8}>🗝️</text>
-                )}
-                {/* weapons (top row) */}
-                {roomWeapons[room.id].map((wid, i) => {
-                  const { cx, cy } = roomSlot(room.id, i, "top")
-                  const wp = WEAPONS.find((w) => w.id === wid)!
-                  return (
-                    <motion.image key={`w${wid}`} href={wp.image} width={7.5} height={7.5}
-                      initial={false} animate={{ x: cx - 3.75, y: cy - 3.75 }}
-                      transition={{ type: "spring", stiffness: 180, damping: 20 }}
-                      style={{ filter: "url(#tok)" }} preserveAspectRatio="xMidYMid slice" />
-                  )
-                })}
-              </g>
-            )
-          })}
-
-          {/* suspect pawns (glide to target) */}
-          {SUSPECTS.map((s) => {
-            const owner = state.players.find((p) => p.suspectId === s.id)
-            const isCur = owner && owner.id === cur.id
-            const isMe = owner && owner.id === currentPlayerId
-            const { cx, cy } = suspectTarget(s.id)
-            return (
-              <motion.g key={s.id} initial={false} animate={{ x: cx, y: cy }}
-                transition={{ type: "spring", stiffness: 170, damping: 22 }} style={{ filter: "url(#tok)" }}>
-                {isCur && <circle r={5.4} fill="none" stroke="#f0d9a4" strokeWidth={0.8} opacity={0.9}>
-                  <animate attributeName="r" values="4.6;5.8;4.6" dur="1.4s" repeatCount="indefinite" />
-                </circle>}
-                {/* pawn body */}
-                <path d="M -3 3.4 Q -3 0 -1.6 -0.9 Q -2.4 -2 -1.1 -2.9 Q 0 -3.6 1.1 -2.9 Q 2.4 -2 1.6 -0.9 Q 3 0 3 3.4 Z"
-                  fill={s.color} stroke="#0f0a05" strokeWidth={0.7} />
-                <ellipse cx={-0.7} cy={-1.6} rx={0.9} ry={1.3} fill="#fff" opacity={0.35} />
-                {isMe && <circle cx={0} cy={-1.9} r={0.7} fill="#fff" opacity={0.9} />}
-              </motion.g>
-            )
-          })}
-
-          <rect x="0" y="0" width={W} height={H} fill="url(#vig)" pointerEvents="none" />
-        </svg>
-
-        {/* Win overlay */}
         <AnimatePresence>
           {state.winnerId && (
             <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
@@ -307,7 +132,7 @@ export default function MysteryBoard({ state, currentPlayerId, onStateChange, on
       </div>
 
       {/* SIDE PANEL */}
-      <div className="flex flex-col flex-1 min-w-[300px] max-w-[370px] gap-2.5 overflow-hidden py-1">
+      <div className="flex w-[320px] max-w-[340px] flex-shrink-0 flex-col gap-2.5 overflow-hidden border-l border-[#6b5230]/30 bg-[#1b130b] p-2.5">
         {/* Detective roster */}
         <div className="flex items-center gap-1.5">
           {state.players.map((p) => {
@@ -328,7 +153,7 @@ export default function MysteryBoard({ state, currentPlayerId, onStateChange, on
         <div className="glass-strong flex items-center gap-3 p-3">
           <div className="grid h-11 w-11 place-items-center rounded-xl text-base font-black shadow"
             style={{ backgroundColor: cur.color, color: "#1a120a", fontFamily: SERIF }}>{cur.name[0]}</div>
-          <div className="flex-1 min-w-0">
+          <div className="min-w-0 flex-1">
             <span className="text-[9px] font-black uppercase tracking-widest text-[#d6a85c]">Now investigating</span>
             <h3 className="truncate text-base font-black text-white" style={{ fontFamily: SERIF }}>
               {cur.name}{cur.isBot && <span className="ml-1.5 rounded bg-[#d6a85c]/20 px-1 py-0.5 text-[7px] font-bold text-[#e8c987]">AI</span>}
@@ -375,10 +200,10 @@ export default function MysteryBoard({ state, currentPlayerId, onStateChange, on
             <div className="flex flex-col gap-2">
               <button onClick={doRoll} disabled={rolling}
                 className="bg-brand flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-black uppercase text-white shadow-glow-grape disabled:opacity-70">
-                <motion.span animate={rolling ? { rotate: 360 } : {}} transition={{ duration: 0.25, repeat: rolling ? Infinity : 0, ease: "linear" }}>
+                <motion.span animate={rolling ? { rotate: 360 } : {}} transition={{ duration: 0.3, repeat: rolling ? Infinity : 0, ease: "linear" }}>
                   <Dices className="h-4 w-4" />
                 </motion.span>
-                {rolling ? `Rolling… ${dieFace}` : "Roll the Dice"}
+                {rolling ? "Rolling…" : "Roll the Dice"}
               </button>
               {me?.inRoom && (
                 <div className="flex gap-2">
@@ -402,7 +227,7 @@ export default function MysteryBoard({ state, currentPlayerId, onStateChange, on
           ) : state.phase === "MOVE" ? (
             <div className="text-center">
               <p className="text-sm font-black text-[#e8c987]" style={{ fontFamily: SERIF }}>🎲 {state.movesLeft} step{state.movesLeft === 1 ? "" : "s"} left</p>
-              <p className="mt-0.5 text-[10px] text-white/50">Click a glowing tile or room to move.</p>
+              <p className="mt-0.5 text-[10px] text-white/50">Click a glowing tile or room on the board.</p>
             </div>
           ) : state.phase === "ACTION" ? (
             <div className="flex flex-col gap-2">
