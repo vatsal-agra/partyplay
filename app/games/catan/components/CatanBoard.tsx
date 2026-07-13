@@ -52,8 +52,18 @@ const RESOURCE_ICONS: Record<ResourceType, string> = {
   ORE: '⛰️'
 }
 
+// What each development card actually does — shown on the card tray so
+// players never have to guess.
+const DEV_CARD_INFO: Record<string, { name: string; icon: string; desc: string }> = {
+  KNIGHT:         { name: 'Knight',         icon: '⚔️', desc: 'Move the robber to any hex and steal 1 random card from an opponent there. 3+ played knights compete for Largest Army (+2 VP).' },
+  ROAD_BUILDING:  { name: 'Road Building',  icon: '🛣️', desc: 'Build 2 roads anywhere on your network — completely free.' },
+  YEAR_OF_PLENTY: { name: 'Year of Plenty', icon: '🎁', desc: 'Take any 2 resources of your choice from the bank for free.' },
+  MONOPOLY:       { name: 'Embargo',        icon: '📢', desc: 'Name one resource — every opponent hands over ALL their cards of it to you.' },
+  VICTORY_POINT:  { name: 'Victory Point',  icon: '🏆', desc: 'Worth 1 VP, counted automatically toward your total. Never needs to be played.' },
+}
+
 export default function CatanBoard({ state, currentPlayerId, onStateChange, onBroadcastAction }: CatanBoardProps) {
-  const [activeTab, setActiveTab]         = useState<'HUD' | 'BUILD' | 'TRADE' | 'DEV'>('HUD')
+  const [activeTab, setActiveTab]         = useState<'HUD' | 'BUILD' | 'TRADE'>('HUD')
   const [tradeTargetId, setTradeTarget]   = useState<string>("")
   const [giveRes, setGiveRes]             = useState<Record<ResourceType, number>>({ WOOD: 0, BRICK: 0, SHEEP: 0, WHEAT: 0, ORE: 0 })
   const [reqRes, setReqRes]               = useState<Record<ResourceType, number>>({ WOOD: 0, BRICK: 0, SHEEP: 0, WHEAT: 0, ORE: 0 })
@@ -402,6 +412,49 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
           </div>
         )}
 
+        {/* Dev card tray — your cards live on the table, each says what it does */}
+        {me && Object.values(me.devCards).some(c => c > 0) && (
+          <div className="absolute bottom-3 right-3 z-10 flex items-end gap-1.5">
+            {Object.entries(me.devCards).filter(([, c]) => c > 0).map(([type, count]) => {
+              const info = DEV_CARD_INFO[type]
+              const playable = isMyTurn && state.phase === 'MAIN' && !state.playedDevCardThisTurn && type !== 'VICTORY_POINT'
+              return (
+                <button
+                  key={type}
+                  onClick={() => playable && playDevCard(type as DevCardType)}
+                  className={`group relative w-[76px] rounded-xl border p-2 pb-1.5 text-left shadow-lg backdrop-blur transition ${
+                    playable
+                      ? 'border-[#d6a85c]/60 bg-gradient-to-b from-[#3a2c18]/95 to-[#241a10]/95 hover:-translate-y-1 hover:border-[#f0d9a4] cursor-pointer'
+                      : 'border-white/15 bg-black/60 opacity-80 cursor-default'
+                  }`}
+                >
+                  {/* count badge */}
+                  {count > 1 && (
+                    <span className="absolute -top-1.5 -right-1.5 grid h-4 min-w-[16px] place-items-center rounded-full bg-[#d6a85c] px-1 text-[9px] font-black text-[#1a120a]">
+                      ×{count}
+                    </span>
+                  )}
+                  <span className="block text-lg leading-none">{info.icon}</span>
+                  <span className="mt-1 block text-[8.5px] font-black uppercase leading-tight tracking-wide text-[#f0d9a4]" style={{ fontFamily: SERIF }}>
+                    {info.name}
+                  </span>
+                  {playable && <span className="mt-0.5 block text-[7px] font-bold uppercase tracking-wider text-emerald-400">▶ tap to play</span>}
+                  {/* what-it-does tooltip */}
+                  <span className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 w-48 -translate-x-1/2 rounded-xl border border-[#6b5230]/60 bg-black/90 p-2.5 opacity-0 shadow-2xl backdrop-blur transition-opacity duration-150 group-hover:opacity-100">
+                    <span className="block text-[9px] font-black uppercase tracking-wider text-[#e8c987]">{info.icon} {info.name}</span>
+                    <span className="mt-1 block text-[9.5px] leading-snug text-white/85">{info.desc}</span>
+                    {!playable && type !== 'VICTORY_POINT' && (
+                      <span className="mt-1 block text-[8px] italic text-white/45">
+                        {state.playedDevCardThisTurn && isMyTurn ? 'Only one dev card per turn.' : 'Playable on your turn, in the Main phase.'}
+                      </span>
+                    )}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+
         {/* Live table feed — the last few game events, newest on top */}
         <div className="pointer-events-none absolute top-3 left-3 z-10 flex w-[290px] max-w-[46%] flex-col gap-1">
           <AnimatePresence initial={false}>
@@ -693,7 +746,7 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
       {/* COLUMN 3: STANDINGS & UTILITIES TABS */}
       <div className="flex flex-col w-64 gap-2 overflow-hidden flex-shrink-0 py-1">
         <div className="flex border-b border-white/10 pb-2 gap-1 flex-shrink-0">
-          {(['HUD', 'BUILD', 'TRADE', 'DEV'] as const).map(tab => (
+          {(['HUD', 'BUILD', 'TRADE'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -916,44 +969,6 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
           </div>
         )}
 
-        {/* DEVELOPMENT CARDS TAB */}
-        {activeTab === 'DEV' && (
-          <div className="flex-1 overflow-y-auto space-y-2 pr-0.5 min-h-0">
-            <h4 className="text-[10px] font-black uppercase text-white/35 tracking-wider mb-1">My Development Deck</h4>
-            {(() => {
-              const myDevs = state.players.find(p => p.id === currentPlayerId)?.devCards
-              if (!myDevs) return null
-
-              const list = Object.entries(myDevs).filter(([, count]) => count > 0)
-              if (list.length === 0) return (
-                <div className="text-center py-12 text-white/30 text-xs italic bg-black/25 rounded-2xl border border-white/5 px-4">
-                  No development cards purchased yet.
-                </div>
-              )
-
-              return list.map(([type, count]) => {
-                const DEV_LABELS: Record<string, string> = { KNIGHT: 'Knight', ROAD_BUILDING: 'Road Building', YEAR_OF_PLENTY: 'Year of Plenty', MONOPOLY: 'Embargo', VICTORY_POINT: 'Victory Point' }
-                const cardName = DEV_LABELS[type] || type.replace('_', ' ')
-                return (
-                  <div key={type} className="flex justify-between items-center bg-black/25 border border-white/5 px-3 py-2 rounded-xl">
-                    <div className="flex flex-col">
-                      <span className="text-xs font-bold capitalize text-white">{cardName}</span>
-                      <span className="text-[9px] text-white/40 mt-0.5">Quantity: {count}</span>
-                    </div>
-                    {isMyTurn && state.phase === 'MAIN' && !state.playedDevCardThisTurn && type !== 'VICTORY_POINT' && (
-                      <button
-                        onClick={() => playDevCard(type as DevCardType)}
-                        className="px-2.5 py-1 bg-[#d6a85c]/20 hover:bg-[#d6a85c]/35 text-[#f0d9a4] text-[9px] font-black rounded uppercase tracking-wider transition"
-                      >
-                        Play
-                      </button>
-                    )}
-                  </div>
-                )
-              })
-            })()}
-          </div>
-        )}
       </div>
 
       {/* OVERLAYS / DIALOGS */}
