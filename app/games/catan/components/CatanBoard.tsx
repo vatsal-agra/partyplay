@@ -78,6 +78,9 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
   const layout = getBoardLayout()
   const curPlayer = state.players[state.currentPlayerIndex]
   const isMyTurn  = curPlayer.id === currentPlayerId
+  // The local player's seat — NOT the same as curPlayer (whoever's turn it is).
+  // Anything about "my hand" (discards, inventory) must read from here.
+  const me = state.players.find(p => p.id === currentPlayerId)
 
   // Bot Auto Play logic
   useEffect(() => {
@@ -308,8 +311,8 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
     }
   }
 
-  // Robber Discard state helper
-  const botNeedsDiscard = state.phase === 'ROBBER_DISCARD' && state.discardRequiredPlayers.includes(currentPlayerId)
+  // Robber Discard state helper — does the LOCAL player owe a discard?
+  const iMustDiscard = state.phase === 'ROBBER_DISCARD' && state.discardRequiredPlayers.includes(currentPlayerId)
   const discardTarget = state.discardCount[currentPlayerId] || 0
   const discardSum = giveRes.WOOD + giveRes.BRICK + giveRes.SHEEP + giveRes.WHEAT + giveRes.ORE
 
@@ -375,8 +378,47 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
         )}
 
         {/* orbit hint */}
-        <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-white/10 bg-black/40 px-3 py-1 text-[10px] text-white/40 backdrop-blur">
+        <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-white/10 bg-black/40 px-3 py-1 text-[10px] text-white/40 backdrop-blur hidden lg:block">
           drag to orbit · scroll to zoom
+        </div>
+
+        {/* My hand — always visible, pops when a count changes */}
+        {me && (
+          <div className="absolute bottom-3 left-3 z-10 flex items-center gap-1.5 rounded-2xl border border-[#6b5230]/50 bg-black/60 px-2 py-1.5 backdrop-blur shadow-lg">
+            <span className="hidden sm:block pl-1 pr-0.5 text-[8px] font-black uppercase tracking-widest text-[#d6a85c]">Hand</span>
+            {RESOURCES.map(r => (
+              <div key={r} className={`flex items-center gap-1 rounded-lg px-1.5 py-1 ${me.resources[r] > 0 ? "bg-white/10" : "bg-white/[0.03] opacity-60"}`} title={r}>
+                <span className="text-sm leading-none">{RESOURCE_ICONS[r]}</span>
+                <motion.span
+                  key={me.resources[r]}
+                  initial={{ scale: 1.6, color: "#ffd88a" }}
+                  animate={{ scale: 1, color: "#f0e6d2" }}
+                  className="min-w-[10px] text-center text-[11px] font-black font-mono"
+                >
+                  {me.resources[r]}
+                </motion.span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Live table feed — the last few game events, newest on top */}
+        <div className="pointer-events-none absolute top-3 left-3 z-10 flex w-[290px] max-w-[46%] flex-col gap-1">
+          <AnimatePresence initial={false}>
+            {state.log.slice(-4).reverse().map((msg, i) => (
+              <motion.div
+                key={msg + (state.log.length - i)}
+                layout
+                initial={{ opacity: 0, x: -18 }}
+                animate={{ opacity: i === 0 ? 1 : 0.55 - i * 0.1, x: 0 }}
+                exit={{ opacity: 0, x: -12 }}
+                transition={{ duration: 0.25 }}
+                className="rounded-lg border border-white/10 bg-black/55 px-2.5 py-1.5 text-[10px] leading-snug text-white/90 backdrop-blur"
+              >
+                {msg}
+              </motion.div>
+            ))}
+          </AnimatePresence>
         </div>
 
         {/* Win banner */}
@@ -490,14 +532,19 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
                 className="glass rounded-2xl border border-red-500/25 p-4 text-center shadow-2xl flex flex-col gap-3"
               >
                 <ShieldAlert className="w-8 h-8 text-red-500 mx-auto" />
-                <h3 className="text-xs font-black uppercase text-red-400 tracking-wider">Discard Required!</h3>
+                <h3 className="text-xs font-black uppercase text-red-400 tracking-wider">Robber Strikes!</h3>
                 <p className="text-[10px] text-white/50">
-                  You have more than 7 cards and must discard exactly <strong className="text-[#e0b56b] font-mono text-sm">{discardTarget}</strong> resources.
+                  {iMustDiscard ? (
+                    <>You have more than 7 cards and must discard exactly <strong className="text-[#e0b56b] font-mono text-sm">{discardTarget}</strong> resources.</>
+                  ) : (
+                    <>A 7 was rolled — players holding more than 7 cards are discarding half.</>
+                  )}
                 </p>
 
-                {botNeedsDiscard ? (
+                {iMustDiscard ? (
                   <div className="space-y-2.5">
-                    {/* Discard resource selectors */}
+                    {/* Discard resource selectors — gated against MY hand, not the
+                        turn player's (a bot may have rolled the 7 that put us here) */}
                     <div className="grid grid-cols-5 gap-1.5 bg-black/40 p-2 rounded-xl">
                       {RESOURCES.map(r => (
                         <div key={r} className="flex flex-col items-center">
@@ -505,7 +552,7 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
                           <span className="text-[9px] font-mono text-[#e0b56b] font-bold mt-1">({giveRes[r]})</span>
                           <div className="flex flex-col gap-1 mt-1">
                             <button
-                              disabled={giveRes[r] >= curPlayer.resources[r]}
+                              disabled={giveRes[r] >= (me?.resources[r] ?? 0)}
                               onClick={() => handleModifyGive(r, 1)}
                               className="w-4 h-4 bg-white/10 hover:bg-white/20 disabled:opacity-30 text-white rounded flex items-center justify-center text-[10px]"
                             >
