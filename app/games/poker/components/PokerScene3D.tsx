@@ -125,6 +125,10 @@ function Card3D({ card, faceUp, ...props }: { card?: Card; faceUp: boolean } & J
 }
 
 // Community card: rises from the deck spot and flips face-up on mount.
+// Rests at y=0.17 — the felt surface is at ~0.15, so anything lower is
+// swallowed by the table.
+const FELT_Y = 0.17
+
 function CommunityCard({ card, slot }: { card: Card; slot: number }) {
   const g = useRef<THREE.Group>(null)
   const t = useRef(0)
@@ -136,14 +140,14 @@ function CommunityCard({ card, slot }: { card: Card; slot: number }) {
     const e = 1 - Math.pow(1 - k, 3) // ease-out
     g.current.position.set(
       -3.4 + (targetX + 3.4) * e,
-      0.06 + Math.sin(e * Math.PI) * 0.9,
+      FELT_Y + Math.sin(e * Math.PI) * 0.9,
       -0.35,
     )
     g.current.rotation.x = -Math.PI / 2
     g.current.rotation.y = Math.PI * (1 - e)   // flip during the slide
   })
   return (
-    <group ref={g} position={[-3.4, 0.06, -0.35]} rotation-x={-Math.PI / 2}>
+    <group ref={g} position={[-3.4, FELT_Y, -0.35]} rotation-x={-Math.PI / 2}>
       <Card3D card={card} faceUp />
     </group>
   )
@@ -174,7 +178,7 @@ function HoleCard({ card, mine, revealed, seatAngle, offset }: {
     )
   }
   return (
-    <group position={[sx, 0.03, sz]} rotation-x={-Math.PI / 2} rotation-z={-seatAngle + Math.PI / 2 + offset * 0.1}>
+    <group position={[sx, FELT_Y, sz]} rotation-x={-Math.PI / 2} rotation-z={-seatAngle + Math.PI / 2 + offset * 0.1}>
       <group ref={inner} rotation-y={Math.PI}>
         <Card3D card={card} faceUp />
       </group>
@@ -236,7 +240,7 @@ function PotPile({ amount, winnerAngle }: { amount: number; winnerAngle: number 
   })
   if (amount <= 0) return null
   return (
-    <group ref={g} position={[0, 0, 0.75]}>
+    <group ref={g} position={[0, FELT_Y - 0.02, 0.75]}>
       <ChipStack amount={amount} />
     </group>
   )

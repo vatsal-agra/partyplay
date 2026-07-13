@@ -249,7 +249,7 @@ export default function GamePlayPage() {
       description: 'Popular card game of skill and chance',
       image: '/images/poker thumbnail.png',
       minPlayers: 2,
-      maxPlayers: 10,
+      maxPlayers: 8, // engine seats at most 8 (initializeGame slices the roster)
       duration: '30-60 min',
       complexity: 'Medium'
     },
@@ -978,6 +978,9 @@ export default function GamePlayPage() {
                               variant="outline"
                               size="sm"
                               onClick={() => setLobbyBots(prev => {
+                                // clamp inside the updater — rapid clicks batch
+                                // before the disabled state re-renders
+                                if (partyMembers.length + prev.length >= gameData.maxPlayers) return prev
                                 const pool = BOT_SUPPORT[gameData.id] || []
                                 return [...prev, { id: `bot-${prev.length + 1}`, name: pool[prev.length] || `Bot ${prev.length + 1}` }]
                               })}

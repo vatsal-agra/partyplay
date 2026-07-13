@@ -56,7 +56,7 @@ export const GAMES_CATALOG: Game[] = [
     description: 'Test your luck and bluffing skills in this classic card game of strategy and chance.',
     image: '/images/poker thumbnail.png',
     minPlayers: 2,
-    maxPlayers: 10,
+    maxPlayers: 8, // engine seats at most 8
     duration: '30-120 min',
     complexity: 'Medium',
     category: ['Card Game', 'Bluffing'],
