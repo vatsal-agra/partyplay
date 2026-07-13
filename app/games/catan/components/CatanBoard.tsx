@@ -68,6 +68,9 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
   const [giveRes, setGiveRes]             = useState<Record<ResourceType, number>>({ WOOD: 0, BRICK: 0, SHEEP: 0, WHEAT: 0, ORE: 0 })
   const [reqRes, setReqRes]               = useState<Record<ResourceType, number>>({ WOOD: 0, BRICK: 0, SHEEP: 0, WHEAT: 0, ORE: 0 })
   const [selectedBuildMode, setBuildMode] = useState<'NONE' | 'SETTLEMENT' | 'ROAD' | 'CITY'>('NONE')
+  // Maritime trade picker: what I give → what I get
+  const [mtGive, setMtGive] = useState<ResourceType | null>(null)
+  const [mtGet, setMtGet]   = useState<ResourceType | null>(null)
   const [showStealDialog, setShowSteal]   = useState(false)
   const [isRolling, setIsRolling]         = useState(false)
 
@@ -489,8 +492,8 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
         </AnimatePresence>
       </div>
 
-      {/* COLUMN 2: ACTIVE TURN & CONTEXT CONTROLS */}
-      <div className="flex flex-col flex-shrink-0 w-[248px] gap-2.5 overflow-hidden justify-between py-1">
+      {/* SIDEBAR: turn state, phase actions, then tabs — one packed column */}
+      <div className="flex w-[300px] flex-shrink-0 flex-col gap-2.5 overflow-hidden py-1">
         {/* Turn HUD Panel */}
         <div className="glass-strong rounded-2xl p-3.5 flex flex-col gap-3 relative shadow-xl overflow-hidden">
           <div className="flex items-center gap-3">
@@ -519,7 +522,7 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
         </div>
 
         {/* Phase Context details */}
-        <div className="flex-1 flex flex-col justify-center min-h-[160px]">
+        <div className="shrink-0">
           <AnimatePresence mode="wait">
 
             {/* Setup placement directions */}
@@ -741,10 +744,8 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
 
           </AnimatePresence>
         </div>
-      </div>
 
-      {/* COLUMN 3: STANDINGS & UTILITIES TABS */}
-      <div className="flex flex-col w-64 gap-2 overflow-hidden flex-shrink-0 py-1">
+        {/* Standings & utilities tabs */}
         <div className="flex border-b border-white/10 pb-2 gap-1 flex-shrink-0">
           {(['HUD', 'BUILD', 'TRADE'] as const).map(tab => (
             <button
@@ -850,41 +851,73 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
         {activeTab === 'TRADE' && (
           <div className="flex-1 overflow-y-auto space-y-3 pr-0.5 min-h-0 scrollbar-thin">
 
-            {/* Maritime Trade panel */}
+            {/* Maritime Trade panel — pick a give chip, a get chip, confirm */}
             <div className="glass p-3 rounded-2xl">
-              <h4 className="text-[10px] font-black uppercase text-[#d6a85c] tracking-wider mb-2 flex items-center gap-1.5">
-                <Landmark className="w-3.5 h-3.5" /> Maritime Exchange
+              <h4 className="text-[10px] font-black uppercase text-[#d6a85c] tracking-wider mb-1.5 flex items-center gap-1.5">
+                <Landmark className="w-3.5 h-3.5" /> Bank Trade
               </h4>
-              <p className="text-[8.5px] text-white/40 mb-3 leading-normal">
-                Trade resources with the Bank. Rates auto-calculate from your harbor ownership.
+              <p className="text-[8.5px] text-white/40 mb-2.5 leading-normal">
+                Your harbors set each rate — pick what to give, then what to get.
               </p>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                {RESOURCES.map(give => {
-                  const rate = getMaritimeRate(give)
-                  const hasEnough = (state.players.find(p => p.id === currentPlayerId)?.resources[give] || 0) >= rate
+
+              <span className="text-[8px] font-black uppercase tracking-widest text-white/40">You give</span>
+              <div className="mt-1 mb-2 grid grid-cols-5 gap-1">
+                {RESOURCES.map(r => {
+                  const rate = getMaritimeRate(r)
+                  const affordable = (me?.resources[r] ?? 0) >= rate
+                  const sel = mtGive === r
                   return (
-                    <div key={give} className="flex flex-col gap-1 bg-black/30 p-2 rounded-xl border border-white/5">
-                      <div className="flex justify-between items-center text-[10px] text-white">
-                        <span>Give {rate} {RESOURCE_ICONS[give]}</span>
-                      </div>
-                      <select
-                        disabled={!hasEnough || !isMyTurn || state.phase !== 'MAIN'}
-                        onChange={(e) => {
-                          const get = e.target.value as ResourceType
-                          if (get) act('maritimeTrade', give, get)
-                          e.target.value = ""
-                        }}
-                        className="w-full bg-[#241a10] border border-white/10 rounded px-1.5 py-0.5 text-[9px] text-white focus:outline-none focus:border-[#d6a85c]"
-                      >
-                        <option value="">Trade Rate: {rate}:1</option>
-                        {RESOURCES.filter(x => x !== give).map(get => (
-                          <option key={get} value={get}>Get 1 {RESOURCE_ICONS[get]} {get}</option>
-                        ))}
-                      </select>
-                    </div>
+                    <button
+                      key={r}
+                      disabled={!affordable}
+                      onClick={() => { setMtGive(sel ? null : r); if (mtGet === r) setMtGet(null) }}
+                      className={`flex flex-col items-center rounded-lg border px-1 py-1.5 transition ${
+                        sel ? 'border-[#f0d9a4] bg-[#d6a85c]/25'
+                        : affordable ? 'border-white/10 bg-white/5 hover:bg-white/10'
+                        : 'border-white/5 bg-white/[0.02] opacity-35'
+                      }`}
+                    >
+                      <span className="text-base leading-none">{RESOURCE_ICONS[r]}</span>
+                      <span className={`mt-1 rounded px-1 text-[8px] font-black font-mono ${rate < 4 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/10 text-[#e0b56b]'}`}>{rate}:1</span>
+                    </button>
                   )
                 })}
               </div>
+
+              <span className="text-[8px] font-black uppercase tracking-widest text-white/40">You get</span>
+              <div className="mt-1 mb-2.5 grid grid-cols-5 gap-1">
+                {RESOURCES.map(r => {
+                  const sel = mtGet === r
+                  const blocked = r === mtGive || !mtGive
+                  return (
+                    <button
+                      key={r}
+                      disabled={blocked}
+                      onClick={() => setMtGet(sel ? null : r)}
+                      className={`flex items-center justify-center rounded-lg border px-1 py-2 transition ${
+                        sel ? 'border-[#f0d9a4] bg-[#d6a85c]/25'
+                        : blocked ? 'border-white/5 bg-white/[0.02] opacity-35'
+                        : 'border-white/10 bg-white/5 hover:bg-white/10'
+                      }`}
+                    >
+                      <span className="text-base leading-none">{RESOURCE_ICONS[r]}</span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              <button
+                disabled={!mtGive || !mtGet || !isMyTurn || state.phase !== 'MAIN'}
+                onClick={() => { act('maritimeTrade', mtGive, mtGet); setMtGive(null); setMtGet(null) }}
+                className="w-full py-2 bg-brand disabled:opacity-40 text-white font-black text-[10px] uppercase rounded-xl transition shadow-lg"
+              >
+                {mtGive && mtGet
+                  ? `Trade ${getMaritimeRate(mtGive)} ${RESOURCE_ICONS[mtGive]} → 1 ${RESOURCE_ICONS[mtGet]}`
+                  : 'Pick give & get'}
+              </button>
+              {mtGive && mtGet && (!isMyTurn || state.phase !== 'MAIN') && (
+                <p className="mt-1 text-center text-[8px] italic text-white/40">Trades happen on your turn, in the Main phase.</p>
+              )}
             </div>
 
             {/* Domestic Player Trading */}
@@ -893,60 +926,74 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
                 <ArrowRightLeft className="w-3.5 h-3.5" /> Propose Player Trade
               </h4>
 
-              <div className="space-y-3">
-                {/* Select Player target */}
+              <div className="space-y-2.5">
+                {/* Opponent picker chips */}
                 <div>
-                  <select
-                    value={tradeTargetId}
-                    onChange={(e) => setTradeTarget(e.target.value)}
-                    className="w-full bg-[#241a10] border border-white/10 rounded-lg p-2 text-xs text-white"
-                  >
-                    <option value="">Select Opponent...</option>
-                    {state.players.filter(p => p.id !== currentPlayerId).map(p => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </select>
+                  <span className="text-[8px] font-black uppercase tracking-widest text-white/40">Trade with</span>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    {state.players.filter(p => p.id !== currentPlayerId).map(p => {
+                      const sel = tradeTargetId === p.id
+                      return (
+                        <button
+                          key={p.id}
+                          onClick={() => setTradeTarget(sel ? "" : p.id)}
+                          className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold transition ${
+                            sel ? 'border-[#f0d9a4] bg-[#d6a85c]/25 text-white' : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'
+                          }`}
+                        >
+                          <span className="h-2.5 w-2.5 rounded-full border border-white/40" style={{ backgroundColor: p.color }} />
+                          {p.name}{p.isBot && <span className="text-[8px] opacity-60">AI</span>}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
 
-                {/* Offer Input selectors */}
+                {/* Offer / request steppers */}
                 <div className="grid grid-cols-2 gap-2 bg-black/30 p-2.5 rounded-xl border border-white/5">
                   <div>
                     <span className="text-[9px] text-[#d6a85c] uppercase font-black tracking-wider block mb-1.5">You Offer</span>
-                    {RESOURCES.map(r => (
-                      <div key={r} className="flex items-center justify-between text-[10px] mb-1 text-white">
-                        <span>{RESOURCE_ICONS[r]} ({giveRes[r]})</span>
-                        <div className="flex gap-1">
-                          <button
-                            onClick={() => handleModifyGive(r, 1)}
-                            className="px-1.5 bg-white/10 rounded font-bold"
-                          >
-                            +
-                          </button>
-                          <button
-                            onClick={() => handleModifyGive(r, -1)}
-                            className="px-1.5 bg-white/10 rounded font-bold"
-                          >
-                            -
-                          </button>
+                    {RESOURCES.map(r => {
+                      const max = me?.resources[r] ?? 0
+                      return (
+                        <div key={r} className={`flex items-center justify-between text-[10px] mb-1 ${max === 0 && giveRes[r] === 0 ? 'text-white/30' : 'text-white'}`}>
+                          <span>{RESOURCE_ICONS[r]} <span className={`font-mono font-bold ${giveRes[r] > 0 ? 'text-[#e0b56b]' : ''}`}>{giveRes[r]}</span><span className="text-white/30">/{max}</span></span>
+                          <div className="flex gap-1">
+                            <button
+                              disabled={giveRes[r] >= max}
+                              onClick={() => handleModifyGive(r, 1)}
+                              className="w-5 rounded bg-white/10 font-bold hover:bg-white/20 disabled:opacity-30"
+                            >
+                              +
+                            </button>
+                            <button
+                              disabled={giveRes[r] <= 0}
+                              onClick={() => handleModifyGive(r, -1)}
+                              className="w-5 rounded bg-white/10 font-bold hover:bg-white/20 disabled:opacity-30"
+                            >
+                              -
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                   <div>
                     <span className="text-[9px] text-emerald-400 uppercase font-black tracking-wider block mb-1.5">You Request</span>
                     {RESOURCES.map(r => (
                       <div key={r} className="flex items-center justify-between text-[10px] mb-1 text-white">
-                        <span>{RESOURCE_ICONS[r]} ({reqRes[r]})</span>
+                        <span>{RESOURCE_ICONS[r]} <span className={`font-mono font-bold ${reqRes[r] > 0 ? 'text-emerald-300' : ''}`}>{reqRes[r]}</span></span>
                         <div className="flex gap-1">
                           <button
                             onClick={() => handleModifyReq(r, 1)}
-                            className="px-1.5 bg-white/10 rounded font-bold"
+                            className="w-5 rounded bg-white/10 font-bold hover:bg-white/20"
                           >
                             +
                           </button>
                           <button
+                            disabled={reqRes[r] <= 0}
                             onClick={() => handleModifyReq(r, -1)}
-                            className="px-1.5 bg-white/10 rounded font-bold"
+                            className="w-5 rounded bg-white/10 font-bold hover:bg-white/20 disabled:opacity-30"
                           >
                             -
                           </button>
@@ -956,12 +1003,21 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
                   </div>
                 </div>
 
+                {/* Live deal summary */}
+                {(Object.values(giveRes).some(v => v > 0) || Object.values(reqRes).some(v => v > 0)) && (
+                  <p className="text-center text-[9.5px] text-white/70">
+                    <span className="text-[#e0b56b]">{RESOURCES.filter(r => giveRes[r] > 0).map(r => `${giveRes[r]}${RESOURCE_ICONS[r]}`).join(' + ') || 'nothing'}</span>
+                    <span className="mx-1.5 text-white/40">→ for →</span>
+                    <span className="text-emerald-300">{RESOURCES.filter(r => reqRes[r] > 0).map(r => `${reqRes[r]}${RESOURCE_ICONS[r]}`).join(' + ') || 'nothing'}</span>
+                  </p>
+                )}
+
                 <button
-                  disabled={!tradeTargetId || !isMyTurn || state.phase !== 'MAIN'}
+                  disabled={!tradeTargetId || !isMyTurn || state.phase !== 'MAIN' || (Object.values(giveRes).every(v => v === 0) && Object.values(reqRes).every(v => v === 0))}
                   onClick={triggerDomesticTrade}
                   className="w-full py-2 bg-brand disabled:opacity-40 text-white font-black text-[10px] uppercase rounded-xl transition shadow-lg"
                 >
-                  Send Trade Proposal
+                  {tradeTargetId ? `Propose to ${getPlayerName(state, tradeTargetId)}` : 'Pick an opponent'}
                 </button>
               </div>
             </div>

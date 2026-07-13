@@ -1150,9 +1150,11 @@ export function maritimeTrade(state: CatanState, give: ResourceType, get: Resour
   };
 }
 
-// End Turn
+// End Turn. A finished game is frozen — allowing endTurn after GAME_OVER used
+// to flip the phase back to ROLL (the bot turn loop always ends with endTurn),
+// which buried the winner screen and soft-locked the table.
 export function endTurn(state: CatanState): CatanState {
-  if (state.phase !== 'MAIN' && state.phase !== 'GAME_OVER') return state;
+  if (state.phase !== 'MAIN' || state.winnerId) return state;
 
   // Move to next active player
   let nextIdx = (state.currentPlayerIndex + 1) % state.players.length;

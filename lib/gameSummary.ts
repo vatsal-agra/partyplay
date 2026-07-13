@@ -84,8 +84,15 @@ export function getGameSummary(gameId: string, state: any, currentUserId?: strin
       }
     }
     case "catan": {
-      const isOver = state.phase === "GAME_OVER"
+      // winnerId is checked too: historic states saved before the endTurn
+      // freeze fix can be GAME_OVER-with-phase-ROLL — still show the recap.
+      const isOver = state.phase === "GAME_OVER" || !!state.winnerId
       const winnerIds = state.winnerId ? [state.winnerId] : []
+      const builds = (p: any) => {
+        const mine = Object.values(state.settlements || {}).filter((s: any) => s.playerId === p.id)
+        const cities = mine.filter((s: any) => s.type === "city").length
+        return { settlements: mine.length - cities, cities }
+      }
       return {
         isOver,
         winnerIds,
@@ -95,7 +102,16 @@ export function getGameSummary(gameId: string, state: any, currentUserId?: strin
         standings: build(players, {
           winnerIds,
           score: (p) => p.victoryPoints,
-          detail: (p) => `${p.victoryPoints} pts`,
+          detail: (p) => {
+            const b = builds(p)
+            return [
+              `${p.victoryPoints} pts`,
+              b.settlements > 0 && `${b.settlements}🏠`,
+              b.cities > 0 && `${b.cities}🏰`,
+              p.longestRoadActive && "🛣️ Road",
+              p.largestArmyActive && "⚔️ Army",
+            ].filter(Boolean).join(" · ")
+          },
         }),
       }
     }
