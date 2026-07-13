@@ -1,14 +1,33 @@
-// Poker — Texas Hold'em table UI. Community board, pot, seats, betting
-// controls, showdown reveal, and a bot driver for solo play.
+// Poker — table container. Renders the real-time 3D casino table (loaded
+// client-only) with overlay HUD: live feed, betting controls, hand-result
+// banner and a full-board game-over screen. All rules flow through the pure
+// engine; this component wires actions and presentation.
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
+import dynamic from "next/dynamic"
 import { motion, AnimatePresence } from "framer-motion"
 import {
-  PokerState, Card, fold, checkCall, raiseTo, allIn, nextHand, playBotStep,
-  rankLabel, suitSymbol, getPlayerName,
+  PokerState, fold, checkCall, raiseTo, allIn, nextHand, playBotStep,
+  initializeGame, getPlayerName,
 } from "../lib/pokerEngine"
-import { Coins, Trophy, CircleDot } from "lucide-react"
+import { Confetti } from "@/components/Confetti"
+import { Loader2, Trophy, Crown, RotateCcw, Share2, Eye, LogOut } from "lucide-react"
+
+const SERIF = "var(--font-display), Georgia, serif"
+
+// The Three.js scene must never render on the server.
+const PokerScene3D = dynamic(() => import("./PokerScene3D"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-full w-full items-center justify-center bg-[#0e0a08]">
+      <div className="flex flex-col items-center gap-3 text-[#e6b45a]">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <p className="text-xs font-bold uppercase tracking-widest" style={{ fontFamily: SERIF }}>Shuffling up…</p>
+      </div>
+    </div>
+  ),
+})
 
 interface Props {
   state: PokerState
@@ -17,175 +36,263 @@ interface Props {
   onBroadcastAction?: (event: string, payload: any) => void
 }
 
-function CardFace({ card, hidden, small }: { card?: Card; hidden?: boolean; small?: boolean }) {
-  const dim = small ? 'w-9 h-12 text-sm' : 'w-12 h-16 text-lg'
-  if (hidden || !card) {
-    return <div className={`${dim} rounded-md border border-white/30 bg-gradient-to-br from-rose-900/70 to-slate-900 flex items-center justify-center`}>
-      <span className="text-rose-300/60 text-[9px] font-black">♠</span>
-    </div>
-  }
-  const red = card.suit === 'H' || card.suit === 'D'
-  return (
-    <div className={`${dim} rounded-md bg-white border border-slate-300 flex flex-col items-center justify-center font-black shadow ${red ? 'text-rose-600' : 'text-slate-900'}`}>
-      <span>{rankLabel(card.rank)}</span>
-      <span className="text-xs leading-none">{suitSymbol(card.suit)}</span>
-    </div>
-  )
-}
-
 export default function PokerBoard({ state, currentPlayerId, onStateChange, onBroadcastAction }: Props) {
+  const [endDismissed, setEndDismissed] = useState(false)
   const commit = (next: PokerState) => { onStateChange(next); onBroadcastAction?.('sync_state', next) }
 
-  const meIndex = Math.max(0, state.players.findIndex((p) => p.id === currentPlayerId))
+  const seatIndex = state.players.findIndex((p) => p.id === currentPlayerId)
+  const isSpectator = seatIndex === -1
+  const meIndex = Math.max(0, seatIndex)
   const me = state.players[meIndex]
   const inBetting = ['PREFLOP', 'FLOP', 'TURN', 'RIVER'].includes(state.stage)
-  const isMyTurn = inBetting && state.players[state.currentPlayerIndex]?.id === currentPlayerId
-  const amHost = state.players[0]?.id === currentPlayerId
+  const isMyTurn = !isSpectator && inBetting && state.players[state.currentPlayerIndex]?.id === currentPlayerId
+  const amHost = !isSpectator && state.players[0]?.id === currentPlayerId
   const reveal = state.stage === 'HAND_OVER' && !!state.winningDesc
   const toCall = state.currentBet - (me?.bet ?? 0)
 
-  // Bot driver
   useEffect(() => {
-    if (state.stage === 'GAME_OVER') return
+    if (state.stage !== 'GAME_OVER') setEndDismissed(false)
+  }, [state.stage])
+
+  // Bot driver — depends on full state so no stale snapshots commit.
+  useEffect(() => {
+    if (state.stage === 'GAME_OVER' || isSpectator) return
     const cur = state.players[state.currentPlayerIndex]
     if (inBetting && cur?.isBot) {
-      const t = setTimeout(() => commit(playBotStep(state)), 850)
+      const t = setTimeout(() => commit(playBotStep(state)), 900)
       return () => clearTimeout(t)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.currentPlayerIndex, state.stage, state.pot])
+  }, [state, isSpectator])
 
   // Host advances to the next hand automatically.
   useEffect(() => {
     if (state.stage === 'HAND_OVER' && amHost) {
-      const t = setTimeout(() => commit(nextHand(state)), 3800)
+      const t = setTimeout(() => commit(nextHand(state)), 4000)
       return () => clearTimeout(t)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.stage, state.handNumber, amHost])
+  }, [state, amHost])
 
-  const seatTag = (i: number) => {
-    const live = state.players.map((p, idx) => idx).filter((idx) => !state.players[idx].busted)
-    const heads = live.length === 2
-    const sb = heads ? state.dealerIndex : live[(live.indexOf(state.dealerIndex) + 1) % live.length]
-    const bb = live[(live.indexOf(sb) + 1) % live.length]
-    if (i === state.dealerIndex) return 'D'
-    if (i === sb) return 'SB'
-    if (i === bb) return 'BB'
-    return null
+  const handleRematch = () => {
+    commit(initializeGame(state.players.map((p) => ({ id: p.id, name: p.name, isBot: p.isBot }))))
   }
 
-  const opponents = state.players.filter((_, i) => i !== meIndex)
-
   return (
-    <div className="flex flex-col w-full h-full overflow-hidden bg-gradient-to-b from-emerald-950 to-slate-950 select-none p-3 gap-2">
-      {/* Opponents */}
-      <div className="flex items-start justify-center gap-2 flex-wrap">
-        {opponents.map((p) => {
-          const i = state.players.indexOf(p)
-          const isCur = state.players[state.currentPlayerIndex]?.id === p.id && inBetting
-          const tag = seatTag(i)
-          return (
-            <div key={p.id} className={`flex flex-col items-center gap-1 px-2.5 py-1.5 rounded-xl border ${p.folded ? 'opacity-40' : ''} ${isCur ? 'bg-sunny-500/15 border-sunny-500/50' : 'bg-black/30 border-white/10'}`}>
-              <div className="flex items-center gap-1">
-                <span className="text-[11px] font-bold text-white">{p.name}</span>
-                {p.isBot && <span className="text-[7px] bg-white/10 text-slate-300 px-1 rounded">AI</span>}
-                {tag && <span className="text-[7px] bg-sunny-500/20 text-sunny-300 px-1 rounded font-black">{tag}</span>}
-              </div>
-              <div className="flex gap-1">
-                {p.hole.length ? p.hole.map((c, k) => <CardFace key={k} card={c} hidden={!reveal || p.folded} small />) : <><CardFace hidden small /><CardFace hidden small /></>}
-              </div>
-              <div className="flex items-center gap-2 text-[10px] font-mono">
-                <span className="text-sunny-400 flex items-center gap-0.5"><Coins className="w-3 h-3" />{p.chips}</span>
-                {p.bet > 0 && <span className="text-emerald-300">bet {p.bet}</span>}
-                {p.allIn && <span className="text-rose-400 font-black">ALL-IN</span>}
-                {p.folded && <span className="text-slate-500">folded</span>}
-              </div>
-            </div>
-          )
-        })}
-      </div>
+    <div className="relative h-full w-full select-none overflow-hidden" style={{ background: '#0e0a08' }}>
+      <PokerScene3D state={state} meIndex={meIndex} isSpectator={isSpectator} reveal={reveal} />
+      <Confetti fire={state.stage === 'GAME_OVER' && state.winnerIds.includes(currentPlayerId)} />
 
-      {/* Center: community + pot */}
-      <div className="flex-1 flex flex-col items-center justify-center gap-3 min-h-0">
-        <div className="px-4 py-1 rounded-full bg-black/40 border border-white/10 text-sunny-400 font-mono font-bold text-sm flex items-center gap-1.5">
-          <Coins className="w-4 h-4" /> Pot: {state.pot}
-        </div>
-        <div className="flex gap-2">
-          {[0, 1, 2, 3, 4].map((k) => (
-            <CardFace key={k} card={state.community[k]} hidden={!state.community[k]} />
+      {/* live feed */}
+      <div className="pointer-events-none absolute top-3 left-3 z-10 flex w-[280px] max-w-[46%] flex-col gap-1">
+        <AnimatePresence initial={false}>
+          {state.log.slice(-4).reverse().map((msg, i) => (
+            <motion.div
+              key={msg + (state.log.length - i)}
+              layout
+              initial={{ opacity: 0, x: -18 }}
+              animate={{ opacity: i === 0 ? 1 : 0.55 - i * 0.1, x: 0 }}
+              exit={{ opacity: 0, x: -12 }}
+              transition={{ duration: 0.25 }}
+              className="rounded-lg border border-white/10 bg-black/55 px-2.5 py-1.5 text-[10px] leading-snug text-white/90 backdrop-blur"
+            >
+              {msg}
+            </motion.div>
           ))}
-        </div>
-        <div className="h-5 text-center">
-          {state.lastAction && inBetting && <span className="text-[11px] text-slate-300">{state.lastAction}</span>}
-          {reveal && <span className="text-sm font-black text-sunny-400">{getPlayerName(state, state.winnerIds[0])} wins with {state.winningDesc}!</span>}
-          {state.stage === 'HAND_OVER' && !state.winningDesc && state.winnerIds[0] && <span className="text-sm font-black text-sunny-400">{getPlayerName(state, state.winnerIds[0])} wins the pot.</span>}
-        </div>
+        </AnimatePresence>
       </div>
 
-      {/* My seat */}
-      <div className="flex-shrink-0 flex flex-col items-center gap-2">
-        <div className="flex items-center gap-3">
-          <div className="flex gap-1.5">
-            {me?.hole.length ? me.hole.map((c, k) => <CardFace key={k} card={c} />) : <><CardFace hidden /><CardFace hidden /></>}
-          </div>
-          <div className="text-left">
-            <div className="text-sm font-black text-white flex items-center gap-1.5">
-              {me?.name} {seatTag(meIndex) && <span className="text-[8px] bg-sunny-500/20 text-sunny-300 px-1 rounded font-black">{seatTag(meIndex)}</span>}
-            </div>
-            <div className="text-xs font-mono text-sunny-400 flex items-center gap-1"><Coins className="w-3 h-3" />{me?.chips} {me && me.bet > 0 && <span className="text-emerald-300 ml-1">bet {me.bet}</span>}</div>
-            {me?.allIn && <span className="text-[10px] text-rose-400 font-black">ALL-IN</span>}
-            {me?.folded && <span className="text-[10px] text-slate-500">folded</span>}
-          </div>
-        </div>
+      {/* stage + hand chip */}
+      <div className="pointer-events-none absolute top-3 right-3 z-10 flex flex-col items-end gap-1.5">
+        <span className="rounded-full border border-[#e6b45a]/30 bg-black/55 px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-[#e6b45a] backdrop-blur">
+          Hand #{state.handNumber} · {state.stage.replace('_', ' ')}
+        </span>
+        {isSpectator && (
+          <span className="rounded-full border border-white/15 bg-black/55 px-3 py-1 text-[10px] text-white/60 backdrop-blur">👁 Spectating</span>
+        )}
+      </div>
 
-        {/* Action controls */}
-        {isMyTurn ? (
-          <div className="flex items-center gap-2 flex-wrap justify-center">
+      {/* showdown / hand-over banner */}
+      <AnimatePresence>
+        {state.stage === 'HAND_OVER' && state.winnerIds.length > 0 && (
+          <motion.div initial={{ opacity: 0, y: -12, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0 }}
+            className="pointer-events-none absolute inset-x-0 top-14 z-10 flex justify-center">
+            <div className="rounded-2xl border border-[#e6b45a]/50 bg-black/75 px-6 py-3 text-center backdrop-blur">
+              <p className="text-base font-black text-[#f2d492]" style={{ fontFamily: SERIF }}>
+                💰 {state.winnerIds.map((id) => getPlayerName(state, id)).join(' & ')} {state.winnerIds.length > 1 ? 'split' : 'takes'} the pot
+              </p>
+              {state.winningDesc && <p className="mt-0.5 text-xs font-bold text-white/70">with {state.winningDesc}</p>}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* betting controls */}
+      <div className="absolute inset-x-0 bottom-3 z-10 flex justify-center">
+        {isMyTurn && me ? (
+          <motion.div initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
+            className="flex flex-wrap items-center justify-center gap-2 rounded-2xl border border-[#e6b45a]/25 bg-black/70 p-2.5 backdrop-blur">
             <button onClick={() => commit(fold(state, currentPlayerId))}
-              className="px-4 py-2 bg-rose-600/80 hover:bg-rose-600 text-white text-xs font-black uppercase rounded-lg">Fold</button>
-            <button onClick={() => commit(checkCall(state, currentPlayerId))}
-              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-xs font-black uppercase rounded-lg">
-              {toCall <= 0 ? 'Check' : `Call ${Math.min(toCall, me!.chips)}`}
+              className="rounded-xl bg-rose-700/90 px-4 py-2.5 text-xs font-black uppercase text-white transition hover:bg-rose-600 active:scale-95">
+              Fold
             </button>
-            {me!.chips > toCall && (
+            <button onClick={() => commit(checkCall(state, currentPlayerId))}
+              className="rounded-xl bg-white/15 px-4 py-2.5 text-xs font-black uppercase text-white transition hover:bg-white/25 active:scale-95">
+              {toCall <= 0 ? 'Check' : `Call ${Math.min(toCall, me.chips)}`}
+            </button>
+            {me.chips > toCall && (
               <>
                 <button onClick={() => commit(raiseTo(state, currentPlayerId, state.currentBet + state.minRaise))}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase rounded-lg">
+                  className="rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-black uppercase text-white transition hover:bg-emerald-600 active:scale-95">
                   Raise {state.currentBet + state.minRaise}
                 </button>
                 <button onClick={() => commit(raiseTo(state, currentPlayerId, state.currentBet + state.pot))}
-                  className="px-4 py-2 bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-black uppercase rounded-lg">
+                  className="rounded-xl bg-emerald-800 px-4 py-2.5 text-xs font-black uppercase text-white transition hover:bg-emerald-700 active:scale-95">
                   Pot
                 </button>
               </>
             )}
             <button onClick={() => commit(allIn(state, currentPlayerId))}
-              className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-black uppercase rounded-lg">All-in</button>
-          </div>
+              className="rounded-xl bg-gradient-to-r from-[#b8860b] to-[#e6b45a] px-4 py-2.5 text-xs font-black uppercase text-[#1a120a] transition hover:brightness-110 active:scale-95">
+              All-in
+            </button>
+          </motion.div>
         ) : (
-          <div className="h-9 flex items-center">
-            <span className="text-[11px] text-slate-400 italic">
-              {state.stage === 'GAME_OVER' ? '' : inBetting ? `${state.players[state.currentPlayerIndex]?.name} is acting…` : state.stage === 'HAND_OVER' ? 'Next hand starting…' : ''}
-            </span>
+          <div className="pointer-events-none rounded-full border border-white/10 bg-black/50 px-4 py-1.5 text-[11px] italic text-white/50 backdrop-blur">
+            {state.stage === 'GAME_OVER' ? 'Game over'
+              : inBetting ? `${state.players[state.currentPlayerIndex]?.name} is acting…`
+              : state.stage === 'HAND_OVER' ? 'Next hand starting…'
+              : ''}
           </div>
         )}
       </div>
 
-      {/* Game over */}
+      {/* orbit hint */}
+      <div className="pointer-events-none absolute bottom-3 right-3 hidden rounded-full border border-white/10 bg-black/40 px-3 py-1 text-[10px] text-white/35 backdrop-blur lg:block">
+        drag to orbit · scroll to zoom
+      </div>
+
+      {/* full-board game-over screen */}
       <AnimatePresence>
-        {state.stage === 'GAME_OVER' && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-            className="fixed inset-0 z-[80] flex items-center justify-center bg-black/75 backdrop-blur-sm">
-            <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }}
-              className="bg-slate-900 border border-sunny-500/30 rounded-2xl p-6 text-center shadow-2xl">
-              <Trophy className="w-12 h-12 text-yellow-400 mx-auto mb-2" />
-              <h2 className="text-xl font-black text-white">{state.winnerIds[0] ? getPlayerName(state, state.winnerIds[0]) : 'Nobody'} takes the table!</h2>
-              <p className="text-xs text-slate-400 mt-1">Last player with chips standing.</p>
-            </motion.div>
+        {state.stage === 'GAME_OVER' && !endDismissed && (
+          <PokerEndScreen state={state} currentPlayerId={currentPlayerId}
+            canRematch={!isSpectator} onRematch={handleRematch} onDismiss={() => setEndDismissed(true)} />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {state.stage === 'GAME_OVER' && endDismissed && (
+          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            className="absolute inset-x-0 top-12 z-20 flex justify-center">
+            <button onClick={() => setEndDismissed(false)}
+              className="flex items-center gap-2 rounded-full border border-[#e6b45a]/50 bg-black/70 px-5 py-2 text-sm font-black text-[#f2d492] backdrop-blur transition hover:bg-black/85"
+              style={{ fontFamily: SERIF }}>
+              <Trophy className="h-4 w-4" /> {state.winnerIds[0] ? getPlayerName(state, state.winnerIds[0]) : 'Nobody'} takes the table! — show results
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
     </div>
+  )
+}
+
+// ---- Full-board game-over screen ---------------------------------------------------
+
+function PokerEndScreen({ state, currentPlayerId, canRematch, onRematch, onDismiss }: {
+  state: PokerState
+  currentPlayerId: string
+  canRematch: boolean
+  onRematch: () => void
+  onDismiss: () => void
+}) {
+  const [shared, setShared] = useState(false)
+  const ranked = [...state.players].sort((a, b) => {
+    if (a.busted !== b.busted) return a.busted ? 1 : -1
+    return b.chips - a.chips
+  })
+  const winner = ranked[0]
+  const youWon = winner.id === currentPlayerId
+  const medals = ['🥇', '🥈', '🥉']
+
+  const share = async () => {
+    const rows = ranked.slice(0, 4).map((p, i) =>
+      `${medals[i] || `${i + 1}.`} ${p.name} — ${p.busted ? 'busted' : p.chips.toLocaleString() + ' chips'}`).join('\n')
+    const text = `♠ Poker night on Dice Alley\n👑 ${winner.name} takes the table!\n\n${rows}\n\nPlay free at Dice Alley`
+    try {
+      if (typeof navigator !== 'undefined' && navigator.share) await navigator.share({ title: 'Poker — Dice Alley', text })
+      else await navigator.clipboard.writeText(text)
+      setShared(true); setTimeout(() => setShared(false), 2000)
+    } catch { /* cancelled */ }
+  }
+
+  const leave = () => {
+    const pid = new URLSearchParams(window.location.search).get('partyId')
+    window.location.href = pid && pid !== 'mock-party-id' ? `/party/${pid}` : '/games'
+  }
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="absolute inset-0 z-30 overflow-y-auto bg-gradient-to-b from-black/85 via-black/60 to-black/85 backdrop-blur-[3px]">
+      <div className="flex min-h-full flex-col items-center justify-center gap-4 p-5">
+        <motion.div initial={{ y: -16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }} className="text-center">
+          <p className="text-[10px] font-black uppercase tracking-[0.35em] text-[#e6b45a]">Poker — Table Closed</p>
+          <h2 className="mt-1 text-3xl font-black text-white sm:text-4xl" style={{ fontFamily: SERIF }}>
+            {youWon ? '🎉 You take the table!' : <>{winner.name} <span className="text-[#f2d492]">takes the table!</span></>}
+          </h2>
+          <p className="mt-1 text-xs text-white/50">{state.handNumber} hands played</p>
+        </motion.div>
+
+        <div className="flex w-full max-w-md flex-col gap-2">
+          {ranked.map((p, i) => {
+            const isMe = p.id === currentPlayerId
+            const isWinner = i === 0
+            return (
+              <motion.div key={p.id}
+                initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 + i * 0.07 }}
+                className={`flex items-center gap-3 rounded-xl border p-3 ${
+                  isWinner ? 'border-2 border-[#e6b45a]/70 bg-gradient-to-b from-[#2a2013]/95 to-[#1a130c]/95 shadow-[0_0_50px_-12px_rgba(230,180,90,0.5)]'
+                  : isMe ? 'border-[#e6b45a]/30 bg-[#e6b45a]/10' : 'border-white/10 bg-black/40'
+                }`}>
+                <span className="w-7 text-center text-lg">{medals[i] || <span className="text-sm text-white/40">{i + 1}</span>}</span>
+                <div className="relative grid h-10 w-10 flex-shrink-0 place-items-center rounded-full border border-white/25 bg-white/10 text-lg">
+                  ♠{isWinner && <Crown className="absolute -top-3 left-1/2 h-4 w-4 -translate-x-1/2 text-[#e6b45a]" />}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-black text-white" style={{ fontFamily: SERIF }}>
+                    {p.name}
+                    {p.isBot && <span className="ml-1.5 rounded bg-[#e6b45a]/20 px-1 py-0.5 text-[7px] font-bold text-[#f2d492]">AI</span>}
+                    {isMe && <span className="ml-1.5 text-[9px] font-bold text-[#f2d492]">(you)</span>}
+                  </p>
+                </div>
+                <p className={`font-mono text-sm font-black ${p.busted ? 'text-rose-400' : 'text-[#e6b45a]'}`}>
+                  {p.busted ? 'BUSTED' : `${p.chips.toLocaleString()} 🪙`}
+                </p>
+              </motion.div>
+            )
+          })}
+        </div>
+
+        <motion.div initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.45 }}
+          className="flex flex-wrap items-center justify-center gap-2">
+          {canRematch && (
+            <button onClick={onRematch}
+              className="flex items-center gap-2 rounded-xl bg-brand px-5 py-2.5 text-xs font-black uppercase text-white shadow-glow-grape transition active:scale-95">
+              <RotateCcw className="h-4 w-4" /> Rematch
+            </button>
+          )}
+          <button onClick={share}
+            className="flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-xs font-bold uppercase text-white transition hover:bg-white/20">
+            <Share2 className="h-4 w-4" /> {shared ? 'Copied!' : 'Share'}
+          </button>
+          <button onClick={onDismiss}
+            className="flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-xs font-bold uppercase text-white transition hover:bg-white/20">
+            <Eye className="h-4 w-4" /> View Table
+          </button>
+          <button onClick={leave}
+            className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold uppercase text-white/60 transition hover:bg-white/10 hover:text-white">
+            <LogOut className="h-4 w-4" /> Leave
+          </button>
+        </motion.div>
+      </div>
+    </motion.div>
   )
 }
