@@ -954,7 +954,10 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
                 <div>
                   <span className="text-[8px] font-black uppercase tracking-widest text-white/40">Trade with</span>
                   <div className="mt-1 flex flex-wrap gap-1.5">
-                    {state.players.filter(p => p.id !== currentPlayerId).map(p => {
+                    {/* Exclude my own seat — by id, and by the mock-mode local
+                        seat name too (guest→signed-in id drift can otherwise
+                        surface "You" as a trading partner). */}
+                    {state.players.filter(p => p.id !== currentPlayerId && p.name !== 'You').map(p => {
                       const sel = tradeTargetId === p.id
                       return (
                         <button
