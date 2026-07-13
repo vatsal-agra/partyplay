@@ -19,7 +19,7 @@ import { Confetti } from "@/components/Confetti"
 import {
   Dices, ChevronRight, Landmark, ArrowRightLeft,
   UserPlus, ShieldAlert, Award, FileText,
-  Hammer, Loader2
+  Hammer, Loader2, Crown, RotateCcw, Share2, Eye, LogOut
 } from "lucide-react"
 
 const SERIF = "var(--font-display), Georgia, serif"
@@ -81,6 +81,8 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
   const [showYearOfPlentyDialog, setShowYearOfPlentyDialog] = useState(false)
   const [yopSelections, setYopSelections] = useState<ResourceType[]>([])
   const [showMonopolyDialog, setShowMonopolyDialog] = useState(false)
+  // Full-board victory screen: dismissible to inspect the final island.
+  const [endDismissed, setEndDismissed] = useState(false)
 
   const logEndRef = useRef<HTMLDivElement>(null)
 
@@ -112,6 +114,17 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
       return () => clearTimeout(t)
     }
   }, [state.currentPlayerIndex, curPlayer.isBot, state.winnerId, state.phase, state.discardRequiredPlayers])
+
+  // Re-arm the victory screen whenever a fresh game starts.
+  useEffect(() => {
+    if (!state.winnerId) setEndDismissed(false)
+  }, [state.winnerId])
+
+  const handleRematch = () => {
+    const next = catanEngine.initializeGame(state.players.map(p => ({ id: p.id, name: p.name, isBot: p.isBot })))
+    onStateChange(next)
+    onBroadcastAction?.('sync_state', next)
+  }
 
   // Trigger Steal choice if robber moved and options exist
   useEffect(() => {
@@ -477,16 +490,30 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
           </AnimatePresence>
         </div>
 
-        {/* Win banner */}
+        {/* Full-board victory screen — the island stays alive behind it */}
         <AnimatePresence>
-          {state.winnerId && (
-            <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-              className="absolute inset-x-0 top-6 flex justify-center pointer-events-none">
-              <div className="rounded-full border border-[#d6a85c]/50 bg-black/70 px-5 py-2 text-center backdrop-blur">
-                <p className="flex items-center gap-2 text-sm font-black text-[#f0d9a4]" style={{ fontFamily: SERIF }}>
-                  <Award className="h-4 w-4" /> {getPlayerName(state, state.winnerId)} rules Hexland!
-                </p>
-              </div>
+          {state.winnerId && !endDismissed && (
+            <HexlandEndScreen
+              state={state}
+              currentPlayerId={currentPlayerId}
+              onRematch={handleRematch}
+              onDismiss={() => setEndDismissed(true)}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Dismissed: slim banner + a way back to the results */}
+        <AnimatePresence>
+          {state.winnerId && endDismissed && (
+            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              className="absolute inset-x-0 top-4 z-20 flex justify-center">
+              <button
+                onClick={() => setEndDismissed(false)}
+                className="flex items-center gap-2 rounded-full border border-[#d6a85c]/50 bg-black/70 px-5 py-2 text-sm font-black text-[#f0d9a4] backdrop-blur transition hover:bg-black/85"
+                style={{ fontFamily: SERIF }}
+              >
+                <Award className="h-4 w-4" /> {getPlayerName(state, state.winnerId)} rules Hexland! — show results
+              </button>
             </motion.div>
           )}
         </AnimatePresence>
@@ -730,11 +757,7 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
                   👑 <strong>{state.players.find(p => p.id === state.winnerId)?.name}</strong> won Hexland!
                 </p>
                 <button
-                  onClick={() => {
-                    const next = catanEngine.initializeGame(state.players.map(p => ({ id: p.id, name: p.name, isBot: p.isBot })))
-                    onStateChange(next)
-                    onBroadcastAction?.('sync_state', next)
-                  }}
+                  onClick={handleRematch}
                   className="w-full py-2 bg-brand text-white font-black text-xs uppercase rounded-xl shadow-lg transition active:scale-95"
                 >
                   Start new match
@@ -1252,5 +1275,172 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
 
       </AnimatePresence>
     </div>
+  )
+}
+
+// ---- Full-board victory screen ------------------------------------------------
+// Takes over the play area when the game ends: the 3D island keeps breathing
+// behind a cinematic dim while the full space shows the podium and each
+// player's complete match stats.
+
+function HexlandEndScreen({ state, currentPlayerId, onRematch, onDismiss }: {
+  state: CatanState
+  currentPlayerId: string
+  onRematch: () => void
+  onDismiss: () => void
+}) {
+  const [shared, setShared] = useState(false)
+  const ranked = [...state.players].sort((a, b) => b.victoryPoints - a.victoryPoints)
+  const winner = ranked[0]
+  const youWon = state.winnerId === currentPlayerId
+  const medals = ["🥇", "🥈", "🥉", "4️⃣"]
+
+  const statsOf = (p: typeof state.players[number]) => {
+    const mine = Object.values(state.settlements).filter(s => s.playerId === p.id)
+    const cities = mine.filter(s => s.type === "city").length
+    return {
+      settlements: mine.length - cities,
+      cities,
+      roads: Object.values(state.roads).filter(id => id === p.id).length,
+      knights: p.playedKnights,
+      devs: Object.values(p.devCards).reduce((a, b) => a + b, 0),
+      cards: Object.values(p.resources).reduce((a, b) => a + b, 0),
+    }
+  }
+
+  const STAT_META: { key: keyof ReturnType<typeof statsOf>; icon: string; label: string }[] = [
+    { key: "settlements", icon: "🏠", label: "Settlements" },
+    { key: "cities", icon: "🏰", label: "Cities" },
+    { key: "roads", icon: "🛣️", label: "Roads" },
+    { key: "knights", icon: "⚔️", label: "Knights" },
+    { key: "devs", icon: "🃏", label: "Dev cards" },
+    { key: "cards", icon: "🖐️", label: "Resources" },
+  ]
+
+  const share = async () => {
+    const rows = ranked.map((p, i) => `${medals[i] || `${i + 1}.`} ${p.name} — ${p.victoryPoints} pts`).join("\n")
+    const text = `🏝️ Hexland on Dice Alley\n👑 ${winner.name} wins!\n\n${rows}\n\nPlay free at Dice Alley`
+    try {
+      if (typeof navigator !== "undefined" && navigator.share) await navigator.share({ title: "Hexland — Dice Alley", text })
+      else await navigator.clipboard.writeText(text)
+      setShared(true)
+      setTimeout(() => setShared(false), 2000)
+    } catch { /* user cancelled — ignore */ }
+  }
+
+  const leave = () => {
+    const pid = new URLSearchParams(window.location.search).get("partyId")
+    window.location.href = pid && pid !== "mock-party-id" ? `/party/${pid}` : "/games"
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="absolute inset-0 z-30 overflow-y-auto bg-gradient-to-b from-black/85 via-black/60 to-black/85 backdrop-blur-[3px]"
+    >
+      <div className="flex min-h-full flex-col items-center justify-center gap-4 p-5">
+        {/* Header */}
+        <motion.div initial={{ y: -16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }} className="text-center">
+          <p className="text-[10px] font-black uppercase tracking-[0.35em] text-[#d6a85c]">Hexland — Game Over</p>
+          <h2 className="mt-1 text-3xl font-black text-white sm:text-4xl" style={{ fontFamily: SERIF }}>
+            {youWon ? "🎉 You rule Hexland!" : <>{winner.name} <span className="text-[#e8c987]">rules Hexland!</span></>}
+          </h2>
+        </motion.div>
+
+        {/* Winner hero card */}
+        <motion.div
+          initial={{ y: 24, opacity: 0, scale: 0.96 }} animate={{ y: 0, opacity: 1, scale: 1 }}
+          transition={{ delay: 0.2, type: "spring", stiffness: 200, damping: 20 }}
+          className="w-full max-w-xl rounded-2xl border-2 border-[#e0b56b]/70 bg-gradient-to-b from-[#3a2c18]/95 to-[#241a10]/95 p-4 shadow-[0_0_60px_-10px_rgba(224,181,107,0.5)]"
+        >
+          <div className="flex items-center gap-3.5">
+            <div className="relative grid h-14 w-14 flex-shrink-0 place-items-center rounded-full border-2 border-white/40 text-2xl shadow-lg" style={{ backgroundColor: winner.color }}>
+              {winner.token}
+              <Crown className="absolute -top-3.5 left-1/2 h-5 w-5 -translate-x-1/2 text-[#e0b56b]" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="truncate text-xl font-black text-white" style={{ fontFamily: SERIF }}>
+                {winner.name}{winner.isBot && <span className="ml-2 rounded bg-[#d6a85c]/20 px-1.5 py-0.5 align-middle text-[8px] font-bold text-[#e8c987]">AI</span>}
+              </h3>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {winner.longestRoadActive && <span className="rounded-full bg-sky-500/20 px-2 py-0.5 text-[9px] font-black text-sky-300">🛣️ Longest Road +2</span>}
+                {winner.largestArmyActive && <span className="rounded-full bg-red-500/20 px-2 py-0.5 text-[9px] font-black text-red-300">⚔️ Largest Army +2</span>}
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-4xl font-black leading-none text-[#e0b56b]" style={{ fontFamily: SERIF }}>{winner.victoryPoints}</p>
+              <p className="text-[8px] font-black uppercase tracking-widest text-white/40">Victory Pts</p>
+            </div>
+          </div>
+          <div className="mt-3 grid grid-cols-6 gap-1.5 border-t border-white/10 pt-3">
+            {STAT_META.map(m => (
+              <div key={m.key} className="rounded-lg bg-black/30 py-1.5 text-center">
+                <p className="text-sm leading-none">{m.icon}</p>
+                <p className="mt-1 text-sm font-black leading-none text-white">{statsOf(winner)[m.key]}</p>
+                <p className="mt-0.5 text-[6.5px] font-bold uppercase tracking-wide text-white/40">{m.label}</p>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* Runners-up */}
+        <div className="grid w-full max-w-xl gap-2 sm:grid-cols-2">
+          {ranked.slice(1).map((p, i) => {
+            const s = statsOf(p)
+            const isMe = p.id === currentPlayerId
+            return (
+              <motion.div
+                key={p.id}
+                initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.3 + i * 0.08 }}
+                className={`rounded-xl border p-3 ${isMe ? "border-[#d6a85c]/40 bg-[#d6a85c]/10" : "border-white/10 bg-black/40"}`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="text-lg">{medals[i + 1] || `${i + 2}.`}</span>
+                  <div className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-full border border-white/30 text-base" style={{ backgroundColor: p.color }}>
+                    {p.token}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-black text-white" style={{ fontFamily: SERIF }}>
+                      {p.name}{isMe && <span className="ml-1.5 text-[9px] font-bold text-[#e8c987]">(you)</span>}
+                    </p>
+                    <div className="flex gap-1">
+                      {p.longestRoadActive && <span className="text-[8px] font-black text-sky-300">🛣️ Road</span>}
+                      {p.largestArmyActive && <span className="text-[8px] font-black text-red-300">⚔️ Army</span>}
+                    </div>
+                  </div>
+                  <p className="text-xl font-black text-[#e8c987]" style={{ fontFamily: SERIF }}>{p.victoryPoints}<span className="ml-0.5 text-[9px] text-white/40">pts</span></p>
+                </div>
+                <div className="mt-2 flex justify-between border-t border-white/5 pt-2 text-[10px] text-white/60">
+                  <span>🏠 {s.settlements}</span><span>🏰 {s.cities}</span><span>🛣️ {s.roads}</span>
+                  <span>⚔️ {s.knights}</span><span>🃏 {s.devs}</span><span>🖐️ {s.cards}</span>
+                </div>
+              </motion.div>
+            )
+          })}
+        </div>
+
+        {/* Actions */}
+        <motion.div initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.45 }}
+          className="flex flex-wrap items-center justify-center gap-2">
+          <button onClick={onRematch}
+            className="flex items-center gap-2 rounded-xl bg-brand px-5 py-2.5 text-xs font-black uppercase text-white shadow-glow-grape transition active:scale-95">
+            <RotateCcw className="h-4 w-4" /> Rematch
+          </button>
+          <button onClick={share}
+            className="flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-xs font-bold uppercase text-white transition hover:bg-white/20">
+            <Share2 className="h-4 w-4" /> {shared ? "Copied!" : "Share"}
+          </button>
+          <button onClick={onDismiss}
+            className="flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-xs font-bold uppercase text-white transition hover:bg-white/20">
+            <Eye className="h-4 w-4" /> View Island
+          </button>
+          <button onClick={leave}
+            className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold uppercase text-white/60 transition hover:bg-white/10 hover:text-white">
+            <LogOut className="h-4 w-4" /> Leave
+          </button>
+        </motion.div>
+      </div>
+    </motion.div>
   )
 }

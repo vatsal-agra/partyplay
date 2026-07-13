@@ -75,6 +75,11 @@ interface ChatMessage {
   display_name?: string
 }
 
+// Games whose board renders its own full-area victory screen — for these the
+// shared GameOverScreen modal stays out of the way (stats, rematch, share and
+// leave all live on the board itself).
+const BOARD_END_SCREEN_GAMES = new Set(['catan'])
+
 // Games that support AI bots, with their bot name pools. Multiplayer-only
 // games (pictionary, codenames, scribbleio) are intentionally absent.
 const BOT_SUPPORT: Record<string, string[]> = {
@@ -1030,7 +1035,7 @@ export default function GamePlayPage() {
               )}
 
               {/* Reopen the recap after peeking at the final board */}
-              {isPlaying && summary.isOver && gameOverDismissed && (
+              {isPlaying && summary.isOver && gameOverDismissed && !BOARD_END_SCREEN_GAMES.has(gameData.id) && (
                 <button
                   onClick={() => setGameOverDismissed(false)}
                   className="absolute bottom-4 left-1/2 z-30 -translate-x-1/2 flex items-center gap-2 rounded-full bg-brand px-4 py-2 text-sm font-bold text-white shadow-lg hover:brightness-110"
@@ -1247,7 +1252,7 @@ export default function GamePlayPage() {
 
       {/* Game-over recap — rendered at top level so its fixed overlay covers the
           full viewport (a transformed ancestor would otherwise trap it). */}
-      {isPlaying && summary.isOver && !gameOverDismissed && (
+      {isPlaying && summary.isOver && !gameOverDismissed && !BOARD_END_SCREEN_GAMES.has(gameData.id) && (
         <GameOverScreen
           gameName={gameData.name}
           summary={summary}
