@@ -31,6 +31,7 @@ export interface Flight {
   targetY: number
   result: ShotResult
   incoming: boolean       // true = enemy shell falling on MY fleet
+  dramaOnly?: boolean     // replay of an already-committed remote shot — never commits
 }
 
 export interface NavalScene3DProps {
@@ -149,7 +150,8 @@ function WarshipModel({ ship }: { ship: Ship }) {
   if (isSub) {
     return (
       <group>
-        <mesh castShadow position={[0, 0.12, 0]}>
+        {/* capsule axis is Y by default — lay it along the ship's Z axis */}
+        <mesh castShadow position={[0, 0.12, 0]} rotation-x={Math.PI / 2}>
           <capsuleGeometry args={[W * 0.42, L * 0.72, 6, 12]} />
           <meshStandardMaterial color="#2c333c" roughness={0.5} metalness={0.4} />
         </mesh>
@@ -485,15 +487,18 @@ function Missile({ flight, launchFrom, onArrive }: {
     (from.x + to.x) / 2, 7.5 + Math.abs(from.z - to.z) * 0.12, (from.z + to.z) / 2,
   ), [from, to])
   const curve = useMemo(() => new THREE.QuadraticBezierCurve3(from, mid, to), [from, mid, to])
-  const tmp = useMemo(() => new THREE.Vector3(), [])
+  // Preallocated hot-path vectors — this runs every frame of every shot.
+  const tmpP = useMemo(() => new THREE.Vector3(), [])
+  const tmpA = useMemo(() => new THREE.Vector3(), [])
 
   useFrame((_, dt) => {
     if (!g.current || done.current) return
     t.current = Math.min(1, t.current + dt / DUR)
-    const p = curve.getPoint(t.current)
-    g.current.position.copy(p)
-    curve.getTangent(Math.min(0.999, t.current), tmp)
-    g.current.lookAt(p.x + tmp.x, p.y + tmp.y, p.z + tmp.z)
+    curve.getPoint(t.current, tmpP)
+    g.current.position.copy(tmpP)
+    // finite-difference tangent (getTangent allocates internally)
+    curve.getPoint(Math.min(1, t.current + 0.01), tmpA)
+    if (tmpA.distanceToSquared(tmpP) > 1e-8) g.current.lookAt(tmpA)
     if (t.current >= 1 && !done.current) {
       done.current = true
       onArrive()
@@ -604,20 +609,6 @@ function EnemyWreck({ ship }: { ship: Ship }) {
   )
 }
 
-// ---- camera shake -------------------------------------------------------------------
-function ShakeRig({ intensity }: { intensity: React.MutableRefObject<number> }) {
-  useFrame(({ camera, clock }) => {
-    const k = intensity.current
-    if (k > 0.001) {
-      const t = clock.elapsedTime
-      camera.position.x += Math.sin(t * 91) * 0.09 * k
-      camera.position.y += Math.sin(t * 83 + 1) * 0.07 * k
-      intensity.current = k * 0.88
-    }
-  })
-  return null
-}
-
 // ---- scene ----------------------------------------------------------------------------
 function Scene(props: NavalScene3DProps) {
   const { state, meIndex, isMyTurn, canFire, flight, onImpact, onFireCell, placing, previewCells, onHoverCell, onClickOwnCell } = props
@@ -674,9 +665,17 @@ function Scene(props: NavalScene3DProps) {
     return { x, y }
   })
 
+  // Gentle world bob + impact shake — applied to the scene group, NOT the
+  // camera (OrbitControls re-derives its orbit from camera.position every
+  // frame, so camera offsets get absorbed and permanently drift the view).
   const bob = useRef<THREE.Group>(null)
   useFrame(({ clock }) => {
-    if (bob.current) bob.current.position.y = Math.sin(clock.elapsedTime * 0.5) * 0.02
+    if (!bob.current) return
+    const t = clock.elapsedTime
+    const k = shake.current
+    bob.current.position.y = Math.sin(t * 0.5) * 0.02 + (k > 0.001 ? Math.sin(t * 83 + 1) * 0.07 * k : 0)
+    bob.current.position.x = k > 0.001 ? Math.sin(t * 91) * 0.09 * k : 0
+    if (k > 0.001) shake.current = k * 0.88
   })
 
   return (
@@ -709,7 +708,13 @@ function Scene(props: NavalScene3DProps) {
             if (!clickable) return null
             return (
               <mesh key={`t${k}`} position={[wx(x), 0.015, enemyZ(y)]} rotation-x={-Math.PI / 2}
-                onClick={(e) => { e.stopPropagation(); onFireCell(x, y) }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  // this plane unmounts on fire, so its onPointerOut never runs
+                  document.body.style.cursor = "auto"
+                  setHoverTarget(null)
+                  onFireCell(x, y)
+                }}
                 onPointerOver={(e) => { e.stopPropagation(); setHoverTarget({ x, y }); document.body.style.cursor = "crosshair" }}
                 onPointerOut={() => { setHoverTarget(null); document.body.style.cursor = "auto" }}
               >
@@ -786,8 +791,6 @@ function Scene(props: NavalScene3DProps) {
         {/* the missile in flight */}
         {flight && <Missile key={flight.id} flight={flight} launchFrom={launchFrom} onArrive={handleArrive} />}
       </group>
-
-      <ShakeRig intensity={shake} />
 
       {/* my-turn glow strip under the enemy grid */}
       {isMyTurn && !flight && (

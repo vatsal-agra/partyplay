@@ -59,25 +59,32 @@ export default function BattleshipBoard({ state, currentPlayerId, onStateChange,
     onBroadcastAction?.("sync_state", next)
   }
 
-  const meIndex = Math.max(0, state.players.findIndex((p) => p.id === currentPlayerId))
+  // Late joiners beyond the two seats spectate: they render player 0's view
+  // but must never fire, place, drive bots or commit state.
+  const seatIndex = state.players.findIndex((p) => p.id === currentPlayerId)
+  const isSpectator = seatIndex === -1
+  const meIndex = Math.max(0, seatIndex)
   const me = state.players[meIndex]
   const opp = state.players[1 - meIndex]
-  const isMyTurn = state.phase === "BATTLE" && state.players[state.currentPlayerIndex].id === me.id
-  const placing = state.phase === "PLACEMENT" && !me.ready
+  const isMyTurn = !isSpectator && state.phase === "BATTLE" && state.players[state.currentPlayerIndex].id === me.id
+  const placing = !isSpectator && state.phase === "PLACEMENT" && !me.ready
 
   useEffect(() => {
     if (!state.winnerId) setEndDismissed(false)
   }, [state.winnerId])
 
-  const launchFlight = (next: BattleshipState, incoming: boolean) => {
+  const launchFlight = (next: BattleshipState, incoming: boolean, dramaOnly = false) => {
     const shot = next.lastShot!
     processedShot.current = shotSig(shot)
-    setFlight({ id: ++flightId.current, targetX: shot.x, targetY: shot.y, result: shot.result, incoming, next })
+    setFlight({ id: ++flightId.current, targetX: shot.x, targetY: shot.y, result: shot.result, incoming, dramaOnly, next })
   }
 
   // ---- Bot driver -------------------------------------------------------------
+  // Depends on the whole state object so a human placement/commit within the
+  // bot's delay window re-arms the timer with fresh state instead of letting a
+  // stale snapshot clobber it. Spectator clients never drive bots.
   useEffect(() => {
-    if (state.winnerId || flight) return
+    if (state.winnerId || flight || isSpectator) return
     if (state.phase === "PLACEMENT") {
       if (state.players.some((p) => p.isBot && !p.ready)) {
         const t = setTimeout(() => commit(playBotStep(state)), 500)
@@ -94,21 +101,26 @@ export default function BattleshipBoard({ state, currentPlayerId, onStateChange,
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.phase, state.currentPlayerIndex, state.players.map((p) => p.ready).join(), state.winnerId, flight])
+  }, [state, flight, isSpectator])
+
+  // A reset (rematch / new game) arriving mid-flight makes the shell stale —
+  // drop it so its impact can't re-commit the previous game.
+  useEffect(() => {
+    if (flight && state.phase === "PLACEMENT") setFlight(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.phase])
 
   // ---- Remote shots (a human opponent fired) — replay the shell locally --------
   useEffect(() => {
     const sig = shotSig(state.lastShot)
-    if (!sig || sig === processedShot.current) return
+    if (!sig) { processedShot.current = ""; return }   // reset on rematch
+    if (sig === processedShot.current) return
     processedShot.current = sig
+    // Never replace an active flight — mark the shot processed and skip drama.
+    if (flight) return
     const shot = state.lastShot!
     // State is already committed remotely; fly the shell for drama only.
-    setFlight({
-      id: ++flightId.current,
-      targetX: shot.x, targetY: shot.y, result: shot.result,
-      incoming: shot.byId !== me.id,
-      next: state,
-    })
+    launchFlight(state, shot.byId !== me.id, true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.lastShot])
 
@@ -120,9 +132,12 @@ export default function BattleshipBoard({ state, currentPlayerId, onStateChange,
     launchFlight(next, false)
   }
 
+  // Drama flights replay an already-committed shot and must never commit —
+  // inferring that from state identity is what let a mid-flight rematch get
+  // clobbered by a re-broadcast of the finished game.
   const handleImpact = () => {
     if (!flight) return
-    if (flight.next !== state) commit(flight.next)
+    if (!flight.dramaOnly) commit(flight.next)
     setFlight(null)
   }
 
@@ -132,7 +147,7 @@ export default function BattleshipBoard({ state, currentPlayerId, onStateChange,
   useEffect(() => {
     if (!flight) return
     const t = setTimeout(() => {
-      if (flight.next !== state) commit(flight.next)
+      if (!flight.dramaOnly) commit(flight.next)
       setFlight(null)
     }, 2000)
     return () => clearTimeout(t)
@@ -153,6 +168,14 @@ export default function BattleshipBoard({ state, currentPlayerId, onStateChange,
   }, [placing, me, hover, selectedShip, orientation])
 
   const handlePlace = (x: number, y: number) => {
+    // Clicking one of my placed ships selects it for repositioning — the
+    // natural instinct — instead of surprise-dropping the selected ship there.
+    const clickedShip = me.ships.find((s) => s.cells.some((c) => c.x === x && c.y === y))
+    if (clickedShip && clickedShip.id !== selectedShip) {
+      setSelectedShip(clickedShip.id)
+      setOrientation(clickedShip.orientation)
+      return
+    }
     const next = placeShip(state, me.id, selectedShip, x, y, orientation)
     if (next === state) return
     commit(next)
@@ -242,6 +265,7 @@ export default function BattleshipBoard({ state, currentPlayerId, onStateChange,
             <NavalEndScreen
               state={state}
               meIndex={meIndex}
+              canRematch={!isSpectator}
               onRematch={handleRematch}
               onDismiss={() => setEndDismissed(true)}
             />
@@ -362,9 +386,10 @@ export default function BattleshipBoard({ state, currentPlayerId, onStateChange,
 
 // ---- Full-board victory screen ----------------------------------------------------
 
-function NavalEndScreen({ state, meIndex, onRematch, onDismiss }: {
+function NavalEndScreen({ state, meIndex, canRematch, onRematch, onDismiss }: {
   state: BattleshipState
   meIndex: number
+  canRematch: boolean
   onRematch: () => void
   onDismiss: () => void
 }) {
@@ -472,10 +497,12 @@ function NavalEndScreen({ state, meIndex, onRematch, onDismiss }: {
 
         <motion.div initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.45 }}
           className="flex flex-wrap items-center justify-center gap-2">
-          <button onClick={onRematch}
-            className="flex items-center gap-2 rounded-xl bg-brand px-5 py-2.5 text-xs font-black uppercase text-white shadow-glow-grape transition active:scale-95">
-            <RotateCcw className="h-4 w-4" /> Rematch
-          </button>
+          {canRematch && (
+            <button onClick={onRematch}
+              className="flex items-center gap-2 rounded-xl bg-brand px-5 py-2.5 text-xs font-black uppercase text-white shadow-glow-grape transition active:scale-95">
+              <RotateCcw className="h-4 w-4" /> Rematch
+            </button>
+          )}
           <button onClick={share}
             className="flex items-center gap-2 rounded-xl bg-white/10 px-4 py-2.5 text-xs font-bold uppercase text-white transition hover:bg-white/20">
             <Share2 className="h-4 w-4" /> {shared ? "Copied!" : "Share"}
