@@ -78,7 +78,7 @@ interface ChatMessage {
 // Games whose board renders its own full-area victory screen — for these the
 // shared GameOverScreen modal stays out of the way (stats, rematch, share and
 // leave all live on the board itself).
-const BOARD_END_SCREEN_GAMES = new Set(['catan'])
+const BOARD_END_SCREEN_GAMES = new Set(['catan', 'battleship'])
 
 // Games that support AI bots, with their bot name pools. Multiplayer-only
 // games (pictionary, codenames, scribbleio) are intentionally absent.
