@@ -3,7 +3,7 @@
 // engine; this component only wires interaction and presentation.
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import dynamic from "next/dynamic"
 import { motion, AnimatePresence } from "framer-motion"
 import {
@@ -17,6 +17,34 @@ import { Confetti } from "@/components/Confetti"
 import { Dices, KeyRound, Search, Megaphone, ChevronRight, NotebookPen, ScrollText, Trophy, Skull, Loader2 } from "lucide-react"
 
 const SERIF = "var(--font-display), Georgia, serif"
+
+const ROOM_ICON: Record<string, string> = {
+  kitchen: '🍳', ballroom: '🎭', conservatory: '🪴', dining: '🍷',
+  billiard: '🎱', library: '📚', lounge: '🛋️', hall: '🏛️', study: '📜',
+}
+
+// A small card visual for a suspect / weapon / room id — reused across the
+// hand, the disprove choices and the reveal.
+function CardFace({ id, size = 74 }: { id: string; size?: number }) {
+  const suspect = SUSPECTS.find((s) => s.id === id)
+  const weapon = WEAPONS.find((w) => w.id === id)
+  return (
+    <div className="flex flex-col items-center justify-between overflow-hidden rounded-lg border-2 p-1"
+      style={{ height: size, width: size * 0.68, borderColor: suspect ? suspect.color : '#6b5230', background: 'linear-gradient(160deg,#2a2013,#171009)' }}>
+      <span className="h-2 w-full rounded-sm" style={{ backgroundColor: suspect ? suspect.color : weapon ? '#8a6a34' : '#4a3b6b' }} />
+      <div className="flex flex-1 items-center justify-center">
+        {weapon ? (
+          <img src={weapon.image} alt="" className="object-contain" style={{ height: size * 0.42, width: size * 0.42 }} />
+        ) : suspect ? (
+          <span className="grid place-items-center rounded-full text-xs font-black text-[#1a120a]" style={{ height: size * 0.38, width: size * 0.38, backgroundColor: suspect.color }}>{suspect.name[0]}</span>
+        ) : (
+          <span style={{ fontSize: size * 0.4 }}>{ROOM_ICON[id] || '🚪'}</span>
+        )}
+      </div>
+      <span className="text-center text-[6.5px] font-black uppercase leading-tight tracking-wide text-[#e8c987]">{cardName(id)}</span>
+    </div>
+  )
+}
 
 // The Three.js scene must never render on the server.
 const MansionScene3D = dynamic(() => import("./MansionScene3D"), {
@@ -49,6 +77,19 @@ export default function MysteryBoard({ state, currentPlayerId, onStateChange, on
   const [notes, setNotes] = useState<Record<string, boolean>>({})
   const [tab, setTab] = useState<"notebook" | "log">("notebook")
   const [rolling, setRolling] = useState(false)
+  // Keep the suggestion announcement on-screen briefly after it resolves (an
+  // all-bot disprove resolves instantly, clearing state.pending).
+  const [recentSug, setRecentSug] = useState<MysteryState["suggestionLog"][number] | null>(null)
+  const sugLenRef = useRef(state.suggestionLog.length)
+  useEffect(() => {
+    if (state.suggestionLog.length > sugLenRef.current) {
+      setRecentSug(state.suggestionLog[state.suggestionLog.length - 1])
+      const t = setTimeout(() => setRecentSug(null), 5000)
+      sugLenRef.current = state.suggestionLog.length
+      return () => clearTimeout(t)
+    }
+    sugLenRef.current = state.suggestionLog.length
+  }, [state.suggestionLog.length])
 
   const commit = (next: MysteryState) => {
     onStateChange(next)
@@ -116,6 +157,44 @@ export default function MysteryBoard({ state, currentPlayerId, onStateChange, on
         <div className="pointer-events-none absolute bottom-3 right-3 hidden rounded-full border border-white/10 bg-black/40 px-3 py-1 text-[10px] text-white/40 backdrop-blur lg:block">
           drag to orbit · scroll to zoom
         </div>
+
+        {/* On-screen suggestion announcement — everyone sees who suggested what,
+            like calling it out at the table. Persists while awaiting a human
+            disprover, and lingers ~5s after an instant (all-bot) resolution. */}
+        {(() => {
+          const ann = state.pending
+            ? { suggesterId: state.pending.suggesterId, suspect: state.pending.suspect, weapon: state.pending.weapon, room: state.pending.room, askIndex: state.pending.askIndex as number, done: null as null | string }
+            : recentSug
+              ? { suggesterId: recentSug.suggesterId, suspect: recentSug.suspect, weapon: recentSug.weapon, room: recentSug.room, askIndex: -1, done: recentSug.disproverName ? `${recentSug.disproverName} disproved it` : 'No one could disprove!' }
+              : null
+          return (
+            <AnimatePresence>
+              {ann && (
+                <motion.div key="suggestion-announce"
+                  initial={{ opacity: 0, y: -24, scale: 0.94 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -16 }}
+                  className="pointer-events-none absolute inset-x-0 top-4 z-20 flex justify-center">
+                  <div className="rounded-2xl border border-[#d6a85c]/50 bg-black/80 px-6 py-3 text-center shadow-2xl backdrop-blur">
+                    <p className="text-[9px] font-black uppercase tracking-[0.25em] text-[#d6a85c]">
+                      {getPlayerName(state, ann.suggesterId)} suggests
+                    </p>
+                    <div className="mt-2 flex items-end justify-center gap-2.5">
+                      <CardFace id={ann.suspect} size={66} />
+                      <span className="mb-6 text-lg text-[#d6a85c]">·</span>
+                      <CardFace id={ann.weapon} size={66} />
+                      <span className="mb-6 text-lg text-[#d6a85c]">·</span>
+                      <CardFace id={ann.room} size={66} />
+                    </div>
+                    <p className="mt-2 text-[10px] italic text-white/55">
+                      {ann.done
+                        ? ann.done
+                        : <>Waiting for <strong className="text-white/80">{getPlayerName(state, state.players[ann.askIndex].id)}</strong> to disprove…</>}
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          )
+        })()}
 
         {/* Your case cards — the hand you were dealt (your evidence), shown as
             real cards so you can see them, not just ticks in the notebook. */}
@@ -200,13 +279,15 @@ export default function MysteryBoard({ state, currentPlayerId, onStateChange, on
           <span className="rounded-md bg-black/30 px-2 py-1 text-[9px] font-mono font-bold uppercase text-[#d6a85c]">{state.phase}</span>
         </div>
 
-        {/* Private reveal */}
+        {/* Private reveal — the shown card slides in; you strike it yourself */}
         <AnimatePresence>
           {revealToMe && (
-            <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-              className="rounded-xl border border-emerald-500/40 bg-emerald-500/15 p-2.5 text-center">
+            <motion.div initial={{ opacity: 0, x: 70, rotate: 10 }} animate={{ opacity: 1, x: 0, rotate: 0 }} exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ type: "spring", stiffness: 200, damping: 20 }}
+              className="flex flex-col items-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3 text-center">
               <p className="text-[10px] text-emerald-300"><strong>{getPlayerName(state, revealToMe.fromPlayerId)}</strong> secretly showed you:</p>
-              <p className="mt-0.5 text-sm font-black text-white" style={{ fontFamily: SERIF }}>{cardName(revealToMe.card)}</p>
+              <CardFace id={revealToMe.card} size={84} />
+              <p className="text-[9px] italic text-white/45">Cross it off in your notebook yourself.</p>
             </motion.div>
           )}
         </AnimatePresence>
@@ -220,13 +301,14 @@ export default function MysteryBoard({ state, currentPlayerId, onStateChange, on
             </div>
           ) : amDisprover ? (
             <div>
-              <p className="mb-2 text-center text-[10px] font-bold text-[#e8c987]">You can disprove — show one card privately:</p>
-              <div className="flex flex-wrap justify-center gap-1.5">
+              <p className="mb-2 text-center text-[10px] font-bold text-[#e8c987]">You can disprove — show one of your matching cards:</p>
+              <div className="flex flex-wrap justify-center gap-2">
                 {state.revealChoices!.map((c) => (
-                  <button key={c} onClick={() => commit(respondDisprove(state, c))}
-                    className="rounded-lg border border-[#d6a85c]/30 bg-[#d6a85c]/15 px-2.5 py-1.5 text-[10px] font-bold text-[#f0d9a4] hover:bg-[#d6a85c]/30">
-                    {cardName(c)}
-                  </button>
+                  <motion.button key={c} onClick={() => commit(respondDisprove(state, c))}
+                    whileHover={{ scale: 1.08, y: -3 }} whileTap={{ scale: 0.96 }}
+                    className="rounded-lg shadow-[0_0_16px_-2px_rgba(230,180,90,0.7)] ring-1 ring-[#e6b45a]/60">
+                    <CardFace id={c} size={68} />
+                  </motion.button>
                 ))}
               </div>
             </div>

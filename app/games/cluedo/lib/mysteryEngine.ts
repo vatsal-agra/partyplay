@@ -382,7 +382,8 @@ function finalizeDisprove(state: MysteryState, disproverIdx: number, card: strin
     disproverId: disprover.id, disproverName: disprover.name, shownCard: card,
   }]
   s.lastReveal = { toPlayerId: suggester.id, fromPlayerId: disprover.id, card }
-  if (!suggester.known.includes(card)) suggester.known.push(card)
+  // Bots auto-learn; a human suggester marks their own notebook manually.
+  if (suggester.isBot && !suggester.known.includes(card)) suggester.known.push(card)
 
   pushLog(s, `🃏 ${disprover.name} privately showed ${suggester.name} a card.`)
   s.pending = null
