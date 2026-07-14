@@ -113,9 +113,47 @@ export default function MysteryBoard({ state, currentPlayerId, onStateChange, on
         <Confetti fire={!!state.winnerId} />
 
         {/* orbit hint */}
-        <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-white/10 bg-black/40 px-3 py-1 text-[10px] text-white/40 backdrop-blur">
+        <div className="pointer-events-none absolute bottom-3 right-3 hidden rounded-full border border-white/10 bg-black/40 px-3 py-1 text-[10px] text-white/40 backdrop-blur lg:block">
           drag to orbit · scroll to zoom
         </div>
+
+        {/* Your case cards — the hand you were dealt (your evidence), shown as
+            real cards so you can see them, not just ticks in the notebook. */}
+        {me && me.hand.length > 0 && (() => {
+          const ROOM_ICON: Record<string, string> = {
+            kitchen: '🍳', ballroom: '🎭', conservatory: '🪴', dining: '🍷',
+            billiard: '🎱', library: '📚', lounge: '🛋️', hall: '🏛️', study: '📜',
+          }
+          return (
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-end justify-center pb-1">
+              <div className="flex items-end">
+                {me.hand.map((id, i) => {
+                  const suspect = SUSPECTS.find((s) => s.id === id)
+                  const weapon = WEAPONS.find((w) => w.id === id)
+                  return (
+                    <div key={id}
+                      className="h-[74px] w-[50px] flex-shrink-0 overflow-hidden rounded-lg border-2 shadow-lg"
+                      style={{ marginLeft: i === 0 ? 0 : -18, borderColor: suspect ? suspect.color : '#6b5230', background: 'linear-gradient(160deg,#2a2013,#171009)' }}>
+                      <div className="flex h-full flex-col items-center justify-between p-1">
+                        <span className="h-2 w-full rounded-sm" style={{ backgroundColor: suspect ? suspect.color : weapon ? '#8a6a34' : '#4a3b6b' }} />
+                        <div className="flex flex-1 items-center justify-center">
+                          {weapon ? (
+                            <img src={weapon.image} alt="" className="h-8 w-8 object-contain" />
+                          ) : suspect ? (
+                            <span className="grid h-7 w-7 place-items-center rounded-full text-xs font-black text-[#1a120a]" style={{ backgroundColor: suspect.color }}>{suspect.name[0]}</span>
+                          ) : (
+                            <span className="text-2xl">{ROOM_ICON[id] || '🚪'}</span>
+                          )}
+                        </div>
+                        <span className="text-center text-[6.5px] font-black uppercase leading-tight tracking-wide text-[#e8c987]">{cardName(id)}</span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })()}
 
         <AnimatePresence>
           {state.winnerId && (

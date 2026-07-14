@@ -408,25 +408,50 @@ export default function CatanBoard({ state, currentPlayerId, onStateChange, onBr
           drag to orbit · scroll to zoom
         </div>
 
-        {/* My hand — always visible, pops when a count changes */}
-        {me && (
-          <div className="absolute bottom-3 left-3 z-10 flex items-center gap-1.5 rounded-2xl border border-[#6b5230]/50 bg-black/60 px-2 py-1.5 backdrop-blur shadow-lg">
-            <span className="hidden sm:block pl-1 pr-0.5 text-[8px] font-black uppercase tracking-widest text-[#d6a85c]">Hand</span>
-            {RESOURCES.map(r => (
-              <div key={r} className={`flex items-center gap-1 rounded-lg px-1.5 py-1 ${me.resources[r] > 0 ? "bg-white/10" : "bg-white/[0.03] opacity-60"}`} title={r}>
-                <span className="text-sm leading-none">{RESOURCE_ICONS[r]}</span>
-                <motion.span
-                  key={me.resources[r]}
-                  initial={{ scale: 1.6, color: "#ffd88a" }}
-                  animate={{ scale: 1, color: "#f0e6d2" }}
-                  className="min-w-[10px] text-center text-[11px] font-black font-mono"
-                >
-                  {me.resources[r]}
-                </motion.span>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* My hand — real resource cards fanned along the bottom, like a hand
+            you'd actually hold. Grouped by type; new cards pop in on gain. */}
+        {me && (() => {
+          const RES_CARD: Record<ResourceType, { bg: string; edge: string; icon: string; label: string }> = {
+            WOOD:  { bg: 'linear-gradient(160deg,#3c9342,#1c4d22)', edge: '#5fbb6a', icon: '🌲', label: 'Wood' },
+            BRICK: { bg: 'linear-gradient(160deg,#c2562e,#7e3417)', edge: '#e0824e', icon: '🧱', label: 'Brick' },
+            SHEEP: { bg: 'linear-gradient(160deg,#8fc752,#56962a)', edge: '#b6e07a', icon: '🐑', label: 'Sheep' },
+            WHEAT: { bg: 'linear-gradient(160deg,#e8c020,#bd861a)', edge: '#f6da5e', icon: '🌾', label: 'Wheat' },
+            ORE:   { bg: 'linear-gradient(160deg,#8a94a3,#3c424d)', edge: '#aab4c2', icon: '⛰️', label: 'Ore' },
+          }
+          const cards = RESOURCES.flatMap((r) => Array.from({ length: me.resources[r] }, (_, i) => ({ r, key: `${r}-${i}` })))
+          return (
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex items-end justify-center pb-1">
+              {cards.length === 0 ? (
+                <span className="mb-3 rounded-full border border-white/10 bg-black/50 px-3 py-1 text-[10px] text-white/40 backdrop-blur">No resource cards yet</span>
+              ) : (
+                <div className="flex items-end">
+                  <AnimatePresence initial={false}>
+                    {cards.map((c, i) => {
+                      const s = RES_CARD[c.r]
+                      return (
+                        <motion.div
+                          key={c.key}
+                          layout
+                          initial={{ y: 40, opacity: 0, scale: 0.8 }}
+                          animate={{ y: 0, opacity: 1, scale: 1 }}
+                          exit={{ y: 30, opacity: 0 }}
+                          transition={{ type: 'spring', stiffness: 260, damping: 24 }}
+                          className="h-[62px] w-[42px] flex-shrink-0 rounded-lg border-2 shadow-lg"
+                          style={{ background: s.bg, borderColor: s.edge, marginLeft: i === 0 ? 0 : -16 }}
+                        >
+                          <div className="flex h-full flex-col items-center justify-between py-1.5">
+                            <span className="text-[14px] leading-none drop-shadow">{s.icon}</span>
+                            <span className="text-[6px] font-black uppercase tracking-wider text-white/90">{s.label}</span>
+                          </div>
+                        </motion.div>
+                      )
+                    })}
+                  </AnimatePresence>
+                </div>
+              )}
+            </div>
+          )
+        })()}
 
         {/* Dev card tray — your cards live on the table, each says what it does */}
         {me && Object.values(me.devCards).some(c => c > 0) && (
