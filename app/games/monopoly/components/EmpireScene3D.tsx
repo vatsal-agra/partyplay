@@ -501,14 +501,56 @@ function CashFloat({ fx }: { fx: CashFx }) {
 }
 
 // ---- scene ------------------------------------------------------------------------------
+// A Fortune/Treasury deck. Pulses, lifts and becomes clickable when it's the
+// local player's turn to draw the card they landed on.
+function Deck({ x, rotY, label, bg, active, onDraw }: {
+  x: number; rotY: number; label: string; bg: string; active: boolean; onDraw: () => void
+}) {
+  const ring = useRef<THREE.Mesh>(null)
+  const grp = useRef<THREE.Group>(null)
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime
+    if (ring.current) (ring.current.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.6 + Math.sin(t * 3.4) * 0.4
+    if (grp.current) grp.current.position.y = BOARD_Y + (active ? 0.12 + Math.sin(t * 3) * 0.05 : 0)
+  })
+  return (
+    <group position={[x, 0, -1.9]} rotation-y={rotY}>
+      <group ref={grp} position={[0, BOARD_Y, 0]}>
+        {[0, 1, 2, 3].map((i) => (
+          <mesh key={i} position={[0, 0.02 + i * 0.02, 0]} rotation-x={-Math.PI / 2} castShadow={i === 3}>
+            <planeGeometry args={[1.15, 1.7]} />
+            <meshBasicMaterial map={deckTexture(label, bg)} toneMapped={false} />
+          </mesh>
+        ))}
+      </group>
+      {active && (
+        <>
+          <mesh ref={ring} position={[0, BOARD_Y + 0.012, 0]} rotation-x={-Math.PI / 2}>
+            <ringGeometry args={[0.95, 1.18, 44]} />
+            <meshStandardMaterial color="#ffe08a" emissive="#ffe08a" emissiveIntensity={0.8} transparent opacity={0.9} side={THREE.DoubleSide} />
+          </mesh>
+          <mesh visible={false} position={[0, BOARD_Y + 0.35, 0]}
+            onClick={(e: ThreeEvent<MouseEvent>) => { e.stopPropagation(); document.body.style.cursor = "auto"; onDraw() }}
+            onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = "pointer" }}
+            onPointerOut={() => { document.body.style.cursor = "auto" }}>
+            <boxGeometry args={[1.4, 0.8, 2.0]} />
+          </mesh>
+        </>
+      )}
+    </group>
+  )
+}
+
 export interface EmpireScene3DProps {
   state: MonopolyState
   rolling: boolean
+  canDrawCard: boolean
   onDiceSettled: () => void
   onTileClick: (index: number) => void
+  onDrawCard: () => void
 }
 
-function Scene({ state, rolling, onDiceSettled, onTileClick }: EmpireScene3DProps) {
+function Scene({ state, rolling, canDrawCard, onDiceSettled, onTileClick, onDrawCard }: EmpireScene3DProps) {
   const wood = useMemo(woodTexture, [])
   const center = useMemo(centerTexture, [])
   const cur = state.players[state.currentPlayerIndex]
@@ -565,23 +607,11 @@ function Scene({ state, rolling, onDiceSettled, onTileClick }: EmpireScene3DProp
         <meshBasicMaterial map={center} toneMapped={false} />
       </mesh>
 
-      {/* deck stacks */}
-      <group position={[-2.6, BOARD_Y, -1.9]} rotation-y={0.35}>
-        {[0, 1, 2, 3].map((i) => (
-          <mesh key={i} position={[0, 0.02 + i * 0.02, 0]} rotation-x={-Math.PI / 2} castShadow={i === 3}>
-            <planeGeometry args={[1.15, 1.7]} />
-            <meshBasicMaterial map={deckTexture("FORTUNE", "#ef8b33")} toneMapped={false} />
-          </mesh>
-        ))}
-      </group>
-      <group position={[2.6, BOARD_Y, -1.9]} rotation-y={-0.35}>
-        {[0, 1, 2, 3].map((i) => (
-          <mesh key={i} position={[0, 0.02 + i * 0.02, 0]} rotation-x={-Math.PI / 2} castShadow={i === 3}>
-            <planeGeometry args={[1.15, 1.7]} />
-            <meshBasicMaterial map={deckTexture("TREASURY", "#e8c53a")} toneMapped={false} />
-          </mesh>
-        ))}
-      </group>
+      {/* deck stacks — click to draw when you land on a card tile */}
+      <Deck x={-2.6} rotY={0.35} label="FORTUNE" bg="#ef8b33"
+        active={canDrawCard && state.pendingCard === 'CHANCE'} onDraw={onDrawCard} />
+      <Deck x={2.6} rotY={-0.35} label="TREASURY" bg="#e8c53a"
+        active={canDrawCard && state.pendingCard === 'COMMUNITY_CHEST'} onDraw={onDrawCard} />
 
       {/* tiles */}
       {BOARD_SPACES.map((space) => {

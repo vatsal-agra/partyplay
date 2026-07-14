@@ -192,8 +192,10 @@ export default function MonopolyBoard({ state, currentPlayerId, onStateChange, o
         <EmpireScene3D
           state={pendingRoll ? { ...state, lastDice: pendingRoll.lastDice } : state}
           rolling={isRolling}
+          canDrawCard={isMyTurn && !curPlayer.isBot && state.phase === 'DRAW_CARD'}
           onDiceSettled={settleRoll}
           onTileClick={setSelected}
+          onDrawCard={() => act('drawPendingCard')}
         />
         <Confetti fire={gameOver && state.winnerId === currentPlayerId} />
 
@@ -334,6 +336,22 @@ export default function MonopolyBoard({ state, currentPlayerId, onStateChange, o
                   className="bg-brand flex w-full items-center justify-center gap-1.5 rounded-xl py-2 text-[10px] font-black uppercase tracking-wider text-white shadow-lg transition active:scale-95 disabled:opacity-70">
                   <Dices className="h-4 w-4" /> {isRolling ? 'Rolling…' : 'Roll for Escape'}
                 </button>
+              </motion.div>
+            )}
+
+            {/* Draw a Fortune/Treasury card */}
+            {state.phase === 'DRAW_CARD' && (
+              <motion.div key="draw-context" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                className="glass flex flex-col items-center gap-2 rounded-2xl p-4 text-center">
+                <span className="text-2xl">{state.pendingCard === 'CHANCE' ? '❓' : '📦'}</span>
+                <h4 className="font-mono text-[9px] font-black uppercase tracking-widest text-[#d6a85c]">
+                  {state.pendingCard === 'CHANCE' ? 'Fortune' : 'Treasury'}
+                </h4>
+                <p className="text-[11px] leading-snug text-white/70">
+                  {isMyTurn && !curPlayer.isBot
+                    ? <>Click the glowing <strong className="text-[#e8c987]">{state.pendingCard === 'CHANCE' ? 'Fortune' : 'Treasury'}</strong> deck on the board to draw your card.</>
+                    : `${curPlayer.name} is drawing a card…`}
+                </p>
               </motion.div>
             )}
 

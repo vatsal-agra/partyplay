@@ -66,10 +66,11 @@ export interface MonopolyState {
   communityChestDeck: number[];
   chanceIndex: number;
   communityChestIndex: number;
-  phase: 'ROLL' | 'BUY_OR_PASS' | 'RENT' | 'JAIL' | 'BANKRUPTCY' | 'GAME_OVER' | 'AUCTION';
+  phase: 'ROLL' | 'BUY_OR_PASS' | 'RENT' | 'JAIL' | 'BANKRUPTCY' | 'GAME_OVER' | 'AUCTION' | 'DRAW_CARD';
   lastDice: [number, number];
   doubleCount: number;
   rolledThisTurn: boolean; // one roll per turn; a bonus roll is only granted on doubles
+  pendingCard: 'CHANCE' | 'COMMUNITY_CHEST' | null; // landed on a card tile; draw manually
   selectedSpaceIndex: number | null; // For info modal
   debtToPlayerId: string | null; // null means Bank
   debtAmount: number;
@@ -461,6 +462,7 @@ export function initializeGame(playersData: { id: string; name: string; isBot: b
     lastDice: [1, 1],
     doubleCount: 0,
     rolledThisTurn: false,
+    pendingCard: null,
     selectedSpaceIndex: null,
     debtToPlayerId: null,
     debtAmount: 0,
@@ -605,9 +607,11 @@ function evaluateLandingSpace(state: MonopolyState, pid: string, index: number):
   } else if (space.type === 'GO_TO_JAIL') {
     return sendPlayerToJail(state, pid);
   } else if (space.type === 'CHANCE') {
-    return drawFortuneCard(state, pid);
+    // Don't auto-draw — wait for the player to reach the tile and click the
+    // Fortune deck on the board (bots draw via playBotTurn).
+    return { ...state, phase: 'DRAW_CARD', pendingCard: 'CHANCE', log: [...state.log, `🎲 ${currentPlayer.name} landed on Fortune — draw a card.`] };
   } else if (space.type === 'COMMUNITY_CHEST') {
-    return drawCommunityChestCard(state, pid);
+    return { ...state, phase: 'DRAW_CARD', pendingCard: 'COMMUNITY_CHEST', log: [...state.log, `🎲 ${currentPlayer.name} landed on Treasury — draw a card.`] };
   }
 
   // Safe zones (GO, Jail Visiting, Free Parking)
@@ -696,6 +700,17 @@ function drawCommunityChestCard(state: MonopolyState, pid: string): MonopolyStat
   };
 
   return card.action(updated, pid);
+}
+
+// Action: draw the pending Fortune/Treasury card (player clicked the deck).
+export function drawPendingCard(state: MonopolyState): MonopolyState {
+  if (state.phase !== 'DRAW_CARD' || !state.pendingCard) return state;
+  const pid = state.players[state.currentPlayerIndex].id;
+  const kind = state.pendingCard;
+  // Reset to ROLL first; the card's action overrides the phase if it needs to
+  // (move -> BUY_OR_PASS, unaffordable -> BANKRUPTCY, go-to-jail -> ROLL, …).
+  const s: MonopolyState = { ...state, pendingCard: null, phase: 'ROLL' };
+  return kind === 'CHANCE' ? drawFortuneCard(s, pid) : drawCommunityChestCard(s, pid);
 }
 
 // Action: Buy current property
@@ -1252,6 +1267,12 @@ export function playBotTurn(state: MonopolyState): MonopolyState {
   // 2. Roll
   if (current.phase === 'ROLL') {
     current = rollDice(current);
+  }
+
+  // 2b. Bots draw their pending card automatically (may chain via advance-cards)
+  let cardGuard = 0;
+  while (current.phase === 'DRAW_CARD' && cardGuard++ < 6) {
+    current = drawPendingCard(current);
   }
 
   bot = getActivePlayer(current);
