@@ -1,23 +1,29 @@
-// Quick Draw — board UI. Live shared canvas in a wooden easel frame, letter-
-// tile word display, urgency timer, juiced guess chat and scoreboard, and a
-// full-board podium when the game ends. All drawing/guessing/host logic is
-// unchanged — this is the presentation layer.
+// Quick Draw — real team Pictionary board UI.
+//
+// Two teams race a token around a category-coloured track. On a team's turn
+// their artist draws the word matching the square's category and ONLY their
+// team guesses; a correct guess rolls the die and advances the token. On a
+// rainbow "All Play" square both teams' artists draw the SAME word at once on
+// their own easel and the first team to guess it advances. First team to the
+// finish wins. Drawing/guessing/host logic lives in the pure engine — this is
+// the presentation layer plus the shared-canvas plumbing.
 "use client"
 
 import { useEffect, useRef, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
-  PictionaryState, ROUND_SECONDS, getPlayerName, initializeGame,
-  submitGuess, endRound, nextRound,
+  PictionaryState, Team, Category, ROUND_SECONDS, BOARD_LENGTH,
+  TEAM_META, CATEGORY_META, getPlayerName, initializeGame, submitGuess,
+  timeout as timeoutTurn, nextTurn, isArtist, artistId, wordFor, teamMembers,
 } from "../lib/pictionaryEngine"
 import { Confetti } from "@/components/Confetti"
 import {
   Paintbrush, Eraser, Trash2, Pencil, Trophy, Users, Send, Crown,
-  RotateCcw, Share2, LogOut,
+  RotateCcw, Share2, LogOut, Flag,
 } from "lucide-react"
 
+interface DrawSeg { x0: number; y0: number; x1: number; y1: number; color: string; size: number; team?: Team }
 export interface LiveEvent { type: 'draw' | 'clear'; payload?: DrawSeg; t: number }
-interface DrawSeg { x0: number; y0: number; x1: number; y1: number; color: string; size: number }
 
 interface Props {
   state: PictionaryState
@@ -32,7 +38,8 @@ const CW = 900, CH = 620
 const COLORS = ['#0b1220', '#dc2626', '#f59e0b', '#16a34a', '#2563eb', '#7c3aed', '#ec4899', '#92400e']
 
 export default function PictionaryBoard({ state, currentPlayerId, onStateChange, onBroadcastAction, liveEvent }: Props) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  // One canvas per team; in a normal turn only the active team's easel renders.
+  const canvasRefs = useRef<Record<Team, HTMLCanvasElement | null>>({ red: null, blue: null })
   const drawing = useRef(false)
   const last = useRef<{ x: number; y: number } | null>(null)
   const [color, setColor] = useState('#0b1220')
@@ -44,11 +51,19 @@ export default function PictionaryBoard({ state, currentPlayerId, onStateChange,
   const chatEndRef = useRef<HTMLDivElement | null>(null)
 
   const me = state.players.find((p) => p.id === currentPlayerId)
-  const drawer = state.players[state.drawerIndex]
-  const isDrawer = drawer?.id === currentPlayerId
+  const myTeam: Team | null = me?.team ?? null
   const amHost = state.players[0]?.id === currentPlayerId
+  const iAmArtist = isArtist(state, currentPlayerId)
+  const isAllPlay = state.phase === 'ALLPLAY'
+  const isDrawingPhase = state.phase === 'DRAWING' || state.phase === 'ALLPLAY'
+  const myWord = wordFor(state, currentPlayerId) // non-null only when I'm an artist
+  const cat = CATEGORY_META[state.category]
+
   const remaining = state.roundEndsAt ? Math.max(0, Math.round((state.roundEndsAt - now) / 1000)) : 0
-  const urgent = state.phase === 'DRAWING' && remaining <= 10
+  const urgent = isDrawingPhase && remaining <= 10
+
+  // Which team can *I* guess for right now?
+  const canGuess = isDrawingPhase && !iAmArtist && !!myTeam && (isAllPlay || myTeam === state.activeTeam)
 
   const commit = (next: PictionaryState) => {
     onStateChange(next)
@@ -56,13 +71,12 @@ export default function PictionaryBoard({ state, currentPlayerId, onStateChange,
   }
 
   // ---- Canvas helpers -------------------------------------------------------
-  const ctx = () => canvasRef.current?.getContext('2d') ?? null
-  const clearCanvas = () => {
-    const c = ctx(); if (!c) return
+  const fillWhite = (canvas: HTMLCanvasElement | null) => {
+    const c = canvas?.getContext('2d'); if (!c) return
     c.fillStyle = '#ffffff'; c.fillRect(0, 0, CW, CH)
   }
-  const paint = (seg: DrawSeg) => {
-    const c = ctx(); if (!c) return
+  const paintOn = (team: Team, seg: DrawSeg) => {
+    const c = canvasRefs.current[team]?.getContext('2d'); if (!c) return
     c.strokeStyle = seg.color
     c.lineWidth = seg.size
     c.lineCap = 'round'; c.lineJoin = 'round'
@@ -72,15 +86,38 @@ export default function PictionaryBoard({ state, currentPlayerId, onStateChange,
     c.stroke()
   }
 
-  // Initialize / clear on new round.
-  useEffect(() => { clearCanvas() /* eslint-disable-next-line */ }, [state.roundNumber, state.phase === 'DRAWING'])
+  // Stable ref callbacks — a fresh closure each render would make React re-run
+  // the ref (and wipe the canvas) on every tick. Fill white on genuine attach.
+  const bindRed = useRef((el: HTMLCanvasElement | null) => {
+    canvasRefs.current.red = el
+    if (el) { const c = el.getContext('2d'); if (c) { c.fillStyle = '#ffffff'; c.fillRect(0, 0, CW, CH) } }
+  }).current
+  const bindBlue = useRef((el: HTMLCanvasElement | null) => {
+    canvasRefs.current.blue = el
+    if (el) { const c = el.getContext('2d'); if (c) { c.fillStyle = '#ffffff'; c.fillRect(0, 0, CW, CH) } }
+  }).current
+  const bindCanvas = (team: Team) => (team === 'red' ? bindRed : bindBlue)
 
-  // Apply remote draw/clear events (skip my own when I'm drawing locally).
+  // Wipe both easels at the start of every new turn.
+  const turnSig = `${state.activeTeam}-${state.category}-${state.roundEndsAt ?? 0}`
+  useEffect(() => {
+    fillWhite(canvasRefs.current.red)
+    fillWhite(canvasRefs.current.blue)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [turnSig])
+
+  // Apply remote draw/clear events. Skip echoes of my own team's strokes while
+  // I'm that team's artist (I already painted them locally).
   useEffect(() => {
     if (!liveEvent) return
-    if (isDrawer) return
-    if (liveEvent.type === 'clear') clearCanvas()
-    else if (liveEvent.payload) paint(liveEvent.payload)
+    const evTeam = liveEvent.payload?.team as Team | undefined
+    if (iAmArtist && evTeam && evTeam === myTeam) return
+    if (liveEvent.type === 'clear') {
+      if (evTeam) fillWhite(canvasRefs.current[evTeam])
+      else { fillWhite(canvasRefs.current.red); fillWhite(canvasRefs.current.blue) }
+    } else if (liveEvent.payload && evTeam) {
+      paintOn(evTeam, liveEvent.payload)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveEvent?.t])
 
@@ -90,46 +127,51 @@ export default function PictionaryBoard({ state, currentPlayerId, onStateChange,
     return () => clearInterval(i)
   }, [])
 
-  // Host drives round progression.
+  // Host drives turn progression (with a wall-clock timeout that survives
+  // hidden tabs — setTimeout still fires, unlike rAF).
   useEffect(() => {
-    if (!amHost || state.winnerId) return
-    if (state.phase === 'DRAWING' && state.roundEndsAt) {
-      if (Date.now() >= state.roundEndsAt) { commit(endRound(state)); return }
-      const t = setTimeout(() => commit(endRound(state)), Math.max(250, state.roundEndsAt - Date.now()))
+    if (!amHost || state.winningTeam) return
+    if (isDrawingPhase && state.roundEndsAt) {
+      if (Date.now() >= state.roundEndsAt) { commit(timeoutTurn(state)); return }
+      const t = setTimeout(() => commit(timeoutTurn(state)), Math.max(300, state.roundEndsAt - Date.now()))
       return () => clearTimeout(t)
     }
-    if (state.phase === 'ROUND_END') {
-      const t = setTimeout(() => commit(nextRound(state)), 4000)
+    if (state.phase === 'TURN_END') {
+      const t = setTimeout(() => commit(nextTurn(state)), 3600)
       return () => clearTimeout(t)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.phase, state.roundNumber, state.roundEndsAt, amHost, state.winnerId])
+  }, [state.phase, turnSig, amHost, state.winningTeam])
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [state.chat])
-  useEffect(() => { if (!state.winnerId) setEndDismissed(false) }, [state.winnerId])
+  useEffect(() => { if (!state.winningTeam) setEndDismissed(false) }, [state.winningTeam])
 
-  // ---- Pointer drawing (drawer only) ----------------------------------------
+  // ---- Pointer drawing (artist only, onto my own team's easel) --------------
+  const canDraw = iAmArtist && isDrawingPhase && !!myTeam
   const ptToNorm = (e: React.PointerEvent) => {
-    const r = canvasRef.current!.getBoundingClientRect()
+    const r = (e.currentTarget as HTMLCanvasElement).getBoundingClientRect()
     return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height }
   }
-  const canDraw = isDrawer && state.phase === 'DRAWING'
   const onDown = (e: React.PointerEvent) => {
     if (!canDraw) return
     drawing.current = true
     last.current = ptToNorm(e)
   }
   const onMove = (e: React.PointerEvent) => {
-    if (!canDraw || !drawing.current || !last.current) return
+    if (!canDraw || !drawing.current || !last.current || !myTeam) return
     const p = ptToNorm(e)
-    const seg: DrawSeg = { x0: last.current.x, y0: last.current.y, x1: p.x, y1: p.y, color: erase ? '#ffffff' : color, size: erase ? 26 : size }
-    paint(seg)
+    const seg: DrawSeg = { x0: last.current.x, y0: last.current.y, x1: p.x, y1: p.y, color: erase ? '#ffffff' : color, size: erase ? 26 : size, team: myTeam }
+    paintOn(myTeam, seg)
     onBroadcastAction?.('draw', seg)
     last.current = p
   }
   const onUp = () => { drawing.current = false; last.current = null }
 
-  const handleClear = () => { clearCanvas(); onBroadcastAction?.('clear', {}) }
+  const handleClear = () => {
+    if (!myTeam) return
+    fillWhite(canvasRefs.current[myTeam])
+    onBroadcastAction?.('clear', { team: myTeam })
+  }
 
   const sendGuess = (e: React.FormEvent) => {
     e.preventDefault()
@@ -143,44 +185,117 @@ export default function PictionaryBoard({ state, currentPlayerId, onStateChange,
     commit(initializeGame(state.players.map((p) => ({ id: p.id, name: p.name }))))
   }
 
-  // ---- Lobby (not enough players) -------------------------------------------
+  const lastCorrect = [...state.chat].reverse().find((c) => c.kind === 'correct')
+  const myTeamJustScored = state.phase === 'TURN_END' && lastCorrect?.team === myTeam
+
+  // ---- Lobby (need at least one player per team) ----------------------------
   if (state.phase === 'LOBBY') {
     return (
       <div className="flex h-full w-full items-center justify-center p-6" style={{ background: 'radial-gradient(1000px 700px at 50% 0%, #241a10, #140d08)' }}>
         <div className="glass max-w-sm rounded-2xl p-8 text-center">
           <Users className="mx-auto mb-3 h-12 w-12 text-[#d6a85c]" />
-          <h2 className="mb-2 text-xl font-black text-white" style={{ fontFamily: SERIF }}>Quick Draw needs 2+ players</h2>
-          <p className="text-sm text-white/50">Invite a friend to the party to start sketching and guessing!</p>
+          <h2 className="mb-2 text-xl font-black text-white" style={{ fontFamily: SERIF }}>Quick Draw needs two teams</h2>
+          <p className="text-sm text-white/50">Invite at least one more friend — players split into a Red and a Blue team and race to the finish.</p>
         </div>
       </div>
     )
   }
 
-  const sorted = [...state.players].sort((a, b) => b.score - a.score)
+  // ---- Board track ----------------------------------------------------------
+  const renderTrack = () => (
+    <div className="glass-strong rounded-2xl p-2.5">
+      <div className="mb-1.5 flex items-center justify-between px-1">
+        <span className="flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-white/40">
+          <Flag className="h-3 w-3 text-[#d6a85c]" /> The Board · race to the finish
+        </span>
+        <span className="flex items-center gap-2 text-[9px] font-bold">
+          {(['red', 'blue'] as Team[]).map((t) => (
+            <span key={t} className="flex items-center gap-1" style={{ color: TEAM_META[t].hex }}>
+              <span className="h-2.5 w-2.5 rounded-full" style={{ background: TEAM_META[t].hex }} />
+              {state.positions[t]}/{BOARD_LENGTH - 1}
+            </span>
+          ))}
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-1">
+        {state.board.map((c, i) => {
+          const m = CATEGORY_META[c]
+          const isFinish = i === BOARD_LENGTH - 1
+          const redHere = state.positions.red === i
+          const blueHere = state.positions.blue === i
+          return (
+            <div key={i}
+              className="relative grid h-6 w-6 flex-shrink-0 place-items-center rounded text-[8px] font-black"
+              style={{ background: `${m.hex}${isFinish ? '' : '33'}`, border: `1px solid ${m.hex}${isFinish ? '' : '55'}`, color: isFinish ? '#1a130c' : m.hex }}
+              title={`${i === 0 ? 'Start' : isFinish ? 'Finish' : `Square ${i}`} — ${m.label}`}>
+              {isFinish ? '🏁' : m.short}
+              {(redHere || blueHere) && (
+                <span className="absolute -top-1.5 left-1/2 flex -translate-x-1/2 gap-0.5">
+                  {redHere && <span className="h-2 w-2 rounded-full ring-1 ring-black/40" style={{ background: TEAM_META.red.hex }} />}
+                  {blueHere && <span className="h-2 w-2 rounded-full ring-1 ring-black/40" style={{ background: TEAM_META.blue.hex }} />}
+                </span>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+
+  // ---- A single easel for a team --------------------------------------------
+  const renderEasel = (team: Team, compact: boolean) => {
+    const artId = artistId(state, team)
+    const iDrawThis = canDraw && myTeam === team
+    return (
+      <div className="flex min-h-0 flex-1 flex-col items-center gap-1">
+        <div className="flex w-full items-center justify-center gap-1.5 text-[10px] font-black" style={{ color: TEAM_META[team].hex }}>
+          <span className="h-2.5 w-2.5 rounded-full" style={{ background: TEAM_META[team].hex }} />
+          {TEAM_META[team].name}
+          <span className="text-white/45">· {iDrawThis ? 'you draw' : `${getPlayerName(state, artId || '')} draws`}</span>
+        </div>
+        <div className="flex min-h-0 w-full flex-1 items-center justify-center">
+          <div className="rounded-xl p-1.5 shadow-2xl" style={{ background: 'linear-gradient(160deg,#4a3018,#2a1c0e)', border: `1px solid ${TEAM_META[team].hex}55`, maxHeight: '100%', maxWidth: '100%' }}>
+            <canvas
+              ref={bindCanvas(team)}
+              width={CW} height={CH}
+              onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={onUp}
+              className={`rounded-lg bg-white ${iDrawThis ? 'cursor-crosshair' : 'cursor-default'}`}
+              style={{ width: compact ? '100%' : undefined, maxHeight: '100%', maxWidth: '100%', aspectRatio: `${CW}/${CH}`, touchAction: 'none' }}
+            />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Ordered team standings for the end screen (winner first).
+  const teamRows = (['red', 'blue'] as Team[])
+    .map((t) => ({ id: t, name: TEAM_META[t].name, score: state.positions[t], isMe: t === myTeam }))
+    .sort((a, b) => b.score - a.score)
 
   return (
     <div className="relative flex h-full w-full select-none gap-2.5 overflow-hidden p-2 text-[#e9ddc5]"
       style={{ background: 'radial-gradient(1200px 800px at 50% 0%, #201710, #120d08)' }}>
-      <Confetti fire={!!me?.guessedThisRound && state.phase === 'DRAWING'} />
+      <Confetti fire={myTeamJustScored || state.winningTeam === myTeam} />
 
-      {/* LEFT: word header + canvas + tools */}
+      {/* LEFT: category header + track + easel(s) + tools */}
       <div className="flex min-w-0 flex-1 flex-col gap-2">
-        {/* Word tiles + artist + timer */}
+        {/* Category + word + timer */}
         <div className="glass-strong flex items-center gap-3 rounded-2xl px-4 py-2.5">
-          <span className="flex flex-shrink-0 items-center gap-1.5 rounded-full bg-[#d6a85c]/15 px-2.5 py-1 text-[10px] font-black text-[#e8c987]">
-            <Pencil className="h-3 w-3" /> {isDrawer ? 'You are drawing' : `${drawer?.name} is drawing`}
+          <span className="flex flex-shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-black"
+            style={{ background: `${cat.hex}22`, color: cat.hex }}>
+            <span className="text-sm leading-none">{cat.icon}</span> {isAllPlay ? 'ALL PLAY' : cat.label}
           </span>
           <div className="flex flex-1 flex-wrap items-center justify-center gap-1">
-            {(state.word ?? '').split('').map((ch, i) => (
+            {(state.card?.[state.category] ?? '').split('').map((ch, i) => (
               <span key={i}
                 className={`grid h-7 min-w-[22px] place-items-center rounded-md border px-1 text-sm font-black uppercase ${
-                  isDrawer ? 'border-[#d6a85c]/50 bg-[#d6a85c]/15 text-[#f0d9a4]' : 'border-white/15 bg-white/5 text-white/85'
+                  myWord ? 'border-[#d6a85c]/50 bg-[#d6a85c]/15 text-[#f0d9a4]' : 'border-white/15 bg-white/5 text-white/85'
                 }`}
                 style={{ fontFamily: SERIF }}>
-                {isDrawer ? ch : ch === ' ' ? ' ' : '_'}
+                {myWord ? ch : ch === ' ' ? ' ' : '_'}
               </span>
             ))}
-            {!state.word && <span className="text-xs italic text-white/35">round starting…</span>}
           </div>
           <motion.span
             key={urgent ? 'u' + remaining : 'calm'}
@@ -188,7 +303,7 @@ export default function PictionaryBoard({ state, currentPlayerId, onStateChange,
             transition={{ duration: 0.5 }}
             className={`w-12 flex-shrink-0 text-right font-mono text-lg font-black ${urgent ? 'text-red-400' : 'text-[#e0b56b]'}`}
           >
-            {state.phase === 'DRAWING' ? `${remaining}s` : ''}
+            {isDrawingPhase ? `${remaining}s` : ''}
           </motion.span>
         </div>
         {/* timer bar */}
@@ -197,21 +312,17 @@ export default function PictionaryBoard({ state, currentPlayerId, onStateChange,
             style={{ width: `${(remaining / ROUND_SECONDS) * 100}%` }} />
         </div>
 
-        {/* Canvas in a wooden easel frame */}
-        <div className="flex min-h-0 flex-1 items-center justify-center">
-          <div className="rounded-xl p-2 shadow-2xl" style={{ background: 'linear-gradient(160deg,#4a3018,#2a1c0e)', border: '1px solid #6b523055', maxHeight: '100%', maxWidth: '100%' }}>
-            <canvas
-              ref={canvasRef}
-              width={CW} height={CH}
-              onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={onUp}
-              className={`w-full rounded-lg bg-white ${canDraw ? 'cursor-crosshair' : 'cursor-default'}`}
-              style={{ maxHeight: 'calc(100% - 0px)', aspectRatio: `${CW}/${CH}`, touchAction: 'none' }}
-            />
-          </div>
+        {renderTrack()}
+
+        {/* Easel(s): one for a normal turn, both for All Play */}
+        <div className="flex min-h-0 flex-1 items-stretch justify-center gap-2">
+          {isAllPlay
+            ? (<>{renderEasel('red', true)}{renderEasel('blue', true)}</>)
+            : renderEasel(state.activeTeam, false)}
         </div>
 
-        {/* Tools (drawer only) */}
-        {isDrawer && state.phase === 'DRAWING' && (
+        {/* Tools (artist only) */}
+        {canDraw && (
           <div className="glass flex flex-wrap items-center gap-3 rounded-2xl px-3 py-2">
             <div className="flex gap-1.5">
               {COLORS.map((c) => (
@@ -236,35 +347,53 @@ export default function PictionaryBoard({ state, currentPlayerId, onStateChange,
               className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 hover:bg-rose-500/20">
               <Trash2 className="h-4 w-4 text-rose-400" />
             </button>
-            <span className="ml-auto flex items-center gap-1 text-[10px] text-[#d6a85c]"><Paintbrush className="h-3 w-3" /> You're the artist!</span>
+            <span className="ml-auto flex items-center gap-1 text-[10px] text-[#d6a85c]"><Paintbrush className="h-3 w-3" /> Draw the {cat.label}!</span>
           </div>
         )}
-        {!isDrawer && state.phase === 'DRAWING' && (
+        {isDrawingPhase && !iAmArtist && (
           <div className="glass rounded-2xl px-3 py-2 text-center">
-            <span className="text-xs text-white/55"><strong className="text-white">{drawer?.name}</strong> is drawing — type your guess! 👇</span>
+            <span className="text-xs text-white/55">
+              {canGuess
+                ? <>Your team is guessing — type it below! 👇</>
+                : isAllPlay
+                  ? <>All Play — both teams are drawing…</>
+                  : <><strong className="text-white">{TEAM_META[state.activeTeam].name}</strong> is playing this turn.</>}
+            </span>
           </div>
         )}
       </div>
 
-      {/* RIGHT: scoreboard + chat */}
+      {/* RIGHT: team standings + turn + chat */}
       <div className="flex w-72 flex-shrink-0 flex-col gap-2.5">
         <div className="glass-strong rounded-2xl p-3">
           <h4 className="mb-2 flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-white/40">
-            <Trophy className="h-3 w-3 text-[#d6a85c]" /> Scores · Round {state.roundNumber}/{state.totalRounds}
+            <Trophy className="h-3 w-3 text-[#d6a85c]" /> Teams {isAllPlay ? '· All Play!' : `· ${TEAM_META[state.activeTeam].name}'s turn`}
           </h4>
-          <div className="space-y-1">
-            {sorted.map((p, rank) => {
-              const isDr = state.players[state.drawerIndex]?.id === p.id
+          <div className="space-y-1.5">
+            {(['red', 'blue'] as Team[]).map((t) => {
+              const active = !isAllPlay && state.activeTeam === t
+              const members = teamMembers(state, t)
+              const artId = artistId(state, t)
               return (
-                <div key={p.id} className={`flex items-center justify-between rounded-lg px-2 py-1.5 ${p.id === currentPlayerId ? 'border border-[#d6a85c]/25 bg-[#d6a85c]/10' : 'bg-white/[0.03]'}`}>
-                  <span className="flex min-w-0 items-center gap-1.5 text-[11px] font-bold text-white">
-                    <span className="w-4 text-center text-[10px]">{['🥇', '🥈', '🥉'][rank] || rank + 1}</span>
-                    <span className="truncate">{p.name}</span>
-                    {isDr && <Pencil className="h-3 w-3 flex-shrink-0 text-[#d6a85c]" />}
-                    {p.guessedThisRound && <span className="text-[9px] text-emerald-400">✓</span>}
-                  </span>
-                  <motion.span key={p.score} initial={{ scale: 1.4, color: '#7fe0a8' }} animate={{ scale: 1, color: '#e0b56b' }}
-                    className="font-mono text-[11px] font-black">{p.score}</motion.span>
+                <div key={t} className={`rounded-lg px-2 py-1.5 ${active || isAllPlay ? 'ring-1' : ''} ${t === myTeam ? 'bg-white/[0.05]' : 'bg-white/[0.02]'}`}
+                  style={{ boxShadow: (active || isAllPlay) ? `inset 0 0 0 1px ${TEAM_META[t].hex}` : undefined }}>
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-[11px] font-black" style={{ color: TEAM_META[t].hex }}>
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ background: TEAM_META[t].hex }} />
+                      {TEAM_META[t].name}{t === myTeam && <span className="text-[8px] text-white/40">(you)</span>}
+                    </span>
+                    <span className="font-mono text-[11px] font-black" style={{ color: TEAM_META[t].hex }}>
+                      {state.positions[t]}/{BOARD_LENGTH - 1}
+                    </span>
+                  </div>
+                  <div className="mt-0.5 flex flex-wrap gap-x-1.5 text-[9px] text-white/45">
+                    {members.map((mem) => (
+                      <span key={mem.id} className={mem.id === artId && (active || isAllPlay) ? 'font-bold text-[#f0d9a4]' : ''}>
+                        {mem.id === artId && (active || isAllPlay) && <Pencil className="mr-0.5 inline h-2.5 w-2.5" />}
+                        {mem.name}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               )
             })}
@@ -282,32 +411,32 @@ export default function PictionaryBoard({ state, currentPlayerId, onStateChange,
                     : m.kind === 'system' ? 'italic text-[#e8c987]'
                     : 'text-white/70'
                   }`}>
-                  {m.kind === 'guess' ? <><span className="font-semibold text-white/40">{m.name}:</span> {m.text}</> : m.text}
+                  {m.kind === 'guess'
+                    ? <><span className="font-semibold" style={{ color: m.team ? TEAM_META[m.team].hex : 'rgba(255,255,255,.4)' }}>{m.name}:</span> {m.text}</>
+                    : m.text}
                 </motion.div>
               ))}
             </AnimatePresence>
             <div ref={chatEndRef} />
           </div>
-          {state.phase === 'DRAWING' && !isDrawer && me && !me.guessedThisRound && (
+          {isDrawingPhase && canGuess && (
             <form onSubmit={sendGuess} className="flex gap-2 border-t border-white/10 p-2">
-              <input value={guess} onChange={(e) => setGuess(e.target.value)} placeholder="Type your guess…"
+              <input value={guess} onChange={(e) => setGuess(e.target.value)} placeholder="Type your team's guess…"
                 className="h-9 flex-1 rounded-lg border border-white/10 bg-white/5 px-3 text-sm text-white placeholder:text-white/25 focus:border-[#d6a85c] focus:outline-none" />
               <button type="submit" className="h-9 rounded-lg bg-brand px-3 transition active:scale-95">
                 <Send className="h-4 w-4 text-white" />
               </button>
             </form>
           )}
-          {state.phase === 'DRAWING' && (isDrawer || me?.guessedThisRound) && (
-            <div className="border-t border-white/10 p-2 text-center text-[10px] text-white/40">
-              {isDrawer ? 'Keep drawing!' : 'You guessed it! 🎉'}
-            </div>
+          {isDrawingPhase && iAmArtist && (
+            <div className="border-t border-white/10 p-2 text-center text-[10px] text-white/40">You're the artist — keep drawing! ✏️</div>
           )}
         </div>
       </div>
 
-      {/* ROUND END overlay */}
+      {/* TURN END overlay */}
       <AnimatePresence>
-        {state.phase === 'ROUND_END' && (
+        {state.phase === 'TURN_END' && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-black/60 backdrop-blur-sm">
             <motion.div initial={{ scale: 0.9, y: 10 }} animate={{ scale: 1, y: 0 }}
@@ -315,24 +444,26 @@ export default function PictionaryBoard({ state, currentPlayerId, onStateChange,
               style={{ background: 'linear-gradient(160deg,#2a2013,#211a10)' }}>
               <p className="text-[10px] font-black uppercase tracking-widest text-white/40">The word was</p>
               <h2 className="my-1 text-3xl font-black capitalize text-[#f0d9a4]" style={{ fontFamily: SERIF }}>
-                {state.word ?? state.chat.filter(c => c.kind === 'system').slice(-1)[0]?.text.match(/"(.+)"/)?.[1] ?? ''}
+                {state.card?.[state.category] ?? ''}
               </h2>
-              <p className="text-xs text-white/55">{state.correctCount} {state.correctCount === 1 ? 'player' : 'players'} guessed it</p>
+              {lastCorrect
+                ? <p className="text-xs font-bold" style={{ color: lastCorrect.team ? TEAM_META[lastCorrect.team].hex : '#fff' }}>{lastCorrect.text}</p>
+                : <p className="text-xs text-white/55">No one guessed it — no advance.</p>}
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* GAME OVER — full-board podium */}
+      {/* GAME OVER — team podium */}
       <AnimatePresence>
-        {state.winnerId && !endDismissed && (
+        {state.winningTeam && !endDismissed && (
           <SketchEndScreen
-            title="Quick Draw — Gallery Closed"
-            winnerName={getPlayerName(state, state.winnerId)}
-            youWon={state.winnerId === currentPlayerId}
-            rows={sorted.map((p) => ({ id: p.id, name: p.name, score: p.score, isMe: p.id === currentPlayerId }))}
+            title="Quick Draw — Race Finished"
+            winnerName={TEAM_META[state.winningTeam].name}
+            youWon={state.winningTeam === myTeam}
+            rows={teamRows}
             shareTitle="Quick Draw — Dice Alley"
-            shareLead="🎨 Quick Draw on Dice Alley"
+            shareLead="🎨 Team Pictionary on Dice Alley"
             canRematch={!!me}
             onRematch={handleRematch}
             onDismiss={() => setEndDismissed(true)}
@@ -340,13 +471,13 @@ export default function PictionaryBoard({ state, currentPlayerId, onStateChange,
         )}
       </AnimatePresence>
       <AnimatePresence>
-        {state.winnerId && endDismissed && (
+        {state.winningTeam && endDismissed && (
           <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
             className="absolute inset-x-0 top-4 z-20 flex justify-center">
             <button onClick={() => setEndDismissed(false)}
               className="flex items-center gap-2 rounded-full border border-[#d6a85c]/50 bg-black/70 px-5 py-2 text-sm font-black text-[#f0d9a4] backdrop-blur transition hover:bg-black/85"
               style={{ fontFamily: SERIF }}>
-              <Crown className="h-4 w-4" /> {getPlayerName(state, state.winnerId)} wins! — show results
+              <Crown className="h-4 w-4" /> {TEAM_META[state.winningTeam].name} wins! — show results
             </button>
           </motion.div>
         )}

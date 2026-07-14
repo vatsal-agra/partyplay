@@ -80,11 +80,11 @@ export const GAME_RULES: Record<string, GameRules> = {
   pictionary: {
     title: "Quick Draw — How to Play",
     sections: [
-      { heading: "1. Object of the Game", body: "Score points by drawing your secret word well enough for others to guess it — and by guessing other players' drawings fast." },
-      { heading: "2. The Drawer", body: "Each round one player is the drawer. Only you can see the secret word; sketch it on the shared canvas — no letters or numbers allowed." },
-      { heading: "3. Guessing", body: "Everyone else types guesses into the chat. The faster you guess correctly, the more points you earn." },
-      { heading: "4. Scoring", body: "Quicker correct guesses score more. The drawer earns points each time someone guesses their drawing." },
-      { heading: "5. Winning", body: "Players take turns drawing. The highest total score after all rounds wins." },
+      { heading: "1. Object of the Game", body: "It's real team Pictionary. Players split into a Red team and a Blue team, and each team races its token across the board to the finish square." },
+      { heading: "2. Your Turn", body: "On your team's turn one team-mate is the artist. The colour of your team's square picks a category on the card — Person, Object, Action or Difficult — and the artist sketches only that word. No letters or numbers." },
+      { heading: "3. Guessing & Moving", body: "Only your team may guess your artist's drawing, typed into chat before time runs out. Guess it and your team rolls the die and advances that many squares; miss and you stay put. Then it's the other team's turn." },
+      { heading: "4. All Play", body: "Land on a rainbow square and it's All Play: both teams' artists draw the SAME word at the same time on their own easel, and the first team to guess it advances." },
+      { heading: "5. Winning", body: "The first team to reach the finish square wins Quick Draw." },
     ],
   },
   scribbleio: {

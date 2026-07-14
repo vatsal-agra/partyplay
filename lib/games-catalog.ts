@@ -75,7 +75,7 @@ export const GAMES_CATALOG: Game[] = [
   {
     id: 'pictionary',
     name: 'Quick Draw',
-    description: 'Draw clues for your team to guess in this classic drawing and guessing game.',
+    description: 'Real team Pictionary — two teams race the board, sketch your category card, first team to the finish wins.',
     image: '/images/games/quick-draw.png',
     minPlayers: 4,
     maxPlayers: 8,

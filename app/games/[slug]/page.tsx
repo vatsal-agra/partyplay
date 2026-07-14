@@ -498,8 +498,8 @@ export default function GamePlayPage() {
       .on('broadcast', { event: 'draw' }, ({ payload }) => {
         setLiveEvent({ type: 'draw', payload, t: Date.now() })
       })
-      .on('broadcast', { event: 'clear' }, () => {
-        setLiveEvent({ type: 'clear', t: Date.now() })
+      .on('broadcast', { event: 'clear' }, ({ payload }) => {
+        setLiveEvent({ type: 'clear', payload, t: Date.now() })
       })
       .on('broadcast', { event: 'request_sync' }, () => {
         console.log('Received request_sync from player. monopolyStateRef.current:', monopolyStateRef.current)

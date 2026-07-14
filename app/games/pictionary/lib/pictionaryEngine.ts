@@ -1,189 +1,296 @@
-// Quick Draw — game engine (pure state; no rendering, no side effects).
+// Quick Draw — real team Pictionary engine (pure state; no side effects).
 //
-// Real-time multiplayer drawing & guessing. Each round one player is the
-// drawer with a secret word and sketches it on a shared canvas; everyone else
-// races to guess in chat. Faster correct guesses score more; the drawer earns
-// points when others guess their drawing. Highest score after all rounds wins.
+// Two teams race a token around a board of category-coloured squares. On a
+// team's turn their current artist draws the word matching their square's
+// category while only their team guesses; a correct guess rolls the die and
+// advances the token. Rainbow "All Play" squares pit both teams' artists
+// drawing the SAME word at once — the first team to guess it advances. First
+// team to reach FINISH wins.
 //
-// Note: the secret word lives in broadcast state and is gated by the UI (only
-// the drawer sees it). True secrecy would need a server authority — acceptable
-// for casual play, same trade-off as the other hidden-info games here.
+// Secret words live in broadcast state, gated by the UI (only the drawing
+// artist(s) see them) — the same hidden-info trade-off as the other games.
 
-export const ROUND_SECONDS = 75
-const ROTATIONS = 2           // how many times each player draws
+export const ROUND_SECONDS = 70
 
-export type Phase = 'LOBBY' | 'DRAWING' | 'ROUND_END' | 'GAME_OVER'
+export type Team = "red" | "blue"
+export type Category = "PERSON" | "OBJECT" | "ACTION" | "DIFFICULT" | "ALLPLAY"
+export type Phase = "LOBBY" | "DRAWING" | "ALLPLAY" | "TURN_END" | "GAME_OVER"
+
+export const TEAMS: Team[] = ["red", "blue"]
+
+export const TEAM_META: Record<Team, { name: string; hex: string }> = {
+  red: { name: "Red Team", hex: "#e0524a" },
+  blue: { name: "Blue Team", hex: "#4a7fe0" },
+}
+
+export const CATEGORY_META: Record<Category, { label: string; short: string; hex: string; icon: string }> = {
+  PERSON: { label: "Person / Place / Animal", short: "P", hex: "#e8b53a", icon: "🧍" },
+  OBJECT: { label: "Object", short: "O", hex: "#3fa356", icon: "📦" },
+  ACTION: { label: "Action", short: "A", hex: "#4a7fe0", icon: "🎬" },
+  DIFFICULT: { label: "Difficult", short: "D", hex: "#c2452e", icon: "🎲" },
+  ALLPLAY: { label: "All Play", short: "AP", hex: "#a24fb0", icon: "🌈" },
+}
 
 export interface PictionaryPlayer {
   id: string
   name: string
-  score: number
-  guessedThisRound: boolean
+  team: Team
+}
+
+export interface Card {
+  PERSON: string
+  OBJECT: string
+  ACTION: string
+  DIFFICULT: string
+  ALLPLAY: string
 }
 
 export interface ChatEntry {
   id: string
   playerId: string
   name: string
+  team: Team | null
   text: string
-  kind: 'guess' | 'correct' | 'system'
+  kind: "guess" | "correct" | "system"
 }
 
 export interface PictionaryState {
   players: PictionaryPlayer[]
-  drawerIndex: number
-  word: string | null            // secret; UI reveals only to the drawer
+  board: Category[]                 // square index -> category; last index is FINISH
+  positions: Record<Team, number>   // token position per team (0 = start)
+  artistIndex: Record<Team, number> // rotating drawer within each team
+  activeTeam: Team
   phase: Phase
-  roundNumber: number            // 1-based; counts every drawer turn
-  totalRounds: number
-  roundEndsAt: number | null     // epoch ms
-  correctCount: number           // correct guessers this round
+  card: Card | null                 // current card (secret words)
+  category: Category                // category to draw this turn
+  roundEndsAt: number | null        // epoch ms
+  lastRoll: number | null
   chat: ChatEntry[]
-  winnerId: string | null
+  winningTeam: Team | null
+  winnerId: string | null           // kept for the shared summary layer (first player of winning team)
   log: string[]
 }
 
-// ---- Word bank (generic, original — no trademarked terms) -------------------
-export const WORDS = [
-  'apple', 'rocket', 'elephant', 'guitar', 'mountain', 'pizza', 'robot',
-  'rainbow', 'butterfly', 'castle', 'octopus', 'volcano', 'snowman', 'bicycle',
-  'lighthouse', 'dragon', 'umbrella', 'cactus', 'astronaut', 'hamburger',
-  'penguin', 'anchor', 'campfire', 'tornado', 'jellyfish', 'windmill',
-  'telescope', 'sandcastle', 'parachute', 'kangaroo', 'pineapple', 'ladder',
-  'spider', 'tractor', 'igloo', 'mermaid', 'scarecrow', 'hammock', 'compass',
-  'waterfall', 'beehive', 'submarine', 'fireworks', 'treasure', 'skateboard',
-  'dinosaur', 'helicopter', 'snail', 'cupcake', 'lantern', 'tent', 'whale',
-  'crocodile', 'sunflower', 'wizard', 'pirate', 'rollercoaster', 'violin',
-  'mushroom', 'igloo', 'snowflake', 'kite', 'cactus', 'dolphin',
+// ---- Card bank (each card: one word per category — generic, original) -------
+export const CARDS: Card[] = [
+  { PERSON: "astronaut", OBJECT: "umbrella", ACTION: "juggling", DIFFICULT: "gravity", ALLPLAY: "volcano" },
+  { PERSON: "wizard", OBJECT: "telescope", ACTION: "sneezing", DIFFICULT: "echo", ALLPLAY: "lighthouse" },
+  { PERSON: "pirate", OBJECT: "anchor", ACTION: "tiptoe", DIFFICULT: "loyalty", ALLPLAY: "waterfall" },
+  { PERSON: "kangaroo", OBJECT: "hammock", ACTION: "yawning", DIFFICULT: "silence", ALLPLAY: "rainbow" },
+  { PERSON: "mermaid", OBJECT: "compass", ACTION: "shivering", DIFFICULT: "jealousy", ALLPLAY: "fireworks" },
+  { PERSON: "scarecrow", OBJECT: "lantern", ACTION: "sculpting", DIFFICULT: "freedom", ALLPLAY: "tornado" },
+  { PERSON: "penguin", OBJECT: "ladder", ACTION: "whispering", DIFFICULT: "patience", ALLPLAY: "castle" },
+  { PERSON: "dragon", OBJECT: "kite", ACTION: "surfing", DIFFICULT: "courage", ALLPLAY: "windmill" },
+  { PERSON: "octopus", OBJECT: "violin", ACTION: "yodeling", DIFFICULT: "memory", ALLPLAY: "carousel" },
+  { PERSON: "cowboy", OBJECT: "cactus", ACTION: "hiccuping", DIFFICULT: "wisdom", ALLPLAY: "campfire" },
+  { PERSON: "ballerina", OBJECT: "trophy", ACTION: "sprinting", DIFFICULT: "dizzy", ALLPLAY: "beehive" },
+  { PERSON: "chef", OBJECT: "kettle", ACTION: "stretching", DIFFICULT: "invisible", ALLPLAY: "submarine" },
+  { PERSON: "robot", OBJECT: "toothbrush", ACTION: "shrugging", DIFFICULT: "future", ALLPLAY: "treasure" },
+  { PERSON: "vampire", OBJECT: "candle", ACTION: "floating", DIFFICULT: "shadow", ALLPLAY: "snowman" },
+  { PERSON: "farmer", OBJECT: "wheelbarrow", ACTION: "digging", DIFFICULT: "harvest", ALLPLAY: "tent" },
+  { PERSON: "clown", OBJECT: "balloon", ACTION: "tripping", DIFFICULT: "chaos", ALLPLAY: "rollercoaster" },
+  { PERSON: "knight", OBJECT: "shield", ACTION: "bowing", DIFFICULT: "honor", ALLPLAY: "drawbridge" },
+  { PERSON: "surfer", OBJECT: "surfboard", ACTION: "paddling", DIFFICULT: "balance", ALLPLAY: "hurricane" },
+  { PERSON: "detective", OBJECT: "magnifier", ACTION: "sniffing", DIFFICULT: "mystery", ALLPLAY: "mansion" },
+  { PERSON: "gardener", OBJECT: "watering can", ACTION: "pruning", DIFFICULT: "growth", ALLPLAY: "greenhouse" },
 ]
+
+// ---- Board layout -----------------------------------------------------------
+// A repeating category ribbon with an All-Play every few squares, ending on
+// FINISH (represented by the ALLPLAY tile at the last index).
+const BOARD_PATTERN: Category[] = [
+  "PERSON", "OBJECT", "ACTION", "DIFFICULT", "ALLPLAY",
+  "OBJECT", "ACTION", "PERSON", "DIFFICULT", "ALLPLAY",
+  "ACTION", "PERSON", "OBJECT", "DIFFICULT",
+]
+export const BOARD_LENGTH = 30 // squares 0..29; index 29 = FINISH
+
+function buildBoard(): Category[] {
+  const b: Category[] = []
+  for (let i = 0; i < BOARD_LENGTH - 1; i++) b.push(BOARD_PATTERN[i % BOARD_PATTERN.length])
+  b.push("ALLPLAY") // FINISH is a rainbow square
+  return b
+}
 
 const clone = (s: PictionaryState): PictionaryState => JSON.parse(JSON.stringify(s))
 const pushLog = (s: PictionaryState, m: string) => { s.log = [...s.log, m].slice(-60) }
 
 export function getPlayerName(state: PictionaryState, id: string): string {
-  return state.players.find((p) => p.id === id)?.name || 'Unknown'
+  return state.players.find((p) => p.id === id)?.name || "Unknown"
 }
 
 export function normalize(t: string): string {
-  return t.toLowerCase().trim().replace(/[^a-z0-9]/g, '')
+  return t.toLowerCase().trim().replace(/[^a-z0-9]/g, "")
 }
 
-function pickWord(exclude?: string | null): string {
-  let w = WORDS[Math.floor(Math.random() * WORDS.length)]
-  let guard = 0
-  while (w === exclude && guard++ < 10) w = WORDS[Math.floor(Math.random() * WORDS.length)]
-  return w
+export function teamOf(state: PictionaryState, playerId: string): Team | null {
+  return state.players.find((p) => p.id === playerId)?.team ?? null
 }
+
+export function teamMembers(state: PictionaryState, team: Team): PictionaryPlayer[] {
+  return state.players.filter((p) => p.team === team)
+}
+
+// The player currently drawing for a team (rotates each of that team's turns).
+export function artistId(state: PictionaryState, team: Team): string | null {
+  const members = teamMembers(state, team)
+  if (members.length === 0) return null
+  return members[state.artistIndex[team] % members.length].id
+}
+
+// Is this player one of the artists who should see the word right now?
+export function isArtist(state: PictionaryState, playerId: string): boolean {
+  if (state.phase === "DRAWING") return artistId(state, state.activeTeam) === playerId
+  if (state.phase === "ALLPLAY") return TEAMS.some((t) => artistId(state, t) === playerId)
+  return false
+}
+
+// The secret word a given artist is drawing (null if they shouldn't see one).
+export function wordFor(state: PictionaryState, playerId: string): string | null {
+  if (!state.card || !isArtist(state, playerId)) return null
+  return state.card[state.category]
+}
+
+function pickCard(prev: Card | null): Card {
+  let c = CARDS[Math.floor(Math.random() * CARDS.length)]
+  let guard = 0
+  while (prev && c.PERSON === prev.PERSON && guard++ < 8) c = CARDS[Math.floor(Math.random() * CARDS.length)]
+  return c
+}
+const rollDie = () => 1 + Math.floor(Math.random() * 6)
 
 // ---- Lifecycle --------------------------------------------------------------
 
 export function initializeGame(playersData: { id: string; name: string; isBot?: boolean }[]): PictionaryState {
-  const players: PictionaryPlayer[] = playersData.map((p) => ({
-    id: p.id, name: p.name, score: 0, guessedThisRound: false,
+  // Split into two balanced teams by join order.
+  const players: PictionaryPlayer[] = playersData.map((p, i) => ({
+    id: p.id, name: p.name, team: i % 2 === 0 ? "red" : "blue",
   }))
 
   const base: PictionaryState = {
     players,
-    drawerIndex: 0,
-    word: null,
-    phase: 'LOBBY',
-    roundNumber: 0,
-    totalRounds: players.length * ROTATIONS,
+    board: buildBoard(),
+    positions: { red: 0, blue: 0 },
+    artistIndex: { red: 0, blue: 0 },
+    activeTeam: "red",
+    phase: "LOBBY",
+    card: null,
+    category: "PERSON",
     roundEndsAt: null,
-    correctCount: 0,
+    lastRoll: null,
     chat: [],
+    winningTeam: null,
     winnerId: null,
-    log: ['🎨 Welcome to Quick Draw! Sketch the word and let friends guess.'],
+    log: ["🎨 Welcome to Quick Draw — real team Pictionary! Split into two teams and race to the finish."],
   }
 
-  if (players.length >= 2) return beginRound(base, 0, 1)
+  // Need at least one player on each team to start.
+  if (teamMembers(base, "red").length >= 1 && teamMembers(base, "blue").length >= 1) {
+    return beginTurn(base, "red")
+  }
   return base
 }
 
-function beginRound(state: PictionaryState, drawerIndex: number, roundNumber: number): PictionaryState {
+// Start a team's drawing turn. If the team's square is All-Play, both teams draw.
+function beginTurn(state: PictionaryState, team: Team): PictionaryState {
   const s = clone(state)
-  s.drawerIndex = drawerIndex
-  s.roundNumber = roundNumber
-  s.word = pickWord(s.word)
-  s.phase = 'DRAWING'
+  s.activeTeam = team
+  const square = s.positions[team]
+  const category = s.board[square] || "PERSON"
+  s.category = category
+  s.card = pickCard(s.card)
+  s.lastRoll = null
   s.roundEndsAt = Date.now() + ROUND_SECONDS * 1000
-  s.correctCount = 0
-  s.players.forEach((p) => { p.guessedThisRound = false })
-  pushLog(s, `✏️ Round ${roundNumber}/${s.totalRounds} — ${s.players[drawerIndex].name} is drawing.`)
-  return s
-}
-
-// Host-only: advance to the next drawer (or end the game).
-export function nextRound(state: PictionaryState): PictionaryState {
-  if (state.phase === 'GAME_OVER') return state
-  if (state.roundNumber >= state.totalRounds) {
-    const s = clone(state)
-    s.phase = 'GAME_OVER'
-    const winner = [...s.players].sort((a, b) => b.score - a.score)[0]
-    s.winnerId = winner?.id ?? null
-    s.word = null
-    pushLog(s, `🏆 ${winner?.name} wins Quick Draw with ${winner?.score} points!`)
-    return s
+  if (category === "ALLPLAY") {
+    s.phase = "ALLPLAY"
+    pushLog(s, `🌈 All Play! Both teams draw "${CATEGORY_META.ALLPLAY.label}" — first team to guess advances.`)
+  } else {
+    s.phase = "DRAWING"
+    const artist = artistId(s, team)
+    pushLog(s, `✏️ ${TEAM_META[team].name}: ${getPlayerName(s, artist || "")} is drawing a ${CATEGORY_META[category].label}.`)
   }
-  const nextDrawer = (state.drawerIndex + 1) % state.players.length
-  return beginRound(state, nextDrawer, state.roundNumber + 1)
+  return s
 }
 
-// Host-only: close the current round (timer expired or everyone guessed).
-export function endRound(state: PictionaryState): PictionaryState {
-  if (state.phase !== 'DRAWING') return state
+// Host-only: the timer expired without a correct guess.
+export function timeout(state: PictionaryState): PictionaryState {
+  if (state.phase !== "DRAWING" && state.phase !== "ALLPLAY") return state
   const s = clone(state)
-  s.phase = 'ROUND_END'
+  s.phase = "TURN_END"
   s.roundEndsAt = null
-  s.chat = [...s.chat, {
-    id: `sys-${Date.now()}`, playerId: 'system', name: 'system', kind: 'system' as const,
-    text: `The word was "${s.word}".`,
-  }].slice(-80)
-  pushLog(s, `⏱️ Round over — the word was "${s.word}".`)
+  s.chat = [...s.chat, sysMsg(`Time! The word was "${s.card ? s.card[s.category] : "?"}".`)].slice(-80)
+  pushLog(s, `⏱️ Time up — the word was "${s.card ? s.card[s.category] : "?"}".`)
   return s
+}
+
+// Host-only: advance to the next turn after a turn ends.
+export function nextTurn(state: PictionaryState): PictionaryState {
+  if (state.phase === "GAME_OVER") return state
+  const s = clone(state)
+  // Rotate the artist for whichever team(s) just drew, then hand off.
+  if (s.phase === "TURN_END" || s.phase === "DRAWING" || s.phase === "ALLPLAY") {
+    // The team that just had the turn rotates its artist; on all-play both do.
+    if (s.category === "ALLPLAY") TEAMS.forEach((t) => { s.artistIndex[t] += 1 })
+    else s.artistIndex[s.activeTeam] += 1
+  }
+  const next: Team = s.activeTeam === "red" ? "blue" : "red"
+  return beginTurn(s, next)
+}
+
+function sysMsg(text: string): ChatEntry {
+  return { id: `sys-${Math.random().toString(36).slice(2)}`, playerId: "system", name: "system", team: null, kind: "system", text }
+}
+
+function advanceAndCheckWin(s: PictionaryState, team: Team, steps: number): void {
+  const target = Math.min(BOARD_LENGTH - 1, s.positions[team] + steps)
+  s.positions[team] = target
+  if (target >= BOARD_LENGTH - 1) {
+    s.phase = "GAME_OVER"
+    s.winningTeam = team
+    s.winnerId = teamMembers(s, team)[0]?.id ?? null
+    s.roundEndsAt = null
+    pushLog(s, `🏆 ${TEAM_META[team].name} reached the finish and wins Quick Draw!`)
+  }
 }
 
 // ---- Guessing ---------------------------------------------------------------
 
 export function submitGuess(state: PictionaryState, playerId: string, text: string): PictionaryState {
-  if (state.phase !== 'DRAWING' || !state.word) return state
-  const player = state.players.find((p) => p.id === playerId)
-  const isDrawer = state.players[state.drawerIndex].id === playerId
-  if (!player || isDrawer || player.guessedThisRound) return state
+  if (state.phase !== "DRAWING" && state.phase !== "ALLPLAY") return state
+  if (!state.card) return state
+  const guesser = state.players.find((p) => p.id === playerId)
+  if (!guesser) return state
+  // Artists can't guess their own drawing.
+  if (isArtist(state, playerId)) return state
+  // In a normal turn only the active team may guess; in all-play, anyone may.
+  if (state.phase === "DRAWING" && guesser.team !== state.activeTeam) return state
 
   const s = clone(state)
   const me = s.players.find((p) => p.id === playerId)!
-  const correct = normalize(text) === normalize(s.word!)
+  const answer = s.card![s.category]
+  const correct = normalize(text) === normalize(answer)
 
-  if (correct) {
-    const remaining = Math.max(0, Math.round(((s.roundEndsAt ?? Date.now()) - Date.now()) / 1000))
-    const points = Math.max(25, remaining)              // faster guess scores more
-    me.score += points
-    me.guessedThisRound = true
-    s.correctCount += 1
-    s.players[s.drawerIndex].score += 20                // drawer reward per correct guess
-    s.chat = [...s.chat, {
-      id: `c-${Date.now()}-${playerId}`, playerId, name: me.name, kind: 'correct' as const,
-      text: `${me.name} guessed the word! (+${points})`,
-    }].slice(-80)
-    pushLog(s, `✅ ${me.name} guessed it (+${points}).`)
+  if (!correct) {
+    s.chat = [...s.chat, { id: `c-${Date.now()}-${playerId}`, playerId, name: me.name, team: me.team, kind: "guess" as const, text: text.slice(0, 60) }].slice(-80)
+    return s
+  }
 
-    // Everyone (besides the drawer) has guessed — end early.
-    const guessers = s.players.filter((p, i) => i !== s.drawerIndex)
-    if (guessers.every((p) => p.guessedThisRound)) {
-      return endRound(s)
-    }
-  } else {
-    s.chat = [...s.chat, {
-      id: `c-${Date.now()}-${playerId}`, playerId, name: me.name, kind: 'guess' as const,
-      text: text.slice(0, 60),
-    }].slice(-80)
+  // Correct! The guesser's team advances by a die roll.
+  const winTeam = me.team
+  const roll = rollDie()
+  s.lastRoll = roll
+  s.chat = [...s.chat, { id: `c-${Date.now()}-${playerId}`, playerId, name: me.name, team: me.team, kind: "correct" as const, text: `${me.name} guessed "${answer}"! ${TEAM_META[winTeam].name} rolls ${roll}.` }].slice(-80)
+  pushLog(s, `✅ ${me.name} got it — ${TEAM_META[winTeam].name} advances ${roll}.`)
+  advanceAndCheckWin(s, winTeam, roll)
+  if (s.phase !== "GAME_OVER") {
+    s.phase = "TURN_END"
+    s.roundEndsAt = null
   }
   return s
 }
 
-// Convenience for the UI: masked word hint (underscores per letter).
+// Masked hint for guessers (underscores per letter, spaces preserved).
 export function maskedWord(word: string | null): string {
-  if (!word) return ''
-  return word.split('').map((c) => (c === ' ' ? '  ' : '_')).join(' ')
+  if (!word) return ""
+  return word.split("").map((c) => (c === " " ? "  " : "_")).join(" ")
 }
