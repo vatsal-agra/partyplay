@@ -1,14 +1,20 @@
-// Doodle Dash — board UI. Word-choice phase, live shared canvas, progressive
-// letter hints, free-for-all guess chat, and host-driven round flow.
+// Doodle Dash — board UI. Word-choice cards, live shared canvas in a wooden
+// frame, gold hint letters that flip in as the clock runs, juiced chat and
+// scoreboard, and a full-board podium at game end. All engine/host logic is
+// unchanged — this is the presentation layer.
 "use client"
 
 import { useEffect, useRef, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
-  DoodleState, ROUND_SECONDS, maskedWord, maxHints, getPlayerName,
+  DoodleState, ROUND_SECONDS, maxHints, getPlayerName, initializeGame,
   chooseWord, submitGuess, revealHint, endRound, nextRound,
 } from "../lib/doodleEngine"
-import { Paintbrush, Eraser, Trash2, Pencil, Trophy, Users, Send, Crown } from "lucide-react"
+import { SketchEndScreen } from "../../pictionary/components/PictionaryBoard"
+import { Confetti } from "@/components/Confetti"
+import {
+  Paintbrush, Eraser, Trash2, Pencil, Trophy, Users, Send, Crown,
+} from "lucide-react"
 
 export interface LiveEvent { type: 'draw' | 'clear'; payload?: DrawSeg; t: number }
 interface DrawSeg { x0: number; y0: number; x1: number; y1: number; color: string; size: number }
@@ -21,6 +27,7 @@ interface Props {
   liveEvent?: LiveEvent | null
 }
 
+const SERIF = "var(--font-display), Georgia, serif"
 const CW = 900, CH = 600
 const COLORS = ['#0b1220', '#dc2626', '#f59e0b', '#16a34a', '#2563eb', '#7c3aed', '#ec4899', '#92400e']
 
@@ -33,6 +40,7 @@ export default function DoodleDashBoard({ state, currentPlayerId, onStateChange,
   const [erase, setErase] = useState(false)
   const [guess, setGuess] = useState('')
   const [now, setNow] = useState(Date.now())
+  const [endDismissed, setEndDismissed] = useState(false)
   const chatEndRef = useRef<HTMLDivElement | null>(null)
 
   const commit = (next: DoodleState) => { onStateChange(next); onBroadcastAction?.('sync_state', next) }
@@ -42,6 +50,7 @@ export default function DoodleDashBoard({ state, currentPlayerId, onStateChange,
   const isDrawer = drawer?.id === currentPlayerId
   const amHost = state.players[0]?.id === currentPlayerId
   const remaining = state.roundEndsAt ? Math.max(0, Math.round((state.roundEndsAt - now) / 1000)) : 0
+  const urgent = state.phase === 'DRAWING' && remaining <= 10
 
   // ---- Canvas ---------------------------------------------------------------
   const ctx = () => canvasRef.current?.getContext('2d') ?? null
@@ -61,6 +70,7 @@ export default function DoodleDashBoard({ state, currentPlayerId, onStateChange,
 
   useEffect(() => { const i = setInterval(() => setNow(Date.now()), 400); return () => clearInterval(i) }, [])
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [state.chat])
+  useEffect(() => { if (!state.winnerId) setEndDismissed(false) }, [state.winnerId])
 
   // ---- Host: word-choice timeout + round end ---------------------------------
   useEffect(() => {
@@ -111,13 +121,17 @@ export default function DoodleDashBoard({ state, currentPlayerId, onStateChange,
     commit(submitGuess(state, currentPlayerId, text)); setGuess('')
   }
 
+  const handleRematch = () => {
+    commit(initializeGame(state.players.map((p) => ({ id: p.id, name: p.name }))))
+  }
+
   if (state.phase === 'LOBBY') {
     return (
-      <div className="flex w-full h-full items-center justify-center bg-slate-950 p-6">
-        <div className="text-center max-w-sm">
-          <Users className="w-12 h-12 text-aqua-400 mx-auto mb-3" />
-          <h2 className="text-xl font-black text-white mb-2">Doodle Dash needs 2+ players</h2>
-          <p className="text-sm text-slate-400">Invite friends to the party to start doodling!</p>
+      <div className="flex h-full w-full items-center justify-center p-6" style={{ background: 'radial-gradient(1000px 700px at 50% 0%, #241a10, #140d08)' }}>
+        <div className="glass max-w-sm rounded-2xl p-8 text-center">
+          <Users className="mx-auto mb-3 h-12 w-12 text-[#d6a85c]" />
+          <h2 className="mb-2 text-xl font-black text-white" style={{ fontFamily: SERIF }}>Doodle Dash needs 2+ players</h2>
+          <p className="text-sm text-white/50">Invite friends to the party to start doodling!</p>
         </div>
       </div>
     )
@@ -126,116 +140,179 @@ export default function DoodleDashBoard({ state, currentPlayerId, onStateChange,
   const sorted = [...state.players].sort((a, b) => b.score - a.score)
 
   return (
-    <div className="flex w-full h-full overflow-hidden bg-slate-950 select-none p-3 gap-3">
-      {/* LEFT: canvas */}
-      <div className="flex-1 flex flex-col min-w-0 gap-2">
-        <div className="bg-slate-900/60 border border-white/10 rounded-xl px-4 py-2 flex items-center gap-4">
-          <Pencil className="w-4 h-4 text-aqua-400 flex-shrink-0" />
-          <div className="flex-1 text-center">
+    <div className="relative flex h-full w-full select-none gap-2.5 overflow-hidden p-2 text-[#e9ddc5]"
+      style={{ background: 'radial-gradient(1200px 800px at 50% 0%, #201710, #120d08)' }}>
+      <Confetti fire={!!me?.guessedThisRound && state.phase === 'DRAWING'} />
+
+      {/* LEFT: header + canvas + tools */}
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        {/* Word tiles / choose banner + timer */}
+        <div className="glass-strong flex items-center gap-3 rounded-2xl px-4 py-2.5">
+          <span className="flex flex-shrink-0 items-center gap-1.5 rounded-full bg-[#d6a85c]/15 px-2.5 py-1 text-[10px] font-black text-[#e8c987]">
+            <Pencil className="h-3 w-3" /> {state.phase === 'CHOOSE' ? (isDrawer ? 'Pick your word' : `${drawer?.name} is choosing`) : isDrawer ? 'You are drawing' : `${drawer?.name} is drawing`}
+          </span>
+          <div className="flex flex-1 flex-wrap items-center justify-center gap-1">
             {state.phase === 'CHOOSE' ? (
-              <span className="text-sm font-bold text-white">{isDrawer ? 'Choose a word to draw' : `${drawer?.name} is choosing a word…`}</span>
-            ) : isDrawer ? (
-              <span className="text-sm font-black text-white tracking-widest">Draw: <span className="text-aqua-400 uppercase">{state.word}</span></span>
+              <span className="text-xs italic text-white/40">a new word is being chosen…</span>
+            ) : state.word ? (
+              state.word.split('').map((ch, i) => {
+                const shown = isDrawer || state.revealed.includes(i)
+                return (
+                  <motion.span key={`${state.roundNumber}-${i}-${shown}`}
+                    initial={shown && !isDrawer ? { rotateX: 90, scale: 1.3 } : false}
+                    animate={{ rotateX: 0, scale: 1 }}
+                    className={`grid h-7 min-w-[22px] place-items-center rounded-md border px-1 text-sm font-black uppercase ${
+                      shown ? 'border-[#d6a85c]/60 bg-[#d6a85c]/20 text-[#f0d9a4]' : 'border-white/15 bg-white/5 text-white/85'
+                    }`}
+                    style={{ fontFamily: SERIF }}>
+                    {shown ? ch : '_'}
+                  </motion.span>
+                )
+              })
             ) : (
-              <span className="text-lg font-black text-white tracking-[0.3em] font-mono">{maskedWord(state.word, state.revealed)}</span>
+              <span className="text-xs italic text-white/35">round starting…</span>
             )}
           </div>
-          <span className="text-sm font-black text-sunny-400 font-mono w-10 text-right flex-shrink-0">{state.phase === 'DRAWING' ? `${remaining}s` : ''}</span>
+          <motion.span
+            key={urgent ? 'u' + remaining : 'calm'}
+            animate={urgent ? { scale: [1, 1.18, 1] } : {}}
+            transition={{ duration: 0.5 }}
+            className={`w-12 flex-shrink-0 text-right font-mono text-lg font-black ${urgent ? 'text-red-400' : 'text-[#e0b56b]'}`}
+          >
+            {state.phase === 'DRAWING' ? `${remaining}s` : ''}
+          </motion.span>
         </div>
-        <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-          <div className="h-full bg-gradient-to-r from-aqua-500 to-sunny-400 transition-all duration-300" style={{ width: `${(remaining / ROUND_SECONDS) * 100}%` }} />
+        <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
+          <div className={`h-full transition-all duration-300 ${urgent ? 'bg-gradient-to-r from-red-500 to-rose-400' : 'bg-gradient-to-r from-[#d6a85c] to-[#e0b56b]'}`}
+            style={{ width: `${(remaining / ROUND_SECONDS) * 100}%` }} />
         </div>
 
-        <div className="flex-1 flex items-center justify-center bg-slate-900/40 rounded-xl border border-white/10 p-2 min-h-0 relative">
-          <canvas ref={canvasRef} width={CW} height={CH}
-            onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={onUp}
-            className={`bg-white rounded-lg w-full ${canDraw ? 'cursor-crosshair' : 'cursor-default'}`}
-            style={{ maxHeight: '100%', aspectRatio: `${CW}/${CH}`, touchAction: 'none' }} />
+        {/* Canvas in a wooden frame */}
+        <div className="relative flex min-h-0 flex-1 items-center justify-center">
+          <div className="rounded-xl p-2 shadow-2xl" style={{ background: 'linear-gradient(160deg,#4a3018,#2a1c0e)', border: '1px solid #6b523055', maxHeight: '100%', maxWidth: '100%' }}>
+            <canvas ref={canvasRef} width={CW} height={CH}
+              onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={onUp}
+              className={`w-full rounded-lg bg-white ${canDraw ? 'cursor-crosshair' : 'cursor-default'}`}
+              style={{ maxHeight: '100%', aspectRatio: `${CW}/${CH}`, touchAction: 'none' }} />
+          </div>
 
           {/* Word choice overlay */}
-          {state.phase === 'CHOOSE' && isDrawer && state.wordChoices && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg">
-              <div className="bg-slate-900 border border-white/10 rounded-2xl p-5 text-center">
-                <h3 className="text-sm font-black text-white mb-3">Pick a word</h3>
-                <div className="flex gap-2">
-                  {state.wordChoices.map((w) => (
-                    <button key={w} onClick={() => commit(chooseWord(state, w))}
-                      className="px-4 py-3 bg-aqua-500/20 hover:bg-aqua-500/40 border border-aqua-500/40 rounded-xl text-white font-bold capitalize">{w}</button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
+          <AnimatePresence>
+            {state.phase === 'CHOOSE' && isDrawer && state.wordChoices && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-black/60 backdrop-blur-sm">
+                <motion.div initial={{ scale: 0.92, y: 10 }} animate={{ scale: 1, y: 0 }}
+                  className="rounded-2xl border border-[#6b5230]/50 p-6 text-center shadow-2xl"
+                  style={{ background: 'linear-gradient(160deg,#2a2013,#211a10)' }}>
+                  <h3 className="mb-4 text-base font-black text-white" style={{ fontFamily: SERIF }}>🎨 Pick a word to draw</h3>
+                  <div className="flex gap-3">
+                    {state.wordChoices.map((w, i) => (
+                      <motion.button key={w} onClick={() => commit(chooseWord(state, w))}
+                        initial={{ y: 12, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.08 * i }}
+                        whileHover={{ scale: 1.08, rotate: i === 1 ? 0 : i === 0 ? -2 : 2 }}
+                        className="rounded-xl border border-[#d6a85c]/50 bg-[#d6a85c]/15 px-5 py-4 text-base font-black capitalize text-[#f0d9a4] shadow-lg transition hover:bg-[#d6a85c]/30"
+                        style={{ fontFamily: SERIF }}>
+                        {w}
+                      </motion.button>
+                    ))}
+                  </div>
+                  <p className="mt-3 text-[9px] italic text-white/35">auto-picks the first word in 10s</p>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Tools (drawer) */}
         {isDrawer && state.phase === 'DRAWING' && (
-          <div className="bg-slate-900/60 border border-white/10 rounded-xl px-3 py-2 flex items-center gap-3 flex-wrap">
+          <div className="glass flex flex-wrap items-center gap-3 rounded-2xl px-3 py-2">
             <div className="flex gap-1.5">
               {COLORS.map((c) => (
                 <button key={c} onClick={() => { setColor(c); setErase(false) }}
-                  className={`w-6 h-6 rounded-full border-2 ${color === c && !erase ? 'border-white scale-110' : 'border-white/20'} transition`} style={{ backgroundColor: c }} />
+                  className={`h-6 w-6 rounded-full border-2 transition ${color === c && !erase ? 'scale-125 border-[#f0d9a4]' : 'border-white/20 hover:scale-110'}`}
+                  style={{ backgroundColor: c }} />
               ))}
             </div>
-            <div className="flex gap-1.5 items-center">
+            <div className="flex items-center gap-1.5">
               {[3, 6, 12].map((sz) => (
                 <button key={sz} onClick={() => { setSize(sz); setErase(false) }}
-                  className={`w-7 h-7 rounded-lg flex items-center justify-center ${size === sz && !erase ? 'bg-aqua-500/30 border border-aqua-500/50' : 'bg-white/5 border border-white/10'}`}>
+                  className={`flex h-7 w-7 items-center justify-center rounded-lg ${size === sz && !erase ? 'border border-[#d6a85c]/60 bg-[#d6a85c]/20' : 'border border-white/10 bg-white/5'}`}>
                   <span className="rounded-full bg-white" style={{ width: sz, height: sz }} />
                 </button>
               ))}
             </div>
-            <button onClick={() => setErase((e) => !e)} className={`w-8 h-8 rounded-lg flex items-center justify-center ${erase ? 'bg-aqua-500/30 border border-aqua-500/50' : 'bg-white/5 border border-white/10'}`}><Eraser className="w-4 h-4 text-white" /></button>
-            <button onClick={handleClear} className="w-8 h-8 rounded-lg flex items-center justify-center bg-white/5 border border-white/10 hover:bg-rose-500/20"><Trash2 className="w-4 h-4 text-rose-400" /></button>
-            <span className="text-[10px] text-slate-500 ml-auto flex items-center gap-1"><Paintbrush className="w-3 h-3" /> You're the artist!</span>
+            <button onClick={() => setErase((e) => !e)}
+              className={`flex h-8 w-8 items-center justify-center rounded-lg ${erase ? 'border border-[#d6a85c]/60 bg-[#d6a85c]/20' : 'border border-white/10 bg-white/5'}`}>
+              <Eraser className="h-4 w-4 text-white" />
+            </button>
+            <button onClick={handleClear}
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/5 hover:bg-rose-500/20">
+              <Trash2 className="h-4 w-4 text-rose-400" />
+            </button>
+            <span className="ml-auto flex items-center gap-1 text-[10px] text-[#d6a85c]"><Paintbrush className="h-3 w-3" /> You're the artist!</span>
           </div>
         )}
         {!isDrawer && state.phase === 'DRAWING' && (
-          <div className="bg-slate-900/60 border border-white/10 rounded-xl px-3 py-2 text-center">
-            <span className="text-xs text-slate-400"><strong className="text-white">{drawer?.name}</strong> is drawing — type your guess! 👇</span>
+          <div className="glass rounded-2xl px-3 py-2 text-center">
+            <span className="text-xs text-white/55"><strong className="text-white">{drawer?.name}</strong> is drawing — type your guess! 👇</span>
           </div>
         )}
       </div>
 
       {/* RIGHT: scores + chat */}
-      <div className="w-72 flex-shrink-0 flex flex-col gap-3">
-        <div className="bg-slate-900/60 border border-white/10 rounded-2xl p-3">
-          <h4 className="text-[9px] font-black uppercase text-slate-500 tracking-wider mb-2 flex items-center gap-1"><Trophy className="w-3 h-3" /> Scores · Round {state.roundNumber}/{state.totalRounds}</h4>
+      <div className="flex w-72 flex-shrink-0 flex-col gap-2.5">
+        <div className="glass-strong rounded-2xl p-3">
+          <h4 className="mb-2 flex items-center gap-1 text-[9px] font-black uppercase tracking-wider text-white/40">
+            <Trophy className="h-3 w-3 text-[#d6a85c]" /> Scores · Round {state.roundNumber}/{state.totalRounds}
+          </h4>
           <div className="space-y-1">
-            {sorted.map((p) => {
+            {sorted.map((p, rank) => {
               const isDr = state.players[state.drawerIndex]?.id === p.id
               return (
-                <div key={p.id} className={`flex items-center justify-between px-2 py-1 rounded-lg ${p.id === currentPlayerId ? 'bg-white/10' : ''}`}>
-                  <span className="flex items-center gap-1.5 text-[11px] text-white truncate">
-                    {isDr && <Pencil className="w-3 h-3 text-aqua-400 flex-shrink-0" />}
-                    {p.guessedThisRound && <span className="text-emerald-400 text-[9px]">✓</span>}
-                    {p.name}
+                <div key={p.id} className={`flex items-center justify-between rounded-lg px-2 py-1.5 ${p.id === currentPlayerId ? 'border border-[#d6a85c]/25 bg-[#d6a85c]/10' : 'bg-white/[0.03]'}`}>
+                  <span className="flex min-w-0 items-center gap-1.5 text-[11px] font-bold text-white">
+                    <span className="w-4 text-center text-[10px]">{['🥇', '🥈', '🥉'][rank] || rank + 1}</span>
+                    <span className="truncate">{p.name}</span>
+                    {isDr && <Pencil className="h-3 w-3 flex-shrink-0 text-[#d6a85c]" />}
+                    {p.guessedThisRound && <span className="text-[9px] text-emerald-400">✓</span>}
                   </span>
-                  <span className="text-[11px] font-mono font-bold text-sunny-400">{p.score}</span>
+                  <motion.span key={p.score} initial={{ scale: 1.4, color: '#7fe0a8' }} animate={{ scale: 1, color: '#e0b56b' }}
+                    className="font-mono text-[11px] font-black">{p.score}</motion.span>
                 </div>
               )
             })}
           </div>
         </div>
 
-        <div className="flex-1 bg-slate-950/60 border border-white/10 rounded-2xl flex flex-col min-h-0">
-          <div className="flex-1 overflow-y-auto p-3 space-y-1 scrollbar-thin min-h-0">
-            {state.chat.map((m) => (
-              <div key={m.id} className={`text-[11px] leading-snug ${m.kind === 'correct' ? 'text-emerald-400 font-bold' : m.kind === 'system' ? 'text-sunny-400 italic' : 'text-slate-300'}`}>
-                {m.kind === 'guess' ? <><span className="text-slate-500 font-semibold">{m.name}:</span> {m.text}</> : m.text}
-              </div>
-            ))}
+        <div className="flex min-h-0 flex-1 flex-col rounded-2xl border border-white/10 bg-black/30">
+          <div className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3 scrollbar-thin">
+            <AnimatePresence initial={false}>
+              {state.chat.map((m) => (
+                <motion.div key={m.id} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
+                  className={`rounded px-1 text-[11px] leading-snug ${
+                    m.kind === 'correct' ? 'bg-emerald-500/10 py-0.5 font-bold text-emerald-400'
+                    : m.kind === 'system' ? 'italic text-[#e8c987]'
+                    : 'text-white/70'
+                  }`}>
+                  {m.kind === 'guess' ? <><span className="font-semibold text-white/40">{m.name}:</span> {m.text}</> : m.text}
+                </motion.div>
+              ))}
+            </AnimatePresence>
             <div ref={chatEndRef} />
           </div>
           {state.phase === 'DRAWING' && !isDrawer && me && !me.guessedThisRound && (
-            <form onSubmit={sendGuess} className="p-2 border-t border-white/10 flex gap-2">
+            <form onSubmit={sendGuess} className="flex gap-2 border-t border-white/10 p-2">
               <input value={guess} onChange={(e) => setGuess(e.target.value)} placeholder="Type your guess…"
-                className="flex-1 h-9 bg-white/5 border border-white/10 rounded-lg px-3 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-aqua-500" />
-              <button type="submit" className="h-9 px-3 bg-aqua-500/30 hover:bg-aqua-500/50 border border-aqua-500/40 rounded-lg"><Send className="w-4 h-4 text-white" /></button>
+                className="h-9 flex-1 rounded-lg border border-white/10 bg-white/5 px-3 text-sm text-white placeholder:text-white/25 focus:border-[#d6a85c] focus:outline-none" />
+              <button type="submit" className="h-9 rounded-lg bg-brand px-3 transition active:scale-95">
+                <Send className="h-4 w-4 text-white" />
+              </button>
             </form>
           )}
           {state.phase === 'DRAWING' && (isDrawer || me?.guessedThisRound) && (
-            <div className="p-2 border-t border-white/10 text-center text-[10px] text-slate-500">{isDrawer ? 'Keep drawing!' : 'You guessed it! 🎉'}</div>
+            <div className="border-t border-white/10 p-2 text-center text-[10px] text-white/40">
+              {isDrawer ? 'Keep drawing!' : 'You guessed it! 🎉'}
+            </div>
           )}
         </div>
       </div>
@@ -244,29 +321,45 @@ export default function DoodleDashBoard({ state, currentPlayerId, onStateChange,
       <AnimatePresence>
         {state.phase === 'ROUND_END' && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm pointer-events-none">
-            <motion.div initial={{ scale: 0.9, y: 10 }} animate={{ scale: 1, y: 0 }} className="bg-slate-900 border border-white/10 rounded-2xl p-6 text-center shadow-2xl">
-              <p className="text-[10px] uppercase tracking-widest text-slate-500 font-black">The word was</p>
-              <h2 className="text-2xl font-black text-aqua-400 my-1 capitalize">{state.chat.filter(c => c.kind === 'system').slice(-1)[0]?.text.match(/"(.+)"/)?.[1] ?? ''}</h2>
-              <p className="text-xs text-slate-400">{state.correctCount} {state.correctCount === 1 ? 'player' : 'players'} guessed it</p>
+            className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <motion.div initial={{ scale: 0.9, y: 10 }} animate={{ scale: 1, y: 0 }}
+              className="rounded-2xl border border-[#6b5230]/50 p-6 text-center shadow-2xl"
+              style={{ background: 'linear-gradient(160deg,#2a2013,#211a10)' }}>
+              <p className="text-[10px] font-black uppercase tracking-widest text-white/40">The word was</p>
+              <h2 className="my-1 text-3xl font-black capitalize text-[#f0d9a4]" style={{ fontFamily: SERIF }}>
+                {state.word ?? state.chat.filter(c => c.kind === 'system').slice(-1)[0]?.text.match(/"(.+)"/)?.[1] ?? ''}
+              </h2>
+              <p className="text-xs text-white/55">{state.correctCount} {state.correctCount === 1 ? 'player' : 'players'} guessed it</p>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* GAME OVER overlay */}
+      {/* GAME OVER — full-board podium */}
       <AnimatePresence>
-        {state.winnerId && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 backdrop-blur-sm">
-            <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }} className="bg-slate-900 border border-aqua-500/30 rounded-2xl p-6 text-center shadow-2xl w-72">
-              <Crown className="w-12 h-12 text-yellow-400 mx-auto mb-2" />
-              <h2 className="text-xl font-black text-white">{getPlayerName(state, state.winnerId)} wins!</h2>
-              <div className="mt-3 space-y-1">
-                {sorted.map((p, i) => (
-                  <div key={p.id} className="flex justify-between text-xs px-3"><span className="text-slate-300">{i + 1}. {p.name}</span><span className="font-mono font-bold text-sunny-400">{p.score}</span></div>
-                ))}
-              </div>
-            </motion.div>
+        {state.winnerId && !endDismissed && (
+          <SketchEndScreen
+            title="Doodle Dash — Gallery Closed"
+            winnerName={getPlayerName(state, state.winnerId)}
+            youWon={state.winnerId === currentPlayerId}
+            rows={sorted.map((p) => ({ id: p.id, name: p.name, score: p.score, isMe: p.id === currentPlayerId }))}
+            shareTitle="Doodle Dash — Dice Alley"
+            shareLead="🖍️ Doodle Dash on Dice Alley"
+            canRematch={!!me}
+            onRematch={handleRematch}
+            onDismiss={() => setEndDismissed(true)}
+          />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {state.winnerId && endDismissed && (
+          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            className="absolute inset-x-0 top-4 z-20 flex justify-center">
+            <button onClick={() => setEndDismissed(false)}
+              className="flex items-center gap-2 rounded-full border border-[#d6a85c]/50 bg-black/70 px-5 py-2 text-sm font-black text-[#f0d9a4] backdrop-blur transition hover:bg-black/85"
+              style={{ fontFamily: SERIF }}>
+              <Crown className="h-4 w-4" /> {getPlayerName(state, state.winnerId)} wins! — show results
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
