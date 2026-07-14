@@ -150,24 +150,39 @@ export function playSfx(name: SfxName) {
 // first glyph and map it to a sound. Unknown events fall back to a soft "pop".
 
 const EMOJI_SFX: Record<string, SfxName> = {
+  // dice / movement / turn flow
   "🎲": "dice",
-  "🚶": "move", "➡️": "move", "▶️": "move", "👉": "turn",
-  "🏡": "buy", "🏗️": "build", "🔨": "build",
-  "💰": "cash", "💵": "cash", "💸": "cash",
-  "🃏": "card", "🂠": "card", "➕": "card",
+  "🚶": "move", "➡️": "move", "👣": "move", "🚪": "move",
+  "👉": "turn",
+  // property / building
+  "🏡": "buy", "🏠": "buy", "🏘️": "buy",
+  "🏗️": "build", "🔨": "build", "🛣️": "build", "🏰": "build",
+  // money
+  "💰": "cash", "💵": "cash", "💸": "cash", "🪙": "cash", "🏦": "cash",
+  // cards
+  "🃏": "card", "🂠": "card", "🎴": "card", "➕": "card", "🚮": "card", "▶️": "card", "📦": "card",
+  // betting chips / calls
   "✔️": "chip", "📞": "chip", "⬆️": "chip",
+  // correct / wrong / errors
   "✅": "correct",
-  "❌": "wrong", "🛑": "wrong",
-  "🚫": "error",
-  "💥": "hit", "🔥": "hit",
-  "🌊": "miss", "📉": "miss",
-  "🏆": "win", "🎉": "win", "🎊": "win",
+  "❌": "wrong", "🛑": "wrong", "⚠️": "wrong",
+  "🚫": "error", "🚨": "error", "👮": "error",
+  // combat / hits
+  "💥": "hit", "🔥": "hit", "⚔️": "hit",
+  "🌊": "miss", "📉": "miss", "👋": "miss",
+  // wins / losses
+  "🏆": "win", "🎉": "win", "🎊": "win", "👑": "win",
+  "☠️": "lose", "💀": "lose",
+  // bells / trades
   "🔔": "bell", "🤝": "bell",
-  "🔄": "whoosh", "⏭️": "whoosh", "↪️": "whoosh",
-  "🎨": "draw", "✏️": "draw",
-  "💬": "clue", "❓": "clue", "🗝️": "clue", "🔍": "clue", "📣": "clue", "🚪": "clue",
-  "🚨": "error", "👮": "error",
-  "🔓": "pop", "🏦": "pop", "⏱️": "pop", "🗳️": "pop",
+  // whooshes / reversals / sailing
+  "🔄": "whoosh", "⏭️": "whoosh", "↪️": "whoosh", "🚢": "whoosh", "🚁": "whoosh", "⛵": "whoosh", "🕵️": "whoosh",
+  // drawing games
+  "🎨": "draw", "✏️": "draw", "🖍️": "draw",
+  // clues / deduction / detective
+  "💬": "clue", "❓": "clue", "🗝️": "clue", "🔍": "clue", "📣": "clue",
+  // misc pops
+  "🔓": "pop", "⏱️": "pop", "🗳️": "pop", "⚓": "pop", "🔒": "pop", "🎯": "pop", "⭐": "pop",
 }
 
 // Returns [emoji, sound] for a log line, or null if it has no leading emoji.
