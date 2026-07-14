@@ -137,8 +137,11 @@ function Card3D({ card, ...props }: { card?: Card } & JSX.IntrinsicElements["gro
 }
 
 // A hand card: fanned, hoverable, clickable when playable.
-function HandCard({ card, i, n, playable, dimmed, onPlay }: {
-  card: Card; i: number; n: number; playable: boolean; dimmed: boolean; onPlay: (id: string) => void
+// A hand card. No "playable" highlighting — every card looks the same (the
+// player decides what to play); the engine simply ignores an illegal click.
+// Hover-lift is uniform tactile feedback on your turn, not a hint.
+function HandCard({ card, i, n, canAct, onPlay }: {
+  card: Card; i: number; n: number; canAct: boolean; onPlay: (id: string) => void
 }) {
   const g = useRef<THREE.Group>(null)
   const [hover, setHover] = useState(false)
@@ -146,8 +149,8 @@ function HandCard({ card, i, n, playable, dimmed, onPlay }: {
   const a = (i - (n - 1) / 2) * spread            // fan angle
   const R = 9                                     // fan radius (pivot behind camera-ish)
   const bx = Math.sin(a) * R
-  const bz = 6.4 - (Math.cos(a) - 1) * R * -1 * 0 + (1 - Math.cos(a)) * R * 0.5
-  const lift = hover && playable ? 0.55 : 0
+  const bz = 6.4 + (1 - Math.cos(a)) * R * 0.5
+  const lift = hover && canAct ? 0.55 : 0
   useFrame((_, dt) => {
     if (!g.current) return
     const k = Math.min(1, dt * 10)
@@ -155,34 +158,19 @@ function HandCard({ card, i, n, playable, dimmed, onPlay }: {
     g.current.position.y += (1.05 + lift + Math.abs(a) * -0.15 - g.current.position.y) * k
     g.current.position.z += (bz - g.current.position.z) * k
     g.current.rotation.z += (-a * 0.9 - g.current.rotation.z) * k
-    const s = hover && playable ? 1.12 : 1
+    const s = hover && canAct ? 1.12 : 1
     g.current.scale.x += (s - g.current.scale.x) * k
     g.current.scale.y += (s - g.current.scale.y) * k
   })
   return (
     <group ref={g} position={[bx, 1.05, bz]} rotation-x={-0.42}>
-      {/* glow backing for playable cards */}
-      {playable && (
-        <mesh position={[0, 0, -0.02]}>
-          <planeGeometry args={[CW + 0.14, CH + 0.14]} />
-          <meshStandardMaterial color="#ffd76a" emissive="#ffd76a" emissiveIntensity={hover ? 1.6 : 0.8} transparent opacity={0.85} />
-        </mesh>
-      )}
-      <group rotation-x={0}>
-        <Card3D card={card} />
-      </group>
-      {/* dim veil for unplayable cards */}
-      {dimmed && (
-        <mesh position={[0, 0, CT / 2 + 0.002]}>
-          <planeGeometry args={[CW, CH]} />
-          <meshBasicMaterial color="#000" transparent opacity={0.55} />
-        </mesh>
-      )}
-      {/* invisible fat hit target */}
+      <Card3D card={card} />
+      {/* invisible fat hit target — any card is clickable on your turn; the
+          engine no-ops an illegal play, so there's no "allowed move" tell. */}
       <mesh
         visible={false}
-        onClick={(e: ThreeEvent<MouseEvent>) => { e.stopPropagation(); if (playable) { document.body.style.cursor = "auto"; onPlay(card.id) } }}
-        onPointerOver={(e) => { e.stopPropagation(); setHover(true); if (playable) document.body.style.cursor = "pointer" }}
+        onClick={(e: ThreeEvent<MouseEvent>) => { e.stopPropagation(); if (canAct) { document.body.style.cursor = "auto"; onPlay(card.id) } }}
+        onPointerOver={(e) => { e.stopPropagation(); setHover(true); if (canAct) document.body.style.cursor = "pointer" }}
         onPointerOut={() => { setHover(false); document.body.style.cursor = "auto" }}
       >
         <planeGeometry args={[CW + 0.06, CH + 0.3]} />
@@ -298,7 +286,7 @@ export interface UnoScene3DProps {
   onDraw: () => void
 }
 
-function Scene({ state, meIndex, isSpectator, isMyTurn, playableIds, canDraw, onPlayCard, onDraw }: UnoScene3DProps) {
+function Scene({ state, meIndex, isSpectator, isMyTurn, canDraw, onPlayCard, onDraw }: UnoScene3DProps) {
   const felt = useMemo(feltTexture, [])
   const me = state.players[meIndex]
   const n = state.players.length
@@ -394,12 +382,11 @@ function Scene({ state, meIndex, isSpectator, isMyTurn, playableIds, canDraw, on
         )
       })}
 
-      {/* my hand fan */}
+      {/* my hand fan — no playability highlighting; you decide what to play */}
       {me && !isSpectator && me.hand.map((c, i) => (
         <HandCard
           key={c.id} card={c} i={i} n={me.hand.length}
-          playable={isMyTurn && playableIds.has(c.id)}
-          dimmed={isMyTurn && !playableIds.has(c.id)}
+          canAct={isMyTurn}
           onPlay={onPlayCard}
         />
       ))}

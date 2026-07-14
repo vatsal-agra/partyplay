@@ -69,6 +69,7 @@ export interface MonopolyState {
   phase: 'ROLL' | 'BUY_OR_PASS' | 'RENT' | 'JAIL' | 'BANKRUPTCY' | 'GAME_OVER' | 'AUCTION';
   lastDice: [number, number];
   doubleCount: number;
+  rolledThisTurn: boolean; // one roll per turn; a bonus roll is only granted on doubles
   selectedSpaceIndex: number | null; // For info modal
   debtToPlayerId: string | null; // null means Bank
   debtAmount: number;
@@ -459,6 +460,7 @@ export function initializeGame(playersData: { id: string; name: string; isBot: b
     phase: 'ROLL',
     lastDice: [1, 1],
     doubleCount: 0,
+    rolledThisTurn: false,
     selectedSpaceIndex: null,
     debtToPlayerId: null,
     debtAmount: 0,
@@ -487,6 +489,7 @@ export function rollDice(state: MonopolyState, manualRoll?: [number, number]): M
     ...state,
     lastDice: [dice1, dice2] as [number, number],
     doubleCount: nextDoubleCount,
+    rolledThisTurn: true,
     lastCardDrawn: null,
     lastRentPaid: null,
     log: nextLogs
@@ -496,7 +499,9 @@ export function rollDice(state: MonopolyState, manualRoll?: [number, number]): M
   if (currentPlayer.inJail) {
     if (isDouble) {
       updatedState.log.push(`🔓 Double! ${currentPlayer.name} broke out of jail!`);
-      updatedState.players = updatedState.players.map((p, idx) => 
+      // Rolling doubles to leave jail does NOT grant an extra roll.
+      updatedState.doubleCount = 0;
+      updatedState.players = updatedState.players.map((p, idx) =>
         idx === state.currentPlayerIndex ? { ...p, inJail: false, position: (p.position + total) % 40 } : p
       );
       return evaluateLandingSpace(updatedState, currentPlayer.id, (currentPlayer.position + total) % 40);
@@ -1220,6 +1225,7 @@ export function endTurn(state: MonopolyState): MonopolyState {
     ...state,
     currentPlayerIndex: nextPlayerIndex,
     doubleCount: nextDoubleCount,
+    rolledThisTurn: false, // fresh roll available for the (possibly same, on doubles) player
     phase: 'ROLL', // Reset phase
     log: [...nextLogs, `👉 It is now ${nextPlayer.name}'s turn.`]
   };

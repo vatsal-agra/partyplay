@@ -291,8 +291,9 @@ export default function MonopolyBoard({ state, currentPlayerId, onStateChange, o
         <div className="shrink-0">
           <AnimatePresence mode="wait">
 
-            {/* Roll (my turn, not in jail) */}
-            {state.phase === 'ROLL' && !curPlayer.inJail && isMyTurn && !curPlayer.isBot && (
+            {/* Roll (my turn, not in jail) — only when a roll is available:
+                a fresh turn, or a bonus roll earned by rolling doubles. */}
+            {state.phase === 'ROLL' && !curPlayer.inJail && isMyTurn && !curPlayer.isBot && (!state.rolledThisTurn || state.doubleCount > 0) && (
               <motion.div key="roll-context" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
                 className="glass flex flex-col gap-2 rounded-2xl p-3.5 text-center">
                 <button
@@ -484,8 +485,9 @@ export default function MonopolyBoard({ state, currentPlayerId, onStateChange, o
           </AnimatePresence>
         </div>
 
-        {/* Trade and end turn controls */}
-        {isMyTurn && !curPlayer.isBot && state.phase === 'ROLL' && !isRolling && (
+        {/* Trade and end turn — only after you've taken your roll (a non-double,
+            so no bonus roll is pending). Prevents skipping or repeating the roll. */}
+        {isMyTurn && !curPlayer.isBot && state.phase === 'ROLL' && !isRolling && state.rolledThisTurn && state.doubleCount === 0 && (
           <div className="glass flex gap-2 rounded-2xl p-2">
             <button onClick={() => setShowTrade(true)}
               className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-white/10 py-2 text-[10px] font-bold uppercase text-white transition hover:bg-white/20">

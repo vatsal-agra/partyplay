@@ -38,6 +38,7 @@ interface Props {
 
 export default function PokerBoard({ state, currentPlayerId, onStateChange, onBroadcastAction }: Props) {
   const [endDismissed, setEndDismissed] = useState(false)
+  const [raiseAmt, setRaiseAmt] = useState("")   // custom raise-to amount
   const commit = (next: PokerState) => { onStateChange(next); onBroadcastAction?.('sync_state', next) }
 
   const seatIndex = state.players.findIndex((p) => p.id === currentPlayerId)
@@ -140,18 +141,42 @@ export default function PokerBoard({ state, currentPlayerId, onStateChange, onBr
               className="rounded-xl bg-white/15 px-4 py-2.5 text-xs font-black uppercase text-white transition hover:bg-white/25 active:scale-95">
               {toCall <= 0 ? 'Check' : `Call ${Math.min(toCall, me.chips)}`}
             </button>
-            {me.chips > toCall && (
-              <>
-                <button onClick={() => commit(raiseTo(state, currentPlayerId, state.currentBet + state.minRaise))}
-                  className="rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-black uppercase text-white transition hover:bg-emerald-600 active:scale-95">
-                  Raise {state.currentBet + state.minRaise}
-                </button>
-                <button onClick={() => commit(raiseTo(state, currentPlayerId, state.currentBet + state.pot))}
-                  className="rounded-xl bg-emerald-800 px-4 py-2.5 text-xs font-black uppercase text-white transition hover:bg-emerald-700 active:scale-95">
-                  Pot
-                </button>
-              </>
-            )}
+            {me.chips > toCall && (() => {
+              const minTo = state.currentBet + state.minRaise
+              const maxTo = me.bet + me.chips              // all-in ceiling
+              const doRaise = (v: number) => { commit(raiseTo(state, currentPlayerId, Math.max(minTo, Math.min(maxTo, v)))); setRaiseAmt("") }
+              const typed = parseInt(raiseAmt)
+              return (
+                <>
+                  <button onClick={() => doRaise(minTo)}
+                    className="rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-black uppercase text-white transition hover:bg-emerald-600 active:scale-95">
+                    Raise {minTo}
+                  </button>
+                  {maxTo > state.currentBet + state.pot && (
+                    <button onClick={() => doRaise(state.currentBet + state.pot)}
+                      className="rounded-xl bg-emerald-800 px-4 py-2.5 text-xs font-black uppercase text-white transition hover:bg-emerald-700 active:scale-95">
+                      Pot
+                    </button>
+                  )}
+                  {/* custom raise-to amount */}
+                  <div className="flex items-center gap-1 rounded-xl border border-emerald-600/40 bg-black/40 px-1 py-1">
+                    <input
+                      type="number" inputMode="numeric" value={raiseAmt}
+                      onChange={(e) => setRaiseAmt(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && !isNaN(typed)) doRaise(typed) }}
+                      placeholder={`${minTo}–${maxTo}`} min={minTo} max={maxTo}
+                      className="w-24 bg-transparent px-2 py-1.5 text-xs font-bold text-white placeholder-white/30 focus:outline-none"
+                    />
+                    <button
+                      disabled={isNaN(typed) || typed < minTo}
+                      onClick={() => doRaise(typed)}
+                      className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-black uppercase text-white transition hover:bg-emerald-500 disabled:opacity-40">
+                      Raise to
+                    </button>
+                  </div>
+                </>
+              )
+            })()}
             <button onClick={() => commit(allIn(state, currentPlayerId))}
               className="rounded-xl bg-gradient-to-r from-[#b8860b] to-[#e6b45a] px-4 py-2.5 text-xs font-black uppercase text-[#1a120a] transition hover:brightness-110 active:scale-95">
               All-in
