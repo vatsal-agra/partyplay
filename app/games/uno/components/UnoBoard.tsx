@@ -4,13 +4,13 @@
 // pure engine; this component wires interaction and presentation.
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import dynamic from "next/dynamic"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   UnoState, Card, COLORS,
   canPlay, playCard, chooseColor, drawCard, passTurn, playBotStep,
-  initializeGame, getPlayerName,
+  callUno, catchUno, initializeGame, getPlayerName,
 } from "../lib/unoEngine"
 import { UNO_HEX } from "./UnoScene3D"
 import { Confetti } from "@/components/Confetti"
@@ -41,6 +41,8 @@ interface Props {
 export default function UnoBoard({ state, currentPlayerId, onStateChange, onBroadcastAction }: Props) {
   const [endDismissed, setEndDismissed] = useState(false)
   const commit = (next: UnoState) => { onStateChange(next); onBroadcastAction?.('sync_state', next) }
+  const stateRef = useRef(state)
+  stateRef.current = state
 
   const seatIndex = state.players.findIndex((p) => p.id === currentPlayerId)
   const isSpectator = seatIndex === -1
@@ -64,6 +66,36 @@ export default function UnoBoard({ state, currentPlayerId, onStateChange, onBroa
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, isSpectator])
+
+  // ---- UNO! call / catch ------------------------------------------------------
+  // The local client drives the timers (solo vs bots has only this client).
+  const flaggedId = state.unoCallNeeded
+  const flagged = flaggedId ? state.players.find((p) => p.id === flaggedId) : null
+  const iOweUno = !isSpectator && flaggedId === currentPlayerId
+  const canCatch = !isSpectator && !!flaggedId && flaggedId !== currentPlayerId
+  useEffect(() => {
+    if (!flaggedId || state.winnerId || isSpectator) return
+    if (flaggedId === currentPlayerId) {
+      // I must call UNO — if I don't in time, an opponent catches me for +2.
+      const t = setTimeout(() => {
+        const s = stateRef.current
+        if (s.unoCallNeeded !== flaggedId) return
+        const catcher = s.players.find((p) => p.id !== currentPlayerId)
+        if (catcher) commit(catchUno(s, catcher.id))
+      }, 4200)
+      return () => clearTimeout(t)
+    }
+    if (flagged?.isBot) {
+      // A bot is at one card — you get a moment to catch it; otherwise it calls.
+      const t = setTimeout(() => {
+        const s = stateRef.current
+        if (s.unoCallNeeded === flaggedId) commit(callUno(s, flaggedId))
+      }, 2800)
+      return () => clearTimeout(t)
+    }
+    // else another human is flagged — a human opponent may catch via the button.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flaggedId, state.winnerId, isSpectator])
 
   const isPlayable = (c: Card) => {
     if (!isMyTurn || state.phase !== 'PLAY') return false
@@ -130,6 +162,30 @@ export default function UnoBoard({ state, currentPlayerId, onStateChange, onBroa
         )}
       </div>
 
+      {/* UNO! call / catch prompts */}
+      <div className="absolute inset-x-0 top-16 z-20 flex justify-center">
+        <AnimatePresence>
+          {iOweUno && (
+            <motion.button key="say-uno"
+              initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: [1, 1.08, 1], opacity: 1 }} exit={{ scale: 0.6, opacity: 0 }}
+              transition={{ scale: { repeat: Infinity, duration: 0.9 } }}
+              onClick={() => commit(callUno(state, currentPlayerId))}
+              className="rounded-full bg-gradient-to-r from-[#e5342b] via-[#f5b81d] to-[#2fa84f] px-8 py-3 text-lg font-black uppercase tracking-widest text-white shadow-2xl ring-2 ring-white/60">
+              Say UNO!
+            </motion.button>
+          )}
+          {canCatch && !iOweUno && (
+            <motion.button key="catch-uno"
+              initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: [1, 1.06, 1], opacity: 1 }} exit={{ scale: 0.6, opacity: 0 }}
+              transition={{ scale: { repeat: Infinity, duration: 1 } }}
+              onClick={() => commit(catchUno(state, currentPlayerId))}
+              className="flex items-center gap-2 rounded-full bg-red-600 px-6 py-2.5 text-sm font-black uppercase tracking-wider text-white shadow-2xl ring-2 ring-white/50 hover:bg-red-500">
+              🚨 Catch {flagged?.name} — no UNO!
+            </motion.button>
+          )}
+        </AnimatePresence>
+      </div>
+
       {/* turn banner + pass */}
       <div className="pointer-events-none absolute inset-x-0 bottom-3 z-10 flex flex-col items-center gap-2">
         {isMyTurn && state.pendingDrawnCardId && (
@@ -143,7 +199,7 @@ export default function UnoBoard({ state, currentPlayerId, onStateChange, onBroa
             <span className="text-white/50">Game over</span>
           ) : isMyTurn ? (
             <span className="font-bold text-[#ffd76a]">
-              {state.phase === 'CHOOSE_COLOR' ? 'Pick a colour!' : state.pendingDrawnCardId ? 'Play the drawn card or pass.' : 'Your turn — play a glowing card or tap the deck.'}
+              {state.phase === 'CHOOSE_COLOR' ? 'Pick a colour!' : state.pendingDrawnCardId ? 'Play the drawn card or pass.' : 'Your turn — play a card or tap the deck to draw.'}
             </span>
           ) : (
             <span className="italic text-white/50">{state.players[state.currentPlayerIndex].name} is playing…</span>

@@ -32,6 +32,7 @@ export interface UnoState {
   activeColor: Color           // colour currently in effect (after a wild this is the chosen one)
   phase: Phase
   pendingDrawnCardId: string | null   // a freshly drawn card the player may still play
+  unoCallNeeded: string | null        // player who reached 1 card and hasn't called "UNO!" — catchable
   winnerId: string | null
   lastAction: string | null
   log: string[]
@@ -107,6 +108,7 @@ export function initializeGame(playersData: { id: string; name: string; isBot: b
     activeColor: first.color,
     phase: 'PLAY',
     pendingDrawnCardId: null,
+    unoCallNeeded: null,
     winnerId: null,
     lastAction: null,
     log: [`🎴 Color Clash begins! Top card: ${first.color} ${first.value}.`],
@@ -176,13 +178,17 @@ export function playCard(state: UnoState, playerId: string, cardId: string, chos
 
   const s = clone(state)
   const me = s.players[idx]
+  // If I was the one who owed an "UNO!" call, reaching my turn again safely
+  // closes the catch window.
+  if (s.unoCallNeeded === me.id) s.unoCallNeeded = null
   me.hand = me.hand.filter((c) => c.id !== cardId)
   s.discardPile.push(card)
   s.pendingDrawnCardId = null
   s.lastAction = `${me.name} played ${card.color === 'wild' ? '' : card.color + ' '}${card.value}`
   pushLog(s, `▶️ ${me.name} played ${card.color === 'wild' ? '' : card.color + ' '}${card.value}.`)
 
-  if (me.hand.length === 1) pushLog(s, `🔔 ${me.name} has UNO!`)
+  // Down to one card — must call "UNO!" or risk being caught for +2.
+  if (me.hand.length === 1) s.unoCallNeeded = me.id
 
   // Win check — emptying your hand ends it immediately.
   if (me.hand.length === 0) {
@@ -234,6 +240,8 @@ export function drawCard(state: UnoState, playerId: string): UnoState {
   if (state.pendingDrawnCardId) return state // already drew this turn
 
   const s = clone(state)
+  // Reaching your turn again safely closes any pending UNO catch window.
+  if (s.unoCallNeeded === s.players[idx].id) s.unoCallNeeded = null
   ensureDraw(s)
   const c = s.drawPile.pop()
   if (!c) { advance(s, 1); return s }
@@ -245,6 +253,28 @@ export function drawCard(state: UnoState, playerId: string): UnoState {
     return s
   }
   advance(s, 1)
+  return s
+}
+
+// Call "UNO!" — the player at one card claims safety before anyone catches them.
+export function callUno(state: UnoState, playerId: string): UnoState {
+  if (state.unoCallNeeded !== playerId) return state
+  const s = clone(state)
+  s.unoCallNeeded = null
+  pushLog(s, `🔔 ${getPlayerName(s, playerId)} calls UNO!`)
+  return s
+}
+
+// Catch a player who forgot to call "UNO!" — they draw 2 as a penalty.
+export function catchUno(state: UnoState, catcherId: string): UnoState {
+  const targetId = state.unoCallNeeded
+  if (!targetId || targetId === catcherId) return state
+  const s = clone(state)
+  const targetIdx = s.players.findIndex((p) => p.id === targetId)
+  if (targetIdx < 0) return state
+  s.unoCallNeeded = null
+  drawN(s, targetIdx, 2)
+  pushLog(s, `🚨 ${getPlayerName(s, catcherId)} caught ${getPlayerName(s, targetId)} not calling UNO — draw 2!`)
   return s
 }
 

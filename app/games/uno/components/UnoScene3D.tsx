@@ -8,7 +8,7 @@
 "use client"
 
 import * as THREE from "three"
-import { Suspense, useMemo, useRef, useState } from "react"
+import { Suspense, useEffect, useMemo, useRef, useState } from "react"
 import { Canvas, useFrame, ThreeEvent } from "@react-three/fiber"
 import { OrbitControls, Html } from "@react-three/drei"
 import { EffectComposer, Bloom, Vignette, SMAA } from "@react-three/postprocessing"
@@ -286,12 +286,66 @@ export interface UnoScene3DProps {
   onDraw: () => void
 }
 
+// A card-back that arcs from the draw pile to a player's hand when they draw.
+function FlyingCard({ to, onDone }: { to: [number, number, number]; onDone: () => void }) {
+  const g = useRef<THREE.Group>(null)
+  const t = useRef(0)
+  const done = useRef(false)
+  const from: [number, number, number] = [-1.5, 0.55, -0.4]
+  const curve = useMemo(() => new THREE.QuadraticBezierCurve3(
+    new THREE.Vector3(...from),
+    new THREE.Vector3((from[0] + to[0]) / 2, Math.max(from[1], to[1]) + 1.8, (from[2] + to[2]) / 2),
+    new THREE.Vector3(...to),
+  ), [to])
+  const tmp = useMemo(() => new THREE.Vector3(), [])
+  useFrame((_, dt) => {
+    if (!g.current || done.current) return
+    t.current = Math.min(1, t.current + dt / 0.6)
+    curve.getPoint(t.current, tmp)
+    g.current.position.copy(tmp)
+    g.current.rotation.z += dt * 9
+    const s = 0.8 + Math.sin(t.current * Math.PI) * 0.15
+    g.current.scale.setScalar(s)
+    if (t.current >= 1) { done.current = true; onDone() }
+  })
+  return (
+    <group ref={g} position={from}>
+      <Card3D />
+    </group>
+  )
+}
+
 function Scene({ state, meIndex, isSpectator, isMyTurn, canDraw, onPlayCard, onDraw }: UnoScene3DProps) {
   const felt = useMemo(feltTexture, [])
   const me = state.players[meIndex]
   const n = state.players.length
   const activeHex = UNO_HEX[state.activeColor] || "#8a8a96"
   const opponents = state.players.map((p, idx) => ({ p, idx })).filter(({ idx }) => idx !== meIndex)
+
+  // ---- draw-to-hand fly animation (visible to everyone) ----------------------
+  const handAnchor = (idx: number): [number, number, number] => {
+    if (idx === meIndex) return [0, 1.4, 5.0]
+    const k = opponents.findIndex((o) => o.idx === idx)
+    const deg = 180 + ((k + 1) * 180) / (opponents.length + 1)
+    const a = (deg * Math.PI) / 180
+    return [Math.cos(a) * 5.0, 1.0, Math.sin(a) * 5.0]
+  }
+  const prevHands = useRef<Record<string, number>>({})
+  const [flies, setFlies] = useState<{ id: number; to: [number, number, number] }[]>([])
+  const flyId = useRef(0)
+  useEffect(() => {
+    const spawn: { id: number; to: [number, number, number] }[] = []
+    state.players.forEach((p, idx) => {
+      const prev = prevHands.current[p.id]
+      if (prev !== undefined && p.hand.length > prev) {
+        const to = handAnchor(idx)
+        for (let b = 0; b < Math.min(p.hand.length - prev, 3); b++) spawn.push({ id: ++flyId.current, to })
+      }
+      prevHands.current[p.id] = p.hand.length
+    })
+    if (spawn.length) setFlies((f) => [...f, ...spawn])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.players])
 
   const colorLight = useRef<THREE.PointLight>(null)
   useFrame(({ clock }) => {
@@ -389,6 +443,11 @@ function Scene({ state, meIndex, isSpectator, isMyTurn, canDraw, onPlayCard, onD
           canAct={isMyTurn}
           onPlay={onPlayCard}
         />
+      ))}
+
+      {/* cards flying from the draw pile to a hand on draw */}
+      {flies.map((f) => (
+        <FlyingCard key={f.id} to={f.to} onDone={() => setFlies((fl) => fl.filter((x) => x.id !== f.id))} />
       ))}
 
       <OrbitControls
