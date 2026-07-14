@@ -312,10 +312,16 @@ export default function GamesPage() {
     [session, activeParty, myVoteGameId, displayName, supabaseClient, fetchVotes]
   )
 
-  // Host launches the most-voted game directly from the games screen.
+  // Host launches the most-voted game for the whole party.
   const handleHostLaunch = useCallback(async () => {
     if (!activeParty?.isHost || !leadingGameId) return
     const game = games.find((g) => g.id === leadingGameId)
+    const partyId = activeParty.id
+
+    // 1. Persist the choice first — this is the durable path: every member's
+    //    parties-row realtime listener redirects them, even if the ephemeral
+    //    broadcast is missed. Set status back and forth so a repeat launch of
+    //    the same game still fires a fresh UPDATE event.
     await supabaseClient
       .from("parties")
       .update({
@@ -323,10 +329,23 @@ export default function GamesPage() {
         game_id: leadingGameId,
         game_image: game?.image || null,
         status: "ready",
+        last_active_at: new Date().toISOString(), // guarantees a fresh UPDATE event even on a repeat launch
       })
-      .eq("id", activeParty.id)
-    launchChannelRef.current?.send({ type: "broadcast", event: "launch", payload: { gameId: leadingGameId } })
-    router.push(gamePath(leadingGameId, `?partyId=${activeParty.id}`))
+      .eq("id", partyId)
+
+    // 2. Broadcast the fast path — AWAIT so it actually flushes to subscribers
+    //    before we navigate away and tear the channel down (this race was why
+    //    it used to take 2–3 tries). Send twice for good measure.
+    try {
+      const ch = launchChannelRef.current
+      if (ch) {
+        await ch.send({ type: "broadcast", event: "launch", payload: { gameId: leadingGameId } })
+        await ch.send({ type: "broadcast", event: "launch", payload: { gameId: leadingGameId } })
+      }
+    } catch { /* the DB path still redirects everyone */ }
+
+    // 3. Now take the host in too.
+    router.push(gamePath(leadingGameId, `?partyId=${partyId}`))
   }, [activeParty, leadingGameId, games, supabaseClient, router])
 
   if (loading) {
