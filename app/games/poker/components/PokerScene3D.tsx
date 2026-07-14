@@ -153,7 +153,8 @@ function CommunityCard({ card, slot }: { card: Card; slot: number }) {
   )
 }
 
-// Hole card at a seat. Opponents flip face-up at showdown.
+// Hole card at a seat. Opponents hold their cards upright (like a real hand) —
+// we see the backs until they flip toward us at showdown.
 function HoleCard({ card, mine, revealed, seatAngle, offset }: {
   card?: Card; mine: boolean; revealed: boolean; seatAngle: number; offset: number
 }) {
@@ -163,24 +164,31 @@ function HoleCard({ card, mine, revealed, seatAngle, offset }: {
     if (!inner.current) return
     const target = revealed ? 1 : 0
     flip.current += (target - flip.current) * Math.min(1, dt * 5)
-    inner.current.rotation.y = Math.PI * (1 - flip.current)
-    inner.current.position.y = Math.sin(flip.current * Math.PI) * 0.35
+    // 0 = back faces the camera (held toward the player), PI = face turned to us
+    inner.current.rotation.y = Math.PI * flip.current
+    inner.current.position.z = Math.sin(flip.current * Math.PI) * 0.12
   })
-  // position: in from the seat toward center
-  const sx = Math.cos(seatAngle) * (TA - 1.6) + Math.cos(seatAngle + Math.PI / 2) * offset
-  const sz = Math.sin(seatAngle) * (TB - 1.1) + Math.sin(seatAngle + Math.PI / 2) * offset
+
   if (mine) {
-    // my cards: standing, tilted back, readable near the camera
+    // my cards: laid toward the camera, big and readable
     return (
       <group position={[offset * 1.35, 0.62, TB - 0.35]} rotation-x={-0.55} rotation-z={-offset * 0.12}>
         <Card3D card={card} faceUp scale={1.35} />
       </group>
     )
   }
+
+  // Opponent: a small standing fan just inside their seat, faces angled toward
+  // the player (so the back shows to the table) until the showdown flip.
+  const bx = Math.cos(seatAngle) * (TA - 1.15)
+  const bz = Math.sin(seatAngle) * (TB - 0.72)
+  const faceOut = Math.PI / 2 - seatAngle   // card front (+z) points out toward the seat
   return (
-    <group position={[sx, FELT_Y, sz]} rotation-x={-Math.PI / 2} rotation-z={-seatAngle + Math.PI / 2 + offset * 0.1}>
-      <group ref={inner} rotation-y={Math.PI}>
-        <Card3D card={card} faceUp />
+    <group position={[bx, FELT_Y + 0.52, bz]} rotation-y={faceOut}>
+      <group position={[offset * 0.34, 0, 0]} rotation-z={-offset * 0.5} rotation-x={0.34}>
+        <group ref={inner}>
+          <Card3D card={card} faceUp scale={0.86} />
+        </group>
       </group>
     </group>
   )
