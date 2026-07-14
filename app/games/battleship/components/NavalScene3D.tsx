@@ -61,16 +61,18 @@ function waterTexture(): THREE.Texture {
   const c = document.createElement("canvas")
   c.width = c.height = 256
   const ctx = c.getContext("2d")!
+  // A real deep-sea teal, not near-black — so the ocean reads as water.
   const g = ctx.createLinearGradient(0, 0, 256, 256)
-  g.addColorStop(0, "#122a38"); g.addColorStop(1, "#0b1d29")
+  g.addColorStop(0, "#1d6b86"); g.addColorStop(0.5, "#14566f"); g.addColorStop(1, "#0e4257")
   ctx.fillStyle = g
   ctx.fillRect(0, 0, 256, 256)
-  for (let i = 0; i < 30; i++) {
-    ctx.strokeStyle = `rgba(120,190,215,${0.04 + (i % 3) * 0.025})`
-    ctx.lineWidth = 1.2
+  // brighter, more visible swell crests
+  for (let i = 0; i < 42; i++) {
+    ctx.strokeStyle = `rgba(150,218,238,${0.06 + (i % 3) * 0.045})`
+    ctx.lineWidth = 1 + (i % 2)
     ctx.beginPath()
-    const y = (i / 30) * 256
-    for (let x = 0; x <= 256; x += 8) {
+    const y = (i / 42) * 256
+    for (let x = 0; x <= 256; x += 6) {
       const yy = y + Math.sin((x / 256) * Math.PI * 5 + i * 2.1) * 3.5
       x === 0 ? ctx.moveTo(x, yy) : ctx.lineTo(x, yy)
     }
@@ -88,7 +90,9 @@ function Ocean() {
   return (
     <mesh rotation-x={-Math.PI / 2} position={[0, -0.06, 0]} receiveShadow>
       <planeGeometry args={[130, 130]} />
-      <meshStandardMaterial map={tex} color="#7fb6cc" roughness={0.32} metalness={0.35} />
+      {/* matte-ish sea: low metalness + higher roughness so the lights don't
+          blow out into two glaring hotspots. */}
+      <meshStandardMaterial map={tex} color="#5fa8c4" roughness={0.68} metalness={0.05} />
     </mesh>
   )
 }
@@ -680,16 +684,16 @@ function Scene(props: NavalScene3DProps) {
 
   return (
     <>
-      {/* dusk light rig */}
-      <ambientLight intensity={0.32} color="#b8c8d8" />
-      <hemisphereLight args={["#7f97ad", "#0c1620", 0.55]} />
+      {/* dusk light rig — softened so the sea isn't blown out by two hotspots */}
+      <ambientLight intensity={0.44} color="#c2d2e0" />
+      <hemisphereLight args={["#9fb6cc", "#123244", 0.7]} />
       <directionalLight
-        position={[-6, 14, -24]} intensity={1.7} color="#ffb377" castShadow
+        position={[-6, 14, -24]} intensity={1.05} color="#ffc49a" castShadow
         shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004}
         shadow-camera-left={-20} shadow-camera-right={20} shadow-camera-top={24} shadow-camera-bottom={-24}
         shadow-camera-near={1} shadow-camera-far={70}
       />
-      <directionalLight position={[10, 10, 16]} intensity={0.5} color="#8fb3cc" />
+      <directionalLight position={[10, 10, 16]} intensity={0.32} color="#9fc0da" />
 
       <Ocean />
       <Horizon />
