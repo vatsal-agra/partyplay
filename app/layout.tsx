@@ -5,6 +5,7 @@ import "./globals.css"
 import { Providers } from "./providers"
 import { MainNav } from "@/components/MainNav"
 import { FeedbackWidget } from "@/components/FeedbackWidget"
+import { MobileGate } from "@/components/MobileGate"
 import { Toaster } from "sonner"
 
 const jakarta = Plus_Jakarta_Sans({
@@ -61,6 +62,7 @@ export default function RootLayout({
             <Toaster position="top-right" richColors theme="dark" />
           </main>
           <FeedbackWidget />
+          <MobileGate />
         </Providers>
       </body>
     </html>

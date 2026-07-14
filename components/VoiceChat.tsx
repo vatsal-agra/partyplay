@@ -1,9 +1,9 @@
 "use client"
 
-import { useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { AnimatePresence, motion } from "framer-motion"
-import { Mic, MicOff, PhoneOff, Loader2, Headphones, Volume2 } from "lucide-react"
+import { Mic, MicOff, PhoneOff, Loader2, Headphones, Volume2, Minus } from "lucide-react"
 import { useVoiceChat } from "@/lib/useVoiceChat"
 
 interface MemberLike {
@@ -28,6 +28,17 @@ export function VoiceChat({
   const { joined, connecting, muted, error, participants, selfSpeaking, join, leave, toggleMute } =
     useVoiceChat({ client, roomId, userId, enabled: true })
 
+  // Collapsible so it never blocks a game's bottom-left controls. Remembered
+  // across navigations.
+  const [minimized, setMinimized] = useState(false)
+  useEffect(() => {
+    try { if (localStorage.getItem("da_voice_min") === "1") setMinimized(true) } catch {}
+  }, [])
+  const setMin = (v: boolean) => {
+    setMinimized(v)
+    try { localStorage.setItem("da_voice_min", v ? "1" : "0") } catch {}
+  }
+
   const nameOf = useMemo(() => {
     const map: Record<string, string> = {}
     members.forEach((m) => {
@@ -38,6 +49,21 @@ export function VoiceChat({
 
   const others = Object.values(participants)
   const connectedCount = others.filter((p) => p.connected).length
+
+  // Collapsed: a small pill that stays out of the way of game controls.
+  if (minimized) {
+    return (
+      <button
+        onClick={() => setMin(false)}
+        title="Open voice"
+        className="glass-strong fixed bottom-4 left-4 z-40 flex select-none items-center gap-2 rounded-full px-3 py-2 shadow-soft transition hover:brightness-110"
+      >
+        <Headphones className="h-4 w-4 text-aqua-400" />
+        <span className="text-xs font-semibold text-white">Voice</span>
+        {joined && <span className="flex items-center gap-1 text-[10px] font-bold text-mint-400"><span className="h-1.5 w-1.5 rounded-full bg-mint-400" />{connectedCount + 1}</span>}
+      </button>
+    )
+  }
 
   return (
     <div className="fixed bottom-4 left-4 z-40 w-[230px] select-none">
@@ -51,15 +77,24 @@ export function VoiceChat({
               <span className="text-[11px] text-white/50">· {connectedCount + 1} in call</span>
             )}
           </div>
-          {joined && (
+          <div className="flex items-center gap-1.5">
+            {joined && (
+              <button
+                onClick={leave}
+                title="Leave voice"
+                className="grid h-7 w-7 place-items-center rounded-lg bg-red-500/20 text-red-300 hover:bg-red-500/30 transition-colors"
+              >
+                <PhoneOff className="h-3.5 w-3.5" />
+              </button>
+            )}
             <button
-              onClick={leave}
-              title="Leave voice"
-              className="grid h-7 w-7 place-items-center rounded-lg bg-red-500/20 text-red-300 hover:bg-red-500/30 transition-colors"
+              onClick={() => setMin(true)}
+              title="Minimise"
+              className="grid h-7 w-7 place-items-center rounded-lg bg-white/10 text-white/70 hover:bg-white/20 transition-colors"
             >
-              <PhoneOff className="h-3.5 w-3.5" />
+              <Minus className="h-3.5 w-3.5" />
             </button>
-          )}
+          </div>
         </div>
 
         {/* Body */}
