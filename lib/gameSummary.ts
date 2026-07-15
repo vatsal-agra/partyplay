@@ -115,7 +115,24 @@ export function getGameSummary(gameId: string, state: any, currentUserId?: strin
         }),
       }
     }
-    case "pictionary":
+    case "pictionary": {
+      // Team Pictionary: the winner is a whole team; players carry a `team`,
+      // not a per-player score.
+      const isOver = state.phase === "GAME_OVER" || !!state.winningTeam
+      const winTeam: "red" | "blue" | null = state.winningTeam ?? null
+      const winnerIds = winTeam ? players.filter((p: any) => p.team === winTeam).map((p: any) => p.id) : []
+      const teamName = winTeam ? (winTeam === "red" ? "Red Team" : "Blue Team") : ""
+      return {
+        isOver,
+        winnerIds,
+        winnerLabel: teamName || label(winnerIds.map(nameOf)),
+        youWon: !!currentUserId && winnerIds.includes(currentUserId),
+        standings: build(players, {
+          winnerIds,
+          detail: (p: any) => (p.team === "red" ? "Red Team" : "Blue Team"),
+        }),
+      }
+    }
     case "scribbleio": {
       const isOver = state.phase === "GAME_OVER"
       const winnerIds = state.winnerId ? [state.winnerId] : []

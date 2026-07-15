@@ -98,9 +98,12 @@ export default function PictionaryBoard({ state, currentPlayerId, onStateChange,
   }).current
   const bindCanvas = (team: Team) => (team === 'red' ? bindRed : bindBlue)
 
-  // Wipe both easels at the start of every new turn.
+  // Wipe both easels at the START of a new turn only. When a turn ENDS
+  // roundEndsAt goes null — skip the wipe there so the finished drawing stays
+  // up during the "the word was …" reveal instead of vanishing on the guess.
   const turnSig = `${state.activeTeam}-${state.category}-${state.roundEndsAt ?? 0}`
   useEffect(() => {
+    if (!state.roundEndsAt) return
     fillWhite(canvasRefs.current.red)
     fillWhite(canvasRefs.current.blue)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -258,7 +261,10 @@ export default function PictionaryBoard({ state, currentPlayerId, onStateChange,
             <canvas
               ref={bindCanvas(team)}
               width={CW} height={CH}
-              onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={onUp}
+              onPointerDown={iDrawThis ? onDown : undefined}
+              onPointerMove={iDrawThis ? onMove : undefined}
+              onPointerUp={iDrawThis ? onUp : undefined}
+              onPointerLeave={iDrawThis ? onUp : undefined}
               className={`rounded-lg bg-white ${iDrawThis ? 'cursor-crosshair' : 'cursor-default'}`}
               style={{ width: compact ? '100%' : undefined, maxHeight: '100%', maxWidth: '100%', aspectRatio: `${CW}/${CH}`, touchAction: 'none' }}
             />
