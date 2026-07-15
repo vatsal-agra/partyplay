@@ -18,6 +18,7 @@ import { EffectComposer, Bloom, Vignette, SMAA } from "@react-three/postprocessi
 import {
   MonopolyState, Player, BOARD_SPACES, Space,
 } from "../lib/monopolyEngine"
+import { Mannequins } from "@/components/three/Mannequins"
 
 const SERIF = "var(--font-display), Georgia, serif"
 
@@ -712,6 +713,14 @@ function Scene({ state, rolling, canDrawCard, onDiceSettled, onTileClick, onDraw
           )
         })
       })()}
+
+      {/* player mannequins seated around the board, each with their name */}
+      <Mannequins
+        players={state.players.filter((p) => !p.isBankrupt).map((p) => ({
+          id: p.id, name: p.name, color: p.color, isBot: p.isBot, active: p.id === cur.id,
+        }))}
+        radius={8} y={-0.35} scale={0.78} startAngle={-Math.PI / 2}
+      />
 
       {/* dice */}
       <Dice dice={state.lastDice} rolling={rolling} onSettled={onDiceSettled} />

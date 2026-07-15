@@ -77,6 +77,10 @@ export default function MysteryBoard({ state, currentPlayerId, onStateChange, on
   const [notes, setNotes] = useState<Record<string, boolean>>({})
   const [tab, setTab] = useState<"notebook" | "log">("notebook")
   const [rolling, setRolling] = useState(false)
+  // One-time "cards are being dealt to everyone" flourish at the very start,
+  // so the hand doesn't just pop into existence.
+  const [dealing, setDealing] = useState(true)
+  useEffect(() => { const t = setTimeout(() => setDealing(false), 2400); return () => clearTimeout(t) }, [])
   // Keep the suggestion announcement on-screen briefly after it resolves (an
   // all-bot disprove resolves instantly, clearing state.pending).
   const [recentSug, setRecentSug] = useState<MysteryState["suggestionLog"][number] | null>(null)
@@ -152,6 +156,33 @@ export default function MysteryBoard({ state, currentPlayerId, onStateChange, on
           onMoveRoom={(room) => commit(moveTo(state, { kind: "room", room }))}
         />
         <Confetti fire={!!state.winnerId} />
+
+        {/* opening deal — cards fly from the deck out to every detective */}
+        <AnimatePresence>
+          {dealing && (
+            <motion.div exit={{ opacity: 0 }} transition={{ duration: 0.5 }}
+              className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-black/72 backdrop-blur-sm">
+              <p className="mb-6 text-sm font-black uppercase tracking-[0.3em] text-[#e8c987]">Dealing the case files…</p>
+              <div className="relative h-44 w-44">
+                {state.players.map((p, i) => {
+                  const angle = (i / Math.max(1, state.players.length)) * Math.PI * 2 - Math.PI / 2
+                  const dx = Math.cos(angle) * 130, dy = Math.sin(angle) * 92
+                  return (
+                    <motion.div key={p.id}
+                      initial={{ x: 0, y: 0, rotate: 0, opacity: 0 }}
+                      animate={{ x: [0, dx], y: [0, dy], rotate: [0, (i % 2 ? 1 : -1) * 18], opacity: [0, 1, 1, 0.85] }}
+                      transition={{ duration: 0.95, delay: 0.12 * i, repeat: Infinity, repeatDelay: 0.5, ease: "easeOut" }}
+                      className="absolute left-1/2 top-1/2 h-12 w-9 -translate-x-1/2 -translate-y-1/2 rounded-md border border-[#e8c987]/40 bg-gradient-to-b from-[#3a2a15] to-[#241a0e] shadow-lg" />
+                  )
+                })}
+                <div className="absolute left-1/2 top-1/2 flex h-14 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-md border border-[#e8c987]/50 bg-[#2a1f10] text-xl shadow-2xl">🃏</div>
+              </div>
+              <div className="mt-6 flex flex-wrap justify-center gap-x-3 gap-y-1 text-[10px] font-bold text-white/60">
+                {state.players.map((p) => <span key={p.id}>{p.name}</span>)}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* orbit hint */}
         <div className="pointer-events-none absolute bottom-3 right-3 hidden rounded-full border border-white/10 bg-black/40 px-3 py-1 text-[10px] text-white/40 backdrop-blur lg:block">
@@ -389,21 +420,24 @@ export default function MysteryBoard({ state, currentPlayerId, onStateChange, on
               <div key={cat} className="mb-3">
                 <h4 className="mb-1 border-b border-[#b89a5e]/50 pb-0.5 text-[10px] font-black uppercase tracking-wider text-[#7d5a24]" style={{ fontFamily: SERIF }}>{label}</h4>
                 {ids.map((id) => {
-                  const ruledOut = knownToMe.has(id) || notes[id]
-                  const locked = knownToMe.has(id)
+                  // Nothing is pre-struck — the detective marks their own sheet,
+                  // including the cards in their own hand. `inHand` is only a
+                  // faint hint dot so you can find them, not an auto-cross-off.
+                  const ruledOut = !!notes[id]
+                  const inHand = knownToMe.has(id)
                   return (
-                    <button key={id} disabled={locked} onClick={() => toggleNote(id)}
+                    <button key={id} onClick={() => toggleNote(id)}
                       className={`flex w-full items-center justify-between px-1 py-0.5 text-[11px] ${ruledOut ? "text-[#a98f5e] line-through" : "text-[#3a2c14] hover:bg-[#00000010]"}`}>
-                      <span>{cardName(id)}</span>
-                      <span className={`text-[10px] font-black ${locked ? "text-emerald-700" : ruledOut ? "text-red-700/70" : "text-[#b89a5e]"}`}>
-                        {locked ? "✓" : ruledOut ? "✗" : "?"}
+                      <span>{cardName(id)}{inHand && !ruledOut && <span className="ml-1 text-[8px] text-[#b89a5e]">• in hand</span>}</span>
+                      <span className={`text-[10px] font-black ${ruledOut ? "text-red-700/70" : "text-[#b89a5e]"}`}>
+                        {ruledOut ? "✗" : "?"}
                       </span>
                     </button>
                   )
                 })}
               </div>
             ))}
-            <p className="text-[8px] italic text-[#9a7d45]">Cards in your hand or shown to you are ticked. Tap the rest to cross off your own deductions.</p>
+            <p className="text-[8px] italic text-[#9a7d45]">Nothing is crossed off for you — tap your own hand cards and anything shown to you to rule them out yourself.</p>
           </div>
         ) : (
           <div className="min-h-0 flex-1 space-y-1 overflow-y-auto rounded-2xl border border-white/10 bg-black/30 p-3">
