@@ -604,7 +604,10 @@ export default function GamePlayPage() {
       // the party alive so the idle-cleanup sweep never reaps it mid-session.
       supabase
         .from("parties")
-        .update({ game_state: monopolyState, last_active_at: new Date().toISOString() })
+        // status:'playing' marks the party in-progress so the /games and /party
+        // "status===ready" redirect listeners stop firing during play — a member
+        // who wanders back is no longer yanked into the game every ~1.2s.
+        .update({ game_state: monopolyState, last_active_at: new Date().toISOString(), status: "playing" })
         .eq("id", partyId)
         .then(({ error }: any) => { if (error) console.warn("persist game_state failed:", error.message) })
     }, 1200)
@@ -642,7 +645,14 @@ export default function GamePlayPage() {
       recordedResultRef.current = false   // fresh game — allow a new result to record
       setNewAchievements([])
       setGameOverDismissed(false)
-      touchParty(supabase, partyId)       // starting a game counts as activity
+      // Starting a game counts as activity, and promptly marks the party
+      // in-progress so members returning to /games mid-game aren't yanked back.
+      if (partyId && partyId !== "mock-party-id") {
+        supabase.from("parties")
+          .update({ status: "playing", last_active_at: new Date().toISOString() })
+          .eq("id", partyId)
+          .then(() => {}, () => { /* status/last_active_at column may be absent — ignore */ })
+      }
       setMonopolyState(initialState)
       setIsPlaying(true)
 

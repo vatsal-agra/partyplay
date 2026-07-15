@@ -175,6 +175,15 @@ export default function GamesPage() {
         }
 
         if (party) {
+          // Landed here mid-launch — join immediately (closes the race where a
+          // member navigates to /games in the instant the host launches and
+          // misses both the realtime UPDATE and the broadcast). Status flips to
+          // "playing" the moment the game actually starts, so this only fires
+          // during the brief launch window, never during active play.
+          if (party.status === "ready") {
+            router.push(gamePath(party.game_id || "monopoly", `?partyId=${party.id}`))
+            return
+          }
           setActiveParty({
             id: party.id,
             name: party.name,
@@ -218,6 +227,10 @@ export default function GamesPage() {
   useEffect(() => {
     if (!activeParty?.id) return
     const partyId = activeParty.id
+    // Only a genuine transition INTO "ready" should launch. Seed with the status
+    // we already know so a "playing"/"ready" heartbeat that merely re-affirms an
+    // in-progress party never yanks a member who has wandered back to this page.
+    let prevStatus: string | null = activeParty.status ?? null
 
     const channel = supabaseClient
       .channel(`games-voting-${partyId}`)
@@ -231,7 +244,9 @@ export default function GamesPage() {
         { event: "UPDATE", schema: "public", table: "parties", filter: `id=eq.${partyId}` },
         (payload) => {
           const updated = payload.new as any
-          if (updated?.status === "ready") {
+          const wasReady = prevStatus === "ready"
+          prevStatus = updated?.status ?? prevStatus
+          if (updated?.status === "ready" && !wasReady) {
             router.push(gamePath(updated.game_id || "monopoly", `?partyId=${partyId}`))
           }
         }

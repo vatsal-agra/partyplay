@@ -65,6 +65,9 @@ export default function PartyPage() {
   const [guestLoading, setGuestLoading] = useState(false);
   const [guestError, setGuestError] = useState<string | null>(null);
   const launchChannelRef = useRef<RealtimeChannel | null>(null);
+  // Last known party status — so only a genuine transition INTO "ready" (a fresh
+  // launch) auto-redirects, not an in-progress "playing"/"ready" heartbeat.
+  const prevPartyStatusRef = useRef<string | null>(null);
   const supabase = getSupabaseBrowserClient()
 
   const handleGuestJoin = async () => {
@@ -163,7 +166,12 @@ export default function PartyPage() {
       
       if (partyError) throw partyError
 
-      // Auto-redirect if party is ready
+      // Remember the current status for the transition-guarded realtime listener.
+      prevPartyStatusRef.current = partyData?.status ?? null
+
+      // Auto-redirect only if a game is actively being launched. Once a game is
+      // in progress the status is "playing", so reloading /party mid-game no
+      // longer forces the member back into the game.
       if (partyData && partyData.status === 'ready') {
         router.push(gamePath(partyData.game_id || 'monopoly', `?partyId=${partyId}`))
         return
@@ -299,7 +307,9 @@ export default function PartyPage() {
           }, (payload) => {
             console.log('Party updated real-time:', payload.new)
             const updated = payload.new as any
-            if (updated && updated.status === 'ready') {
+            const wasReady = prevPartyStatusRef.current === 'ready'
+            prevPartyStatusRef.current = updated?.status ?? prevPartyStatusRef.current
+            if (updated && updated.status === 'ready' && !wasReady) {
               router.push(gamePath(updated.game_id || 'monopoly', `?partyId=${partyId}`))
             } else {
               getParty(session)
