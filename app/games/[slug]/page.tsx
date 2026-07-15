@@ -118,6 +118,7 @@ export default function GamePlayPage() {
   }
 
   const [isPlaying, setIsPlaying] = useState(false)
+  const [showEndConfirm, setShowEndConfirm] = useState(false)
   const [liveEvent, setLiveEvent] = useState<LiveEvent | null>(null)
   const [lobbyBots, setLobbyBots] = useState<{ id: string; name: string }[]>([])
   const [showRules, setShowRules] = useState(false)
@@ -495,6 +496,11 @@ export default function GamePlayPage() {
         setMonopolyState(payload)
         setIsPlaying(true)
       })
+      .on('broadcast', { event: 'end_game' }, () => {
+        // The host ended the game for everyone — leave the table.
+        const pid = new URLSearchParams(window.location.search).get('partyId')
+        window.location.href = pid && pid !== 'mock-party-id' ? `/party/${pid}` : '/games'
+      })
       .on('broadcast', { event: 'draw' }, ({ payload }) => {
         setLiveEvent({ type: 'draw', payload, t: Date.now() })
       })
@@ -763,8 +769,8 @@ export default function GamePlayPage() {
             transition={{ duration: 0.5 }}
           >
             {/* Game title */}
-            <div className="p-2 bg-black/30 border-b border-white/10">
-              <motion.h1 
+            <div className="flex items-center justify-between gap-2 border-b border-white/10 bg-black/30 p-2">
+              <motion.h1
                 className="text-xl font-bold text-white"
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -772,7 +778,53 @@ export default function GamePlayPage() {
               >
                 {gameData.name}
               </motion.h1>
+              {isPlaying && (
+                <button
+                  onClick={() => setShowEndConfirm(true)}
+                  className="flex flex-shrink-0 items-center gap-1.5 rounded-lg border border-red-500/30 bg-red-950/40 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide text-red-200 transition hover:bg-red-900/50"
+                >
+                  ⏹ End Game
+                </button>
+              )}
             </div>
+
+            {/* End / leave game confirmation */}
+            {showEndConfirm && (
+              <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm" onClick={() => setShowEndConfirm(false)}>
+                <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm rounded-2xl border border-white/15 bg-gradient-to-b from-[#2a2013] to-[#1a130c] p-6 text-center shadow-2xl">
+                  <h3 className="text-lg font-black text-white">End the game?</h3>
+                  <p className="mt-2 text-xs leading-relaxed text-white/60">
+                    Leave the table now{isHost ? ', or end the game for everyone in the party.' : '. The host can end it for the whole party.'}
+                  </p>
+                  <div className="mt-5 flex flex-col gap-2">
+                    {isHost && (
+                      <button
+                        onClick={() => {
+                          activeChannelRef.current?.send({ type: 'broadcast', event: 'end_game', payload: {} })
+                          const pid = new URLSearchParams(window.location.search).get('partyId')
+                          window.location.href = pid && pid !== 'mock-party-id' ? `/party/${pid}` : '/games'
+                        }}
+                        className="w-full rounded-xl bg-gradient-to-r from-red-600 to-rose-600 py-2.5 text-xs font-black uppercase tracking-wider text-white transition hover:brightness-110 active:scale-95"
+                      >
+                        End for Everyone
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        const pid = new URLSearchParams(window.location.search).get('partyId')
+                        window.location.href = pid && pid !== 'mock-party-id' ? `/party/${pid}` : '/games'
+                      }}
+                      className="w-full rounded-xl bg-white/10 py-2.5 text-xs font-bold uppercase text-white transition hover:bg-white/20"
+                    >
+                      {isHost ? 'Just Leave Myself' : 'Leave Game'}
+                    </button>
+                    <button onClick={() => setShowEndConfirm(false)} className="w-full rounded-xl py-2 text-xs font-bold uppercase text-white/50 transition hover:text-white">
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
             
             <div className="flex-1 w-full relative overflow-hidden">
               {isPlaying && gameData.id === 'monopoly' && monopolyState ? (

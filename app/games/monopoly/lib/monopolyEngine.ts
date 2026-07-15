@@ -66,18 +66,19 @@ export interface MonopolyState {
   communityChestDeck: number[];
   chanceIndex: number;
   communityChestIndex: number;
-  phase: 'ROLL' | 'BUY_OR_PASS' | 'RENT' | 'JAIL' | 'BANKRUPTCY' | 'GAME_OVER' | 'AUCTION' | 'DRAW_CARD';
+  phase: 'ROLL' | 'BUY_OR_PASS' | 'RENT' | 'JAIL' | 'BANKRUPTCY' | 'GAME_OVER' | 'AUCTION' | 'DRAW_CARD' | 'CONFIRM_CARD';
   lastDice: [number, number];
   doubleCount: number;
   rolledThisTurn: boolean; // one roll per turn; a bonus roll is only granted on doubles
   pendingCard: 'CHANCE' | 'COMMUNITY_CHEST' | null; // landed on a card tile; draw manually
+  revealedCard: { kind: 'CHANCE' | 'COMMUNITY_CHEST'; cardIndex: number } | null; // drawn, shown, awaiting Confirm
   selectedSpaceIndex: number | null; // For info modal
   debtToPlayerId: string | null; // null means Bank
   debtAmount: number;
   winnerId: string | null;
   tradeSession: TradeSession | null;
   auctionState: AuctionState | null;
-  lastCardDrawn: { type: 'CHANCE' | 'COMMUNITY_CHEST'; text: string } | null;
+  lastCardDrawn: { type: 'CHANCE' | 'COMMUNITY_CHEST'; text: string; by?: string } | null;
   lastRentPaid: { amount: number; from: string; to: string; propertyName: string } | null;
 }
 
@@ -463,6 +464,7 @@ export function initializeGame(playersData: { id: string; name: string; isBot: b
     doubleCount: 0,
     rolledThisTurn: false,
     pendingCard: null,
+    revealedCard: null,
     selectedSpaceIndex: null,
     debtToPlayerId: null,
     debtAmount: 0,
@@ -493,6 +495,7 @@ export function rollDice(state: MonopolyState, manualRoll?: [number, number]): M
     doubleCount: nextDoubleCount,
     rolledThisTurn: true,
     lastCardDrawn: null,
+    revealedCard: null,
     lastRentPaid: null,
     log: nextLogs
   };
@@ -671,46 +674,50 @@ function isColorSetWithPotential(state: MonopolyState, colorGroup: ColorGroup, o
   return groupSpaces.every(s => s.index === landingIndex || state.properties[s.index]?.ownerId === ownerId);
 }
 
-// Draw card routines
-function drawFortuneCard(state: MonopolyState, pid: string): MonopolyState {
-  const cardIndex = state.chanceDeck[state.chanceIndex];
-  const card = CHANCE_CARDS[cardIndex];
-  
-  let nextFortuneIndex = (state.chanceIndex + 1) % CHANCE_CARDS.length;
-  let updated = {
-    ...state,
-    chanceIndex: nextFortuneIndex,
-    lastCardDrawn: { type: 'CHANCE' as const, text: card.text },
-    log: [...state.log, `🃏 ${getPlayerName(state, pid)} drew Fortune card: "${card.text}"`]
-  };
-
-  return card.action(updated, pid);
-}
-
-function drawCommunityChestCard(state: MonopolyState, pid: string): MonopolyState {
-  const cardIndex = state.communityChestDeck[state.communityChestIndex];
-  const card = COMMUNITY_CHEST_CARDS[cardIndex];
-  
-  let nextChestIndex = (state.communityChestIndex + 1) % COMMUNITY_CHEST_CARDS.length;
-  let updated = {
-    ...state,
-    communityChestIndex: nextChestIndex,
-    lastCardDrawn: { type: 'COMMUNITY_CHEST' as const, text: card.text },
-    log: [...state.log, `📦 ${getPlayerName(state, pid)} drew Treasury card: "${card.text}"`]
-  };
-
-  return card.action(updated, pid);
-}
-
 // Action: draw the pending Fortune/Treasury card (player clicked the deck).
+// This only REVEALS the card (flips it face-up and logs it) and parks the game
+// in CONFIRM_CARD — the effect isn't applied until confirmCardAction, so the
+// player sees exactly what they drew before anything happens to their pieces.
 export function drawPendingCard(state: MonopolyState): MonopolyState {
   if (state.phase !== 'DRAW_CARD' || !state.pendingCard) return state;
   const pid = state.players[state.currentPlayerIndex].id;
   const kind = state.pendingCard;
+  if (kind === 'CHANCE') {
+    const cardIndex = state.chanceDeck[state.chanceIndex];
+    const card = CHANCE_CARDS[cardIndex];
+    return {
+      ...state,
+      pendingCard: null,
+      phase: 'CONFIRM_CARD',
+      chanceIndex: (state.chanceIndex + 1) % CHANCE_CARDS.length,
+      revealedCard: { kind: 'CHANCE', cardIndex },
+      lastCardDrawn: { type: 'CHANCE', text: card.text, by: getPlayerName(state, pid) },
+      log: [...state.log, `🃏 ${getPlayerName(state, pid)} drew a Fortune card: "${card.text}"`],
+    };
+  }
+  const cardIndex = state.communityChestDeck[state.communityChestIndex];
+  const card = COMMUNITY_CHEST_CARDS[cardIndex];
+  return {
+    ...state,
+    pendingCard: null,
+    phase: 'CONFIRM_CARD',
+    communityChestIndex: (state.communityChestIndex + 1) % COMMUNITY_CHEST_CARDS.length,
+    revealedCard: { kind: 'COMMUNITY_CHEST', cardIndex },
+    lastCardDrawn: { type: 'COMMUNITY_CHEST', text: card.text, by: getPlayerName(state, pid) },
+    log: [...state.log, `📦 ${getPlayerName(state, pid)} drew a Treasury card: "${card.text}"`],
+  };
+}
+
+// Action: apply the revealed card's effect (player pressed "Confirm card action").
+export function confirmCardAction(state: MonopolyState): MonopolyState {
+  if (state.phase !== 'CONFIRM_CARD' || !state.revealedCard) return state;
+  const pid = state.players[state.currentPlayerIndex].id;
+  const { kind, cardIndex } = state.revealedCard;
+  const card = kind === 'CHANCE' ? CHANCE_CARDS[cardIndex] : COMMUNITY_CHEST_CARDS[cardIndex];
   // Reset to ROLL first; the card's action overrides the phase if it needs to
   // (move -> BUY_OR_PASS, unaffordable -> BANKRUPTCY, go-to-jail -> ROLL, …).
-  const s: MonopolyState = { ...state, pendingCard: null, phase: 'ROLL' };
-  return kind === 'CHANCE' ? drawFortuneCard(s, pid) : drawCommunityChestCard(s, pid);
+  const s: MonopolyState = { ...state, revealedCard: null, phase: 'ROLL' };
+  return card.action(s, pid);
 }
 
 // Action: Buy current property
@@ -1242,6 +1249,7 @@ export function endTurn(state: MonopolyState): MonopolyState {
     doubleCount: nextDoubleCount,
     rolledThisTurn: false, // fresh roll available for the (possibly same, on doubles) player
     phase: 'ROLL', // Reset phase
+    revealedCard: null, // any card was already confirmed; lastCardDrawn lingers for the toast until the next roll
     log: [...nextLogs, `👉 It is now ${nextPlayer.name}'s turn.`]
   };
 }
@@ -1269,10 +1277,11 @@ export function playBotTurn(state: MonopolyState): MonopolyState {
     current = rollDice(current);
   }
 
-  // 2b. Bots draw their pending card automatically (may chain via advance-cards)
+  // 2b. Bots draw AND confirm their pending card automatically (the reveal +
+  // confirm are separate for humans, but a bot does both in one turn).
   let cardGuard = 0;
-  while (current.phase === 'DRAW_CARD' && cardGuard++ < 6) {
-    current = drawPendingCard(current);
+  while ((current.phase === 'DRAW_CARD' || current.phase === 'CONFIRM_CARD') && cardGuard++ < 8) {
+    current = current.phase === 'DRAW_CARD' ? drawPendingCard(current) : confirmCardAction(current);
   }
 
   bot = getActivePlayer(current);

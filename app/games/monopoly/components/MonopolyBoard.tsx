@@ -57,7 +57,8 @@ export default function MonopolyBoard({ state, currentPlayerId, onStateChange, o
   const [selectedSpaceIndex, setSelected] = useState<number | null>(null)
   const [showTradeDialog, setShowTrade]   = useState(false)
   const [activeTab, setActiveTab]         = useState<'HUD' | 'PROPS'>('HUD')
-  const [showCardDraw, setShowCardDraw]   = useState(false)
+  const [cardToast, setCardToast]         = useState<{ text: string; type: 'CHANCE' | 'COMMUNITY_CHEST'; name: string } | null>(null)
+  const [feed, setFeed]                   = useState<{ id: number; text: string }[]>([])
   const [customBidVal, setCustomBidVal]   = useState("")
   const [endDismissed, setEndDismissed]   = useState(false)
   // Pre-computed roll result: dice tumble in 3D, state commits on settle.
@@ -70,6 +71,20 @@ export default function MonopolyBoard({ state, currentPlayerId, onStateChange, o
   const logEndRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [state.log])
+
+  // Transient headline feed: each new log line pops in at the top, then fades
+  // out on its own after a few seconds instead of sitting there permanently.
+  const feedLogLen = useRef(state.log.length)
+  const feedIdRef = useRef(0)
+  useEffect(() => {
+    const fresh = state.log.slice(feedLogLen.current)
+    feedLogLen.current = state.log.length
+    if (!fresh.length) return
+    const items = fresh.map((text) => ({ id: ++feedIdRef.current, text }))
+    setFeed((f) => [...f, ...items].slice(-3))
+    const timers = items.map((it) => setTimeout(() => setFeed((f) => f.filter((x) => x.id !== it.id)), 4200))
+    return () => timers.forEach(clearTimeout)
   }, [state.log])
 
   const commit = (next: MonopolyState) => {
@@ -88,19 +103,25 @@ export default function MonopolyBoard({ state, currentPlayerId, onStateChange, o
     if (!gameOver) setEndDismissed(false)
   }, [gameOver])
 
-  // Show card draw overlay when state changes and contains a card draw
+  // Side toast when SOMEONE ELSE (another player or a bot) draws a card — the
+  // drawer themselves gets the full confirm overlay instead. Bot draws are
+  // delayed so the toast lands after the token has reached its tile, not before.
+  const lastCardKeyRef = useRef<string | null>(null)
   useEffect(() => {
-    if (state.lastCardDrawn) {
-      setShowCardDraw(true)
-      // If it is a bot's card draw, auto close after 2.5 seconds
-      if (curPlayer.isBot) {
-        const timer = setTimeout(() => setShowCardDraw(false), 2500)
-        return () => clearTimeout(timer)
-      }
-    } else {
-      setShowCardDraw(false)
-    }
-  }, [state.lastCardDrawn, curPlayer.isBot])
+    const card = state.lastCardDrawn
+    if (!card) { lastCardKeyRef.current = null; return }
+    const key = `${card.by ?? ''}:${card.text}`
+    if (key === lastCardKeyRef.current) return
+    lastCardKeyRef.current = key
+    // The human drawer is shown the big confirm overlay, so skip their toast.
+    if (isMyTurn && !curPlayer.isBot && state.phase === 'CONFIRM_CARD') return
+    const drewByBot = card.by ? !!state.players.find(p => p.name === card.by)?.isBot : curPlayer.isBot
+    const delay = drewByBot ? 1800 : 200
+    const show = setTimeout(() => setCardToast({ text: card.text, type: card.type, name: card.by || 'Someone' }), delay)
+    const hide = setTimeout(() => setCardToast(null), delay + 4500)
+    return () => { clearTimeout(show); clearTimeout(hide) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.lastCardDrawn])
 
   // Bot auto-play loop with doubles and auction handling. Full-state deps so a
   // pending timer never fires against a stale snapshot; spectators never drive.
@@ -199,20 +220,20 @@ export default function MonopolyBoard({ state, currentPlayerId, onStateChange, o
         />
         <Confetti fire={gameOver && state.winnerId === currentPlayerId} />
 
-        {/* live feed */}
-        <div className="pointer-events-none absolute top-3 left-3 z-10 flex w-[290px] max-w-[46%] flex-col gap-1">
+        {/* transient headline feed — pops in at top-center, fades on its own */}
+        <div className="pointer-events-none absolute top-3 left-1/2 z-10 flex w-[360px] max-w-[74%] -translate-x-1/2 flex-col items-center gap-1.5">
           <AnimatePresence initial={false}>
-            {state.log.slice(-4).reverse().map((msg, i) => (
+            {feed.map((m) => (
               <motion.div
-                key={msg + (state.log.length - i)}
+                key={m.id}
                 layout
-                initial={{ opacity: 0, x: -18 }}
-                animate={{ opacity: i === 0 ? 1 : 0.55 - i * 0.1, x: 0 }}
-                exit={{ opacity: 0, x: -12 }}
-                transition={{ duration: 0.25 }}
-                className="rounded-lg border border-white/10 bg-black/55 px-2.5 py-1.5 text-[10px] leading-snug text-white/90 backdrop-blur"
+                initial={{ opacity: 0, y: -16, scale: 0.85 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -8, scale: 0.9 }}
+                transition={{ type: 'spring', stiffness: 420, damping: 30 }}
+                className="max-w-full rounded-full border border-[#d6a85c]/30 bg-black/72 px-4 py-1.5 text-center text-[11px] font-semibold leading-snug text-white shadow-[0_6px_20px_-6px_rgba(0,0,0,0.8)] backdrop-blur"
               >
-                {msg}
+                {m.text}
               </motion.div>
             ))}
           </AnimatePresence>
@@ -225,7 +246,7 @@ export default function MonopolyBoard({ state, currentPlayerId, onStateChange, o
               initial={{ opacity: 0, y: -16, scale: 0.92 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -16 }}
-              className="pointer-events-none absolute inset-x-0 top-3 z-10 flex justify-center"
+              className="pointer-events-none absolute inset-x-0 top-16 z-10 flex justify-center"
             >
               <div className="flex items-center gap-1.5 rounded-full border border-red-500/40 bg-red-950/85 px-4 py-1.5 font-mono text-[10px] text-white backdrop-blur">
                 <DollarSign className="h-3.5 w-3.5 text-[#e6b45a]" />
@@ -235,10 +256,60 @@ export default function MonopolyBoard({ state, currentPlayerId, onStateChange, o
           )}
         </AnimatePresence>
 
+        {/* card-draw side toast — shown to everyone who isn't the drawer */}
+        <AnimatePresence>
+          {cardToast && (
+            <motion.div
+              initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 30 }}
+              className="pointer-events-none absolute right-3 top-16 z-20 flex max-w-[230px] items-start gap-2 rounded-xl border px-3 py-2 backdrop-blur"
+              style={{ background: 'rgba(0,0,0,0.72)', borderColor: cardToast.type === 'CHANCE' ? 'rgba(239,139,51,0.4)' : 'rgba(232,197,58,0.4)' }}
+            >
+              <span className="text-lg leading-none">{cardToast.type === 'CHANCE' ? '❓' : '📦'}</span>
+              <div className="min-w-0">
+                <p className="text-[9px] font-black uppercase tracking-wider" style={{ color: cardToast.type === 'CHANCE' ? '#ef8b33' : '#e8c53a' }}>
+                  {cardToast.name} drew {cardToast.type === 'CHANCE' ? 'Fortune' : 'Treasury'}
+                </p>
+                <p className="mt-0.5 text-[10px] leading-snug text-white/85">{cardToast.text}</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* spectator chip */}
         {isSpectator && (
           <div className="pointer-events-none absolute top-3 right-3 z-10 rounded-full border border-white/15 bg-black/55 px-3 py-1 text-[10px] text-white/60 backdrop-blur">👁 Spectating</div>
         )}
+
+        {/* my title deeds — a fanned hand of cards right on the board, like the
+            other games, so you never have to dig through a tab to see them */}
+        {!isSpectator && (() => {
+          const myProps = Object.entries(state.properties)
+            .filter(([, s]) => s.ownerId === currentPlayerId)
+            .map(([i]) => +i)
+          if (myProps.length === 0) return null
+          return (
+            <div className="pointer-events-none absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 items-end">
+              {myProps.map((i, k) => {
+                const sp = BOARD_SPACES[i]
+                const prop = state.properties[i]
+                const color = GROUP_COLORS[sp.group] || '#888'
+                const status = prop.houses === 5 ? '🏨' : prop.houses > 0 ? `🏠${prop.houses}` : prop.isMortgaged ? '🚫' : `$${calculateRent(state, i)}`
+                return (
+                  <div key={i}
+                    className="flex h-[68px] w-12 flex-col overflow-hidden rounded-md border border-black/50 bg-[#f5efdd] shadow-[0_4px_10px_-2px_rgba(0,0,0,0.7)]"
+                    style={{ marginLeft: k === 0 ? 0 : -14, transform: `rotate(${(k - (myProps.length - 1) / 2) * 3}deg)`, transformOrigin: 'bottom center' }}
+                    title={`${sp.name} · ${prop.isMortgaged ? 'mortgaged' : '$' + calculateRent(state, i) + ' rent'}`}>
+                    <div className="h-3.5 w-full flex-shrink-0" style={{ background: color }} />
+                    <div className="flex flex-1 flex-col justify-between p-0.5 text-center">
+                      <span className="line-clamp-2 text-[6.5px] font-black uppercase leading-[1.05] text-[#1f1b12]">{sp.name}</span>
+                      <span className="text-[7px] font-black text-[#1f1b12]/75">{status}</span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })()}
 
         {/* orbit hint */}
         <div className="pointer-events-none absolute bottom-3 right-3 hidden rounded-full border border-white/10 bg-black/40 px-3 py-1 text-[10px] text-white/35 backdrop-blur lg:block">
@@ -351,6 +422,19 @@ export default function MonopolyBoard({ state, currentPlayerId, onStateChange, o
                   {isMyTurn && !curPlayer.isBot
                     ? <>Click the glowing <strong className="text-[#e8c987]">{state.pendingCard === 'CHANCE' ? 'Fortune' : 'Treasury'}</strong> deck on the board to draw your card.</>
                     : `${curPlayer.name} is drawing a card…`}
+                </p>
+              </motion.div>
+            )}
+
+            {/* Confirm the drawn card's effect */}
+            {state.phase === 'CONFIRM_CARD' && (
+              <motion.div key="confirm-context" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                className="glass flex flex-col items-center gap-2 rounded-2xl p-4 text-center">
+                <span className="text-2xl">{state.lastCardDrawn?.type === 'CHANCE' ? '❓' : '📦'}</span>
+                <p className="text-[11px] leading-snug text-white/70">
+                  {isMyTurn && !curPlayer.isBot
+                    ? <>Read your card, then press <strong className="text-[#e8c987]">Confirm Card Action</strong> to apply it.</>
+                    : `${curPlayer.name} is resolving a card…`}
                 </p>
               </motion.div>
             )}
@@ -506,14 +590,18 @@ export default function MonopolyBoard({ state, currentPlayerId, onStateChange, o
         {/* Trade and end turn — only after you've taken your roll (a non-double,
             so no bonus roll is pending). Prevents skipping or repeating the roll. */}
         {isMyTurn && !curPlayer.isBot && state.phase === 'ROLL' && !isRolling && state.rolledThisTurn && state.doubleCount === 0 && (
-          <div className="glass flex gap-2 rounded-2xl p-2">
+          <div className="flex flex-col gap-2">
+            {/* End Turn is the whole point of this moment — make it unmissable */}
+            <motion.button onClick={() => act('endTurn')}
+              initial={{ scale: 0.96, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1, boxShadow: ['0 0 0px rgba(214,168,92,0.0)', '0 0 22px rgba(214,168,92,0.55)', '0 0 0px rgba(214,168,92,0.0)'] }}
+              transition={{ boxShadow: { repeat: Infinity, duration: 2 } }}
+              className="bg-brand flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-black uppercase tracking-[0.15em] text-white shadow-glow-grape transition active:scale-95">
+              End Turn <ChevronRight className="h-5 w-5" />
+            </motion.button>
             <button onClick={() => setShowTrade(true)}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-white/10 py-2 text-[10px] font-bold uppercase text-white transition hover:bg-white/20">
-              <HeartHandshake className="h-3.5 w-3.5 text-[#d6a85c]" /> Trade
-            </button>
-            <button onClick={() => act('endTurn')}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-white/10 py-2 text-[10px] font-bold uppercase text-white transition hover:bg-white/20">
-              End Turn <ChevronRight className="h-3.5 w-3.5 text-[#d6a85c]" />
+              className="flex items-center justify-center gap-1.5 rounded-xl bg-white/10 py-2 text-[10px] font-bold uppercase text-white/80 transition hover:bg-white/20">
+              <HeartHandshake className="h-3.5 w-3.5 text-[#d6a85c]" /> Propose a Trade First
             </button>
           </div>
         )}
@@ -525,7 +613,7 @@ export default function MonopolyBoard({ state, currentPlayerId, onStateChange, o
               className={`flex-1 rounded-xl py-2 text-center text-[10px] font-black uppercase tracking-wider transition ${
                 activeTab === tab ? 'border border-[#d6a85c]/30 bg-[#d6a85c]/15 text-[#f0d9a4]' : 'text-white/35 hover:text-white/70'
               }`}>
-              {tab === 'HUD' ? '📊 Standings' : '🏠 Estates'}
+              {tab === 'HUD' ? '📊 Standings' : '🛠 Manage'}
             </button>
           ))}
         </div>
@@ -594,7 +682,16 @@ export default function MonopolyBoard({ state, currentPlayerId, onStateChange, o
         {/* ESTATES TAB */}
         {activeTab === 'PROPS' && (
           <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-0.5 scrollbar-thin">
-            <h4 className="mb-1 text-[10px] font-black uppercase tracking-wider text-white/35">My Owned Titles</h4>
+            <div className="mb-1 flex items-center justify-between">
+              <h4 className="text-[10px] font-black uppercase tracking-wider text-white/35">Assets · Trade · Mortgage · Build</h4>
+              <button
+                onClick={() => setShowTrade(true)}
+                disabled={isSpectator || curPlayer.isBot || !isMyTurn || state.phase !== 'ROLL'}
+                className="flex items-center gap-1 rounded-lg bg-[#d6a85c]/15 px-2 py-1 text-[9px] font-black uppercase text-[#f0d9a4] transition hover:bg-[#d6a85c]/30 disabled:opacity-35"
+                title={isMyTurn ? 'Propose a trade' : 'Trade on your turn'}>
+                <HeartHandshake className="h-3 w-3" /> Trade
+              </button>
+            </div>
             {(() => {
               const myProps = Object.entries(state.properties)
                 .filter(([, s]) => s.ownerId === currentPlayerId)
@@ -673,21 +770,25 @@ export default function MonopolyBoard({ state, currentPlayerId, onStateChange, o
           />
         )}
 
-        {/* Chance / Community Chest card draw popup */}
-        {showCardDraw && state.lastCardDrawn && (
-          <PropertyCardView
-            space={BOARD_SPACES[curPlayer.position]}
-            isCardDraw={true}
-            cardText={state.lastCardDrawn.text}
-            cardType={state.lastCardDrawn.type}
-            onClose={() => {
-              setShowCardDraw(false)
-              // Clear card draw status after client closes to keep sync tidy
-              if (isMyTurn && !curPlayer.isBot) {
-                commit({ ...state, lastCardDrawn: null })
-              }
-            }}
-          />
+        {/* Fortune/Treasury — the drawer alone sees the full card and must
+            press Confirm before its effect is applied. */}
+        {state.phase === 'CONFIRM_CARD' && state.lastCardDrawn && isMyTurn && !curPlayer.isBot && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+            <motion.div initial={{ scale: 0.82, rotateY: -25, opacity: 0 }} animate={{ scale: 1, rotateY: 0, opacity: 1 }}
+              className="w-full max-w-xs rounded-2xl border-2 p-6 text-center shadow-2xl"
+              style={{ background: 'linear-gradient(160deg,#2a2013,#160f08)', borderColor: state.lastCardDrawn.type === 'CHANCE' ? '#ef8b33' : '#e8c53a' }}>
+              <span className="text-4xl">{state.lastCardDrawn.type === 'CHANCE' ? '❓' : '📦'}</span>
+              <h3 className="mt-2 font-mono text-[10px] font-black uppercase tracking-[0.3em]"
+                style={{ color: state.lastCardDrawn.type === 'CHANCE' ? '#ef8b33' : '#e8c53a' }}>
+                {state.lastCardDrawn.type === 'CHANCE' ? 'Fortune' : 'Treasury'}
+              </h3>
+              <p className="mt-3 text-sm font-semibold leading-relaxed text-white" style={{ fontFamily: SERIF }}>{state.lastCardDrawn.text}</p>
+              <button onClick={() => act('confirmCardAction')}
+                className="bg-brand mt-5 w-full rounded-xl py-2.5 text-xs font-black uppercase tracking-widest text-white shadow-glow-grape transition active:scale-95">
+                Confirm Card Action
+              </button>
+            </motion.div>
+          </div>
         )}
 
         {/* Incoming trade dialog offer */}

@@ -270,11 +270,17 @@ function FleetShip({ ship, shotsOnMe, phase }: { ship: Ship; shotsOnMe: Record<s
   useFrame(({ clock }, dt) => {
     if (!g.current) return
     if (ship.sunk) {
-      sunkT.current = Math.min(1, sunkT.current + dt * 0.5)
+      sunkT.current = Math.min(1, sunkT.current + dt * 0.42)
       const k = sunkT.current
-      g.current.position.y = -k * 0.55
-      g.current.rotation.z = k * 0.55
-      g.current.rotation.x = k * 0.12
+      const ease = k * k * (3 - 2 * k)                       // smoothstep
+      // she rolls hard onto her side as she goes down…
+      g.current.rotation.z = ease * 0.92
+      // …bow heaves up mid-sink, then pitches under bow-first
+      g.current.rotation.x = Math.sin(k * Math.PI) * 0.3 - ease * 0.55
+      // settle, then accelerate down below the waves so she vanishes cleanly
+      g.current.position.y = -Math.pow(k, 1.7) * 1.9
+      // a dying shudder that fades out as she slips under
+      g.current.position.x = Math.sin(clock.elapsedTime * 20) * (1 - k) * 0.035
     } else {
       const t = clock.elapsedTime
       g.current.position.y = Math.sin(t * 1.1 + phase) * 0.045

@@ -164,25 +164,32 @@ function centerTexture(): THREE.CanvasTexture {
   g.addColorStop(1, "rgba(90,110,80,0.25)")
   ctx.fillStyle = g
   ctx.fillRect(0, 0, 512, 512)
-  // branding banner
+  // branding banner — auto-fit the title so it never spills past the red plate,
+  // sit it a little higher and drop the tagline so they never overlap.
   ctx.save()
-  ctx.translate(256, 232)
-  ctx.rotate(-0.16)
+  ctx.translate(256, 212)
+  ctx.rotate(-0.11)
+  const BOX_W = 456, BOX_H = 82
   ctx.fillStyle = "#d9362c"
-  ctx.fillRect(-215, -42, 430, 84)
+  ctx.fillRect(-BOX_W / 2, -BOX_H / 2, BOX_W, BOX_H)
   ctx.strokeStyle = "#f5f2e6"
   ctx.lineWidth = 6
-  ctx.strokeRect(-215, -42, 430, 84)
+  ctx.strokeRect(-BOX_W / 2, -BOX_H / 2, BOX_W, BOX_H)
   ctx.fillStyle = "#f5f2e6"
-  ctx.font = "900 44px Georgia, serif"
   ctx.textAlign = "center"
   ctx.textBaseline = "middle"
+  let titleFs = 46
+  ctx.font = `900 ${titleFs}px Georgia, serif`
+  while (ctx.measureText("PROPERTY EMPIRE").width > BOX_W - 44 && titleFs > 26) {
+    titleFs -= 2
+    ctx.font = `900 ${titleFs}px Georgia, serif`
+  }
   ctx.fillText("PROPERTY EMPIRE", 0, 2)
   ctx.restore()
   ctx.fillStyle = "rgba(31,27,18,0.55)"
   ctx.font = "900 17px Georgia, serif"
   ctx.textAlign = "center"
-  ctx.fillText("DICE ALLEY CLASSIC EDITION", 256, 300)
+  ctx.fillText("DICE ALLEY CLASSIC EDITION", 256, 312)
   const t = new THREE.CanvasTexture(c)
   t.anisotropy = 8
   texCache.set("center", t)
@@ -337,25 +344,31 @@ function TokenShape({ seat, color }: { seat: number; color: string }) {
 }
 
 // Board-track player token: hops tile-by-tile toward its target space.
-function PlayerToken({ player, seat, isCurrent }: { player: Player; seat: number; isCurrent: boolean }) {
+function PlayerToken({ player, seat, isCurrent, stackIndex, stackCount }: {
+  player: Player; seat: number; isCurrent: boolean; stackIndex: number; stackCount: number
+}) {
   const g = useRef<THREE.Group>(null)
   const shown = useRef<number>(player.position)   // continuously displayed index
   const hop = useRef(0)                           // 0..1 progress of current hop
   const ring = useRef<THREE.Mesh>(null)
 
-  // per-seat offset so tokens on the same tile don't overlap
-  const off = useMemo(() => ({
-    x: ((seat % 3) - 1) * 0.28,
-    z: (Math.floor(seat / 3) - 0.5) * 0.3,
-  }), [seat])
-
+  // A lone token sits dead-center on its tile; when several share a tile they
+  // fan out along the tile's depth (perpendicular to its edge) so they queue
+  // one behind another instead of colliding into one blob.
   const posOf = (idx: number) => {
     const t = tileTransform(Math.round(idx) % 40)
-    return { x: t.x + off.x, z: t.z + off.z }
+    const lz = stackCount > 1 ? (stackIndex - (stackCount - 1) / 2) * 0.44 : 0
+    return { x: t.x + lz * Math.sin(t.rotY), z: t.z + lz * Math.cos(t.rotY) }
   }
 
   useFrame(({ clock }, dt) => {
     if (!g.current) return
+    // Sent to jail — glide straight to the cell in one displacement instead of
+    // hopping through every tile (which looked chaotic right after the roll).
+    if (player.inJail && player.position === 10 && shown.current !== 10) {
+      shown.current = 10
+      hop.current = 0
+    }
     const target = player.position
     let cur = shown.current
     if (cur !== target) {
@@ -390,7 +403,7 @@ function PlayerToken({ player, seat, isCurrent }: { player: Player; seat: number
   if (player.isBankrupt) return null
   const start = posOf(player.position)
   return (
-    <group ref={g} position={[start.x, BOARD_Y, start.z]} scale={0.92}>
+    <group ref={g} position={[start.x, BOARD_Y, start.z]} scale={1.22}>
       <TokenShape seat={seat} color={player.color} />
       {isCurrent && (
         <mesh ref={ring} rotation-x={-Math.PI / 2} position={[0, 0.012, 0]}>
@@ -575,6 +588,20 @@ function Scene({ state, rolling, canDrawCard, onDiceSettled, onTileClick, onDraw
     }
   }, [state.players])
 
+  // "Passed GO" celebration — a golden +$200 burst over the GO corner.
+  const [goBursts, setGoBursts] = useState<number[]>([])
+  const goId = useRef(0)
+  const prevLogLen = useRef(state.log.length)
+  useEffect(() => {
+    const freshLines = state.log.slice(prevLogLen.current)
+    prevLogLen.current = state.log.length
+    if (freshLines.some((l) => l.includes("Passed GO"))) {
+      const id = ++goId.current
+      setGoBursts((b) => [...b, id])
+      setTimeout(() => setGoBursts((b) => b.filter((x) => x !== id)), 1800)
+    }
+  }, [state.log])
+
   return (
     <>
       {/* warm parlor lighting */}
@@ -669,16 +696,41 @@ function Scene({ state, rolling, canDrawCard, onDiceSettled, onTileClick, onDraw
         )
       })}
 
-      {/* tokens */}
-      {state.players.map((p, i) => (
-        <PlayerToken key={p.id} player={p} seat={i} isCurrent={p.id === cur.id && !p.isBankrupt} />
-      ))}
+      {/* tokens — grouped per tile so co-located pieces fan out and center */}
+      {(() => {
+        const onTile: Record<number, string[]> = {}
+        state.players.forEach((p) => {
+          if (p.isBankrupt) return
+          if (!onTile[p.position]) onTile[p.position] = []
+          onTile[p.position].push(p.id)
+        })
+        return state.players.map((p, i) => {
+          const mates = onTile[p.position] || [p.id]
+          return (
+            <PlayerToken key={p.id} player={p} seat={i} isCurrent={p.id === cur.id && !p.isBankrupt}
+              stackIndex={Math.max(0, mates.indexOf(p.id))} stackCount={mates.length} />
+          )
+        })
+      })()}
 
       {/* dice */}
       <Dice dice={state.lastDice} rolling={rolling} onSettled={onDiceSettled} />
 
       {/* cash floaters */}
       {cashFx.map((fx) => <CashFloat key={fx.id} fx={fx} />)}
+
+      {/* GO salary celebration */}
+      {goBursts.map((id) => {
+        const gt = tileTransform(0)
+        return (
+          <Html key={id} position={[gt.x, BOARD_Y + 0.95, gt.z]} center distanceFactor={11} style={{ pointerEvents: "none" }}>
+            <div style={{ fontFamily: "monospace", fontWeight: 900, fontSize: 20, whiteSpace: "nowrap", color: "#ffdf6b", textShadow: "0 2px 12px rgba(0,0,0,0.95)", animation: "dicealley-goburst 1.7s ease-out forwards" }}>
+              💰 +$200 · GO!
+            </div>
+            <style>{`@keyframes dicealley-goburst { 0%{opacity:0;transform:scale(0.5) translateY(12px)} 20%{opacity:1;transform:scale(1.18) translateY(0)} 45%{transform:scale(1)} 100%{opacity:0;transform:scale(1) translateY(-42px)} }`}</style>
+          </Html>
+        )
+      })}
 
       <OrbitControls
         makeDefault enablePan={false} minDistance={8} maxDistance={30}
