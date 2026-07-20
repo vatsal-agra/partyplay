@@ -370,11 +370,11 @@ function Scene({ state, meIndex, isSpectator, reveal }: PokerScene3DProps) {
             {/* seated player figure — opponents only (I'm the camera at my seat) */}
             {!mine && (
               <group
-                position={[Math.cos(ang) * (TA + 0.4), -0.55, Math.sin(ang) * (TB + 0.4)]}
+                position={[Math.cos(ang) * (TA + 0.55), -1.05, Math.sin(ang) * (TB + 0.5)]}
                 rotation-y={Math.atan2(-Math.cos(ang), -Math.sin(ang))}
-                scale={0.9}
+                scale={1.25}
               >
-                <Mannequin name={p.name} color={SEAT_COLORS[idx % SEAT_COLORS.length]} isBot={p.isBot} active={isCur} index={idx} showName={false} />
+                <Mannequin name={p.name} color={SEAT_COLORS[idx % SEAT_COLORS.length]} isBot={p.isBot} active={isCur} index={idx} showName={false} seated />
               </group>
             )}
 

@@ -719,7 +719,7 @@ function Scene({ state, rolling, canDrawCard, onDiceSettled, onTileClick, onDraw
         players={state.players.filter((p) => !p.isBankrupt).map((p) => ({
           id: p.id, name: p.name, color: p.color, isBot: p.isBot, active: p.id === cur.id,
         }))}
-        radius={8} y={-0.35} scale={0.78} startAngle={-Math.PI / 2}
+        radius={8} y={-1.5} scale={1.2} startAngle={-Math.PI / 2} seated
       />
 
       {/* dice */}

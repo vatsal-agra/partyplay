@@ -95,7 +95,7 @@ export default function MonopolyBoard({ state, currentPlayerId, onStateChange, o
   const seatIndex = state.players.findIndex(p => p.id === currentPlayerId)
   const isSpectator = seatIndex === -1
   const curPlayer = state.players[state.currentPlayerIndex]
-  const isMyTurn  = !isSpectator && curPlayer.id === currentPlayerId
+  const isMyTurn  = !isSpectator && curPlayer?.id === currentPlayerId
   const isRolling = !!pendingRoll
   const gameOver = state.phase === 'GAME_OVER' || !!state.winnerId
 
@@ -115,7 +115,7 @@ export default function MonopolyBoard({ state, currentPlayerId, onStateChange, o
     lastCardKeyRef.current = key
     // The human drawer is shown the big confirm overlay, so skip their toast.
     if (isMyTurn && !curPlayer.isBot && state.phase === 'CONFIRM_CARD') return
-    const drewByBot = card.by ? !!state.players.find(p => p.name === card.by)?.isBot : curPlayer.isBot
+    const drewByBot = card.by ? !!state.players.find(p => p.name === card.by)?.isBot : !!curPlayer?.isBot
     const delay = drewByBot ? 1800 : 200
     const show = setTimeout(() => setCardToast({ text: card.text, type: card.type, name: card.by || 'Someone' }), delay)
     const hide = setTimeout(() => setCardToast(null), delay + 4500)
@@ -203,6 +203,20 @@ export default function MonopolyBoard({ state, currentPlayerId, onStateChange, o
       }
     })
     return w
+  }
+
+  // A restored/desynced snapshot can point currentPlayerIndex at a seat that
+  // no longer exists. Bail to a friendly notice instead of dereferencing
+  // undefined mid-render, which white-screened the whole game page.
+  if (!curPlayer) {
+    return (
+      <div className="flex h-full w-full items-center justify-center p-6 text-center" style={{ background: '#120d08' }}>
+        <div className="glass max-w-sm rounded-2xl p-8">
+          <p className="text-sm font-black text-white" style={{ fontFamily: SERIF }}>Restoring the board…</p>
+          <p className="mt-2 text-xs text-white/50">This game&apos;s saved state looks out of date. Start a new game from the lobby if it doesn&apos;t recover.</p>
+        </div>
+      </div>
+    )
   }
 
   return (
