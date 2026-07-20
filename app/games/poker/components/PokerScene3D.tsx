@@ -308,7 +308,8 @@ function Scene({ state, meIndex, isSpectator, reveal }: PokerScene3DProps) {
       <pointLight position={[8, 5, -6]} intensity={14} color="#ffd9a0" distance={24} decay={2} />
 
       {/* the card room itself, instead of a black void */}
-      <RoomBox size={46} height={18} y={-1.2} wall="#2b2018" floor="#17120d" accent="#40301e" glow="#ffca85" />
+      {/* wider than OrbitControls' maxDistance (22) so the camera stays inside */}
+      <RoomBox size={54} height={20} y={-1.2} floor="#17120d" glow="#ffca85" />
 
       {/* table: felt + wood rail */}
       <group scale={[TA / 5, 1, TB / 5]}>

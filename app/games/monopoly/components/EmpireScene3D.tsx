@@ -615,7 +615,9 @@ function Scene({ state, rolling, canDrawCard, onDiceSettled, onTileClick, onDraw
       <pointLight position={[9, 6, 6]} intensity={14} color="#ffdca8" distance={26} decay={2} />
 
       {/* the games room around it, instead of a black void */}
-      <RoomBox size={54} height={20} y={-3.9} wall="#2a2018" floor="#171008" accent="#3e2e1c" glow="#ffd79a" />
+      {/* room must be wider than OrbitControls' maxDistance (30) or the camera
+          orbits outside it and the inward-facing walls disappear */}
+      <RoomBox size={70} height={24} y={-3.9} floor="#171008" glow="#ffd79a" />
 
       {/* the table the board actually sits on (a real table, not an endless plane) */}
       <mesh rotation-x={-Math.PI / 2} position={[0, -0.35, 0]} receiveShadow>
