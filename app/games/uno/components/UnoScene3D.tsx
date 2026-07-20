@@ -12,6 +12,11 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react"
 import { Canvas, useFrame, ThreeEvent } from "@react-three/fiber"
 import { OrbitControls, Html } from "@react-three/drei"
 import { EffectComposer, Bloom, Vignette, SMAA } from "@react-three/postprocessing"
+import { Mannequin } from "@/components/three/Mannequins"
+import { RoomBox } from "@/components/three/RoomBox"
+
+// per-seat identity colours for the seated mannequins
+const UNO_SEAT_COLORS = ["#d9453a", "#3558c9", "#3fa356", "#e8c53a", "#e05a9e", "#57b8e8", "#ef8b33", "#7a86c9"]
 import {
   UnoState, Card, Color, symbolFor,
 } from "../lib/unoEngine"
@@ -360,6 +365,32 @@ function Scene({ state, meIndex, isSpectator, isMyTurn, canDraw, onPlayCard, onD
       <spotLight position={[0, 12, 2]} angle={0.7} penumbra={0.6} intensity={230} color="#f2ead2" castShadow
         shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004} />
       <pointLight ref={colorLight} position={[0, 4.5, -0.4]} intensity={26} color={activeHex} distance={16} decay={2} />
+
+      {/* games room (wider than OrbitControls maxDistance 22) */}
+      <RoomBox size={54} height={20} y={-1.2} floor="#12131a" glow="#9fb0ff" />
+
+      {/* the other players seated around the table (I'm the camera) */}
+      {state.players.map((p, idx) => {
+        if (idx === meIndex) return null
+        const n = Math.max(1, state.players.length)
+        const rel = ((idx - meIndex) % n + n) % n
+        const ang = Math.PI / 2 + (rel / n) * Math.PI * 2
+        const R = 9.4
+        return (
+          <group
+            key={`mq-${p.id}`}
+            position={[Math.cos(ang) * R, -2.45, Math.sin(ang) * R]}
+            rotation-y={Math.atan2(-Math.cos(ang), -Math.sin(ang))}
+            scale={1.9}
+          >
+            <Mannequin
+              name={p.name} color={UNO_SEAT_COLORS[idx % UNO_SEAT_COLORS.length]}
+              isBot={p.isBot} active={state.players[state.currentPlayerIndex]?.id === p.id}
+              index={idx} seated showName={false}
+            />
+          </group>
+        )
+      })}
 
       {/* floor */}
       <mesh rotation-x={-Math.PI / 2} position={[0, -1.2, 0]} receiveShadow>

@@ -12,6 +12,8 @@ import { Suspense, useMemo, useRef } from "react"
 import { Canvas, useFrame, ThreeEvent } from "@react-three/fiber"
 import { OrbitControls, RoundedBox, Html, Environment, Lightformer, ContactShadows, useTexture } from "@react-three/drei"
 import { EffectComposer, Bloom, Vignette, SMAA } from "@react-three/postprocessing"
+import { Mannequins } from "@/components/three/Mannequins"
+import { RoomBox } from "@/components/three/RoomBox"
 import {
   ROOMS, SUSPECTS, WEAPONS, CELLAR_RECT, BOARD_W, BOARD_H, getRoom, RoomId,
 } from "../lib/mansionLayout"
@@ -204,6 +206,13 @@ function WeaponToken({ image, target }: { image: string; target: { x: number; z:
 }
 
 // ---- dice -------------------------------------------------------------------
+// Rotations that bring a given value face-up (matches the material order below).
+const FACE_UP_EULER: Record<number, [number, number, number]> = {
+  1: [0, 0, Math.PI / 2], 6: [0, 0, -Math.PI / 2],
+  2: [0, 0, 0], 5: [Math.PI, 0, 0],
+  3: [-Math.PI / 2, 0, 0], 4: [Math.PI / 2, 0, 0],
+}
+
 function Dice({ dice, rolling }: { dice: [number, number] | null; rolling: boolean }) {
   const faces = useMemo(() => [1, 2, 3, 4, 5, 6].map(dieFaceTexture), [])
   const mats = useMemo(
@@ -213,6 +222,8 @@ function Dice({ dice, rolling }: { dice: [number, number] | null; rolling: boole
   )
   const a = useRef<THREE.Mesh>(null)
   const b = useRef<THREE.Mesh>(null)
+  const qT = useMemo(() => new THREE.Quaternion(), [])
+  const eT = useMemo(() => new THREE.Euler(), [])
   useFrame((_, dt) => {
     ;[a.current, b.current].forEach((m, i) => {
       if (!m) return
@@ -221,10 +232,12 @@ function Dice({ dice, rolling }: { dice: [number, number] | null; rolling: boole
         m.rotation.y += dt * (11 - i * 3)
         m.position.y = 1.1 + Math.abs(Math.sin(performanceNow() * 0.006 + i)) * 0.5
       } else {
-        // settle to a pleasant resting tilt near the board centre
-        const rest = 0.35 + i * 0.15
-        m.rotation.x += (rest - m.rotation.x) * Math.min(1, dt * 6)
-        m.rotation.y += (-0.4 + i * 0.3 - m.rotation.y) * Math.min(1, dt * 6)
+        // Settle showing the value that was ACTUALLY rolled — these used to
+        // settle to an arbitrary tilt, so the pips never matched movesLeft.
+        const v = dice ? dice[i] : 1
+        eT.set(...(FACE_UP_EULER[v] ?? FACE_UP_EULER[1]))
+        qT.setFromEuler(eT)
+        m.quaternion.slerp(qT, Math.min(1, dt * 8))
         m.position.y += (0.42 - m.position.y) * Math.min(1, dt * 6)
       }
     })
@@ -355,6 +368,18 @@ function Scene({ state, currentPlayerId, reachCellKeys, reachRoomIds, onMoveCell
         <Lightformer intensity={1.2} form="circle" position={[-6, 4, -6]} scale={4} color="#ffb867" />
         <Lightformer intensity={1} form="circle" position={[6, 3, 6]} scale={4} color="#ffe1b0" />
       </Environment>
+
+      {/* games-room walls (wider than OrbitControls maxDistance 40) */}
+      <RoomBox size={96} height={30} y={-0.33} floor="#171008" glow="#ffd79a" />
+
+      {/* the detectives gathered around the board */}
+      <Mannequins
+        players={state.players.map((p) => ({
+          id: p.id, name: p.name, color: (p as any).color, isBot: p.isBot,
+          active: state.players[state.currentPlayerIndex]?.id === p.id,
+        }))}
+        radius={16.5} y={-0.32} scale={2.0} startAngle={-Math.PI / 2}
+      />
 
       {/* table */}
       <mesh rotation-x={-Math.PI / 2} position={[0, -0.32, 0]} receiveShadow>

@@ -19,8 +19,10 @@ import {
 import { playSfx } from "@/lib/sfx"
 
 // ---- world mapping ------------------------------------------------------------
-const CELL = 1.15
-const GAP = 3.2                    // open sea between the two grids
+// Still a 10x10 fleet grid — the cells are simply bigger so the battleground
+// fills the frame instead of being a postage stamp in a huge ocean.
+const CELL = 1.62
+const GAP = 2.6                    // open sea between the two grids
 const wx = (x: number) => (x - (GRID - 1) / 2) * CELL
 const ownZ = (y: number) => GAP + y * CELL          // my grid: toward camera
 const enemyZ = (y: number) => -(GAP + y * CELL)     // enemy grid: away
@@ -346,7 +348,9 @@ function Fire({ position, big }: { position: [number, number, number]; big?: boo
         <coneGeometry args={[0.1, 0.3, 6]} />
         <meshStandardMaterial color="#ffd23e" emissive="#ffb300" emissiveIntensity={3} transparent opacity={0.95} />
       </mesh>
-      <pointLight color="#ff7a1a" intensity={big ? 3.2 : 1.6} distance={4} decay={2} />
+      {/* no pointLight here: every burning cell would add a light, and adding
+          or removing a light forces THREE to recompile every material in the
+          scene — that was the hitch on each shot. Bloom carries the glow. */}
       <group ref={smoke}>
         {[0, 1, 2].map((i) => (
           <mesh key={i}>
@@ -364,6 +368,8 @@ type FxKind = "boom" | "splash" | "bigboom"
 interface Fx { id: number; kind: FxKind; x: number; z: number }
 
 // Explosion: particle burst + expanding shock ring + flash.
+// The impact flash is driven by a persistent scene-level light (see Scene), not
+// one mounted here — mounting a light per explosion recompiled every shader.
 function Boom({ x, z, big }: { x: number; z: number; big?: boolean }) {
   const N = big ? 34 : 22
   const parts = useMemo(() =>
@@ -378,7 +384,6 @@ function Boom({ x, z, big }: { x: number; z: number; big?: boolean }) {
     }), [N])
   const group = useRef<THREE.Group>(null)
   const ring = useRef<THREE.Mesh>(null)
-  const flash = useRef<THREE.PointLight>(null)
   const t = useRef(0)
   const s = big ? 1.6 : 1
   useFrame((_, dt) => {
@@ -400,7 +405,6 @@ function Boom({ x, z, big }: { x: number; z: number; big?: boolean }) {
       const mat = ring.current.material as THREE.MeshBasicMaterial
       mat.opacity = Math.max(0, 0.75 - tt * 0.75)
     }
-    if (flash.current) flash.current.intensity = Math.max(0, (big ? 26 : 16) * (1 - tt * 1.8))
   })
   return (
     <group position={[x, 0.25, z]}>
@@ -420,7 +424,6 @@ function Boom({ x, z, big }: { x: number; z: number; big?: boolean }) {
         <ringGeometry args={[0.9, 1.05, 40]} />
         <meshBasicMaterial color="#ffb35c" transparent opacity={0.75} depthWrite={false} side={THREE.DoubleSide} />
       </mesh>
-      <pointLight ref={flash} color="#ffab4a" distance={14} decay={2} />
     </group>
   )
 }
@@ -480,10 +483,11 @@ function Splash({ x, z }: { x: number; z: number }) {
 }
 
 // ---- missile ---------------------------------------------------------------------
-function Missile({ flight, launchFrom, onArrive }: {
+function Missile({ flight, launchFrom, onArrive, lightRef }: {
   flight: Flight
   launchFrom: { x: number; z: number }
   onArrive: () => void
+  lightRef: React.RefObject<THREE.PointLight>
 }) {
   const g = useRef<THREE.Group>(null)
   const t = useRef(0)
@@ -507,6 +511,11 @@ function Missile({ flight, launchFrom, onArrive }: {
     t.current = Math.min(1, t.current + dt / DUR)
     curve.getPoint(t.current, tmpP)
     g.current.position.copy(tmpP)
+    // drive the persistent scene light instead of mounting one per shot
+    if (lightRef.current) {
+      lightRef.current.position.copy(tmpP)
+      lightRef.current.intensity = 5
+    }
     // finite-difference tangent (getTangent allocates internally)
     curve.getPoint(Math.min(1, t.current + 0.01), tmpA)
     if (tmpA.distanceToSquared(tmpP) > 1e-8) g.current.lookAt(tmpA)
@@ -535,7 +544,6 @@ function Missile({ flight, launchFrom, onArrive }: {
             <sphereGeometry args={[0.09, 8, 6]} />
             <meshStandardMaterial color="#ffd23e" emissive="#ff9d00" emissiveIntensity={4} transparent opacity={0.9} />
           </mesh>
-          <pointLight color="#ffab4a" intensity={5} distance={6} decay={2} />
         </group>
       </Trail>
     </group>
@@ -633,6 +641,14 @@ function Scene(props: NavalScene3DProps) {
   const shake = useRef(0)
   const [hoverTarget, setHoverTarget] = useState<{ x: number; y: number } | null>(null)
 
+  // Persistent lights for the shell and its impact. These stay mounted for the
+  // whole game and are just moved / dimmed — mounting a light per shot made
+  // THREE recompile every shader in the scene, which is what hitched each fire.
+  const missileLight = useRef<THREE.PointLight>(null)
+  const impactLight = useRef<THREE.PointLight>(null)
+  const impactT = useRef(0)
+  const impactBig = useRef(false)
+
   // Whoosh the instant a shell leaves the deck; the impact boom / splash comes
   // from the result log so the two land in sequence — launch, then explosion.
   const firedRef = useRef<number | null>(null)
@@ -645,6 +661,12 @@ function Scene(props: NavalScene3DProps) {
     const id = ++fxId.current
     setFx((q) => [...q, { id, kind, x, z }])
     setTimeout(() => setFx((q) => q.filter((e) => e.id !== id)), kind === "splash" ? 1700 : 2100)
+    // fire the persistent impact flash rather than mounting a light
+    if (kind !== "splash" && impactLight.current) {
+      impactLight.current.position.set(x, 0.9, z)
+      impactT.current = 1
+      impactBig.current = kind === "bigboom"
+    }
   }
 
   // Missile launch origin: one of my alive ships (outgoing) or offshore (incoming).
@@ -688,7 +710,14 @@ function Scene(props: NavalScene3DProps) {
   // camera (OrbitControls re-derives its orbit from camera.position every
   // frame, so camera offsets get absorbed and permanently drift the view).
   const bob = useRef<THREE.Group>(null)
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, dt) => {
+    // decay the impact flash and idle the shell light between shots
+    if (impactLight.current) {
+      impactT.current = Math.max(0, impactT.current - dt * 1.8)
+      impactLight.current.intensity = (impactBig.current ? 26 : 16) * impactT.current
+    }
+    if (!flight && missileLight.current) missileLight.current.intensity = 0
+
     if (!bob.current) return
     const t = clock.elapsedTime
     const k = shake.current
@@ -709,6 +738,10 @@ function Scene(props: NavalScene3DProps) {
         shadow-camera-near={1} shadow-camera-far={70}
       />
       <directionalLight position={[10, 10, 16]} intensity={0.32} color="#9fc0da" />
+
+      {/* always-mounted shell + impact lights (see note above) */}
+      <pointLight ref={missileLight} color="#ffab4a" intensity={0} distance={7} decay={2} />
+      <pointLight ref={impactLight} color="#ffab4a" intensity={0} distance={14} decay={2} />
 
       <Ocean />
       <Horizon />
@@ -779,14 +812,16 @@ function Scene(props: NavalScene3DProps) {
           </mesh>
         ))}
 
-        {/* placement: hover targets + ghost preview */}
+        {/* Placement hover targets + ghost preview.
+            NOTE: {...p} must be spread FIRST — it also defines onPointerOver /
+            onPointerOut for the cursor, and spreading it last silently
+            clobbered these handlers, so the ghost preview never appeared. */}
         {placing && Array.from({ length: GRID }).map((_, y) =>
           Array.from({ length: GRID }).map((_, x) => (
-            <mesh key={`p${x},${y}`} position={[wx(x), 0.015, ownZ(y)]} rotation-x={-Math.PI / 2}
+            <mesh key={`p${x},${y}`} {...p} position={[wx(x), 0.015, ownZ(y)]} rotation-x={-Math.PI / 2}
               onClick={(e) => { e.stopPropagation(); onClickOwnCell(x, y) }}
-              onPointerOver={(e) => { e.stopPropagation(); onHoverCell({ x, y }) }}
-              onPointerOut={() => onHoverCell(null)}
-              {...p}
+              onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = "pointer"; onHoverCell({ x, y }) }}
+              onPointerOut={() => { document.body.style.cursor = "auto"; onHoverCell(null) }}
             >
               <planeGeometry args={[CELL * 0.96, CELL * 0.96]} />
               <meshStandardMaterial color="#3f6a80" transparent opacity={0.12} depthWrite={false} />
@@ -816,7 +851,7 @@ function Scene(props: NavalScene3DProps) {
         )}
 
         {/* the missile in flight */}
-        {flight && <Missile key={flight.id} flight={flight} launchFrom={launchFrom} onArrive={handleArrive} />}
+        {flight && <Missile key={flight.id} flight={flight} launchFrom={launchFrom} onArrive={handleArrive} lightRef={missileLight} />}
       </group>
 
       {/* my-turn glow strip under the enemy grid */}
@@ -828,8 +863,8 @@ function Scene(props: NavalScene3DProps) {
       )}
 
       <OrbitControls
-        makeDefault enablePan minDistance={8} maxDistance={46} screenSpacePanning
-        minPolarAngle={0.2} maxPolarAngle={1.52} target={[0, 0, -1]} enableDamping dampingFactor={0.08}
+        makeDefault enablePan minDistance={12} maxDistance={52} screenSpacePanning
+        minPolarAngle={0.2} maxPolarAngle={1.52} target={[0, 0, 0]} enableDamping dampingFactor={0.08}
       />
     </>
   )
@@ -839,7 +874,7 @@ export default function NavalScene3D(props: NavalScene3DProps) {
   return (
     <Canvas
       shadows dpr={[1, 2]} gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.02 }}
-      camera={{ position: [0, 13, 18], fov: 46, near: 0.1, far: 240 }}
+      camera={{ position: [0, 27, 23], fov: 46, near: 0.1, far: 240 }}
       style={{ width: "100%", height: "100%" }}
     >
       <color attach="background" args={["#0a141d"]} />

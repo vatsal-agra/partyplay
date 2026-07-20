@@ -614,20 +614,16 @@ function Scene({ state, rolling, canDrawCard, onDiceSettled, onTileClick, onDraw
       <pointLight position={[-9, 6, -6]} intensity={16} color="#ffb877" distance={26} decay={2} />
       <pointLight position={[9, 6, 6]} intensity={14} color="#ffdca8" distance={26} decay={2} />
 
-      {/* the games room around it, instead of a black void */}
-      {/* room must be wider than OrbitControls' maxDistance (30) or the camera
-          orbits outside it and the inward-facing walls disappear */}
-      <RoomBox size={70} height={24} y={-3.9} floor="#171008" glow="#ffd79a" />
+      {/* Games-room WALLS only — the original wood floor below is untouched.
+          Room floor sits just under it, so the walls rise from that surface.
+          Must be wider than OrbitControls' maxDistance (30) or the camera
+          orbits outside the inward-facing walls and they disappear. */}
+      <RoomBox size={70} height={24} y={-0.36} floor="#171008" glow="#ffd79a" />
 
-      {/* the table the board actually sits on (a real table, not an endless plane) */}
+      {/* table (unchanged) */}
       <mesh rotation-x={-Math.PI / 2} position={[0, -0.35, 0]} receiveShadow>
-        <planeGeometry args={[24, 24]} />
+        <planeGeometry args={[70, 70]} />
         <meshStandardMaterial map={wood} color="#211709" roughness={0.75} />
-      </mesh>
-      {/* table edge so it reads as a solid slab from the side */}
-      <mesh position={[0, -0.5, 0]} castShadow receiveShadow>
-        <boxGeometry args={[24, 0.3, 24]} />
-        <meshStandardMaterial map={wood} color="#1b1207" roughness={0.8} />
       </mesh>
 
       {/* board slab */}
@@ -730,7 +726,7 @@ function Scene({ state, rolling, canDrawCard, onDiceSettled, onTileClick, onDraw
         players={state.players.filter((p) => !p.isBankrupt).map((p) => ({
           id: p.id, name: p.name, color: p.color, isBot: p.isBot, active: p.id === cur.id,
         }))}
-        radius={9.3} y={-2.9} scale={2.2} startAngle={-Math.PI / 2} seated
+        radius={9.3} y={-0.35} scale={1.8} startAngle={-Math.PI / 2}
       />
 
       {/* dice */}
