@@ -444,38 +444,56 @@ export function playBotStep(state: PokerState): PokerState {
   if (!p.isBot) return state
 
   // A little noise so bots aren't perfectly predictable.
-  const str = Math.max(0, Math.min(1, strength(state, idx) + (Math.random() * 0.12 - 0.06)))
+  const str = Math.max(0, Math.min(1, strength(state, idx) + (Math.random() * 0.1 - 0.05)))
   const toCall = state.currentBet - p.bet
   const pot = Math.max(1, state.pot)
   const potOdds = toCall / (pot + toCall)
-
-  // Standard raise sizing: ~⅔ pot, rounded to big blinds, capped at all-in.
+  const bb = state.bigBlind
   const maxTotal = p.bet + p.chips
-  const raiseSize = Math.max(state.bigBlind, Math.round((pot * 0.66) / state.bigBlind) * state.bigBlind)
-  const raiseTarget = Math.min(maxTotal, state.currentBet + raiseSize)
-  const canRaise = p.chips > toCall && raiseTarget > state.currentBet
+  const canRaise = p.chips > toCall
 
+  // Bet sizing as a fraction of the pot, rounded to big blinds, capped all-in.
+  const sizedRaise = (frac: number) => {
+    const amt = Math.max(bb, Math.round((pot * frac) / bb) * bb)
+    return Math.min(maxTotal, state.currentBet + amt)
+  }
+
+  if (state.community.length === 0) {
+    // ---------------- PRE-FLOP: play by hand range, not by pot odds ----------
+    const opened = state.currentBet > bb            // someone raised beyond the BB
+    if (str > 0.58) {
+      // Premium — open or re-raise for value.
+      if (canRaise && Math.random() < 0.85) return raiseTo(state, p.id, sizedRaise(opened ? 1.0 : 0.75))
+      return checkCall(state, p.id)
+    }
+    if (str > 0.36) {
+      // Playable — open if nobody has, else call a reasonably sized raise.
+      if (!opened && toCall === 0 && canRaise && Math.random() < 0.55) return raiseTo(state, p.id, sizedRaise(0.7))
+      if (toCall === 0) return checkCall(state, p.id)
+      if (toCall <= Math.max(bb * 3, pot * 0.5)) return checkCall(state, p.id)
+      return fold(state, p.id)
+    }
+    // Weak — take a free look, defend the blind cheaply, otherwise let it go.
+    if (toCall === 0) return checkCall(state, p.id)
+    if (str > 0.24 && toCall <= bb) return checkCall(state, p.id)
+    return fold(state, p.id)
+  }
+
+  // ---------------- POST-FLOP: made hands + draws vs the price ---------------
   if (toCall === 0) {
-    // Unbet: value-bet strong hands, occasionally stab, otherwise check.
-    if (str > 0.58 && canRaise) return raiseTo(state, p.id, raiseTarget)
-    if (str > 0.34 && canRaise && Math.random() < 0.22) return raiseTo(state, p.id, raiseTarget)
+    if (str > 0.62 && canRaise) return raiseTo(state, p.id, sizedRaise(0.7))          // value bet
+    if (str > 0.42 && canRaise && Math.random() < 0.45) return raiseTo(state, p.id, sizedRaise(0.5))
+    if (str < 0.3 && canRaise && Math.random() < 0.18) return raiseTo(state, p.id, sizedRaise(0.45)) // stab
     return checkCall(state, p.id)
   }
-
-  // Facing a bet.
-  if (str > 0.8) {
-    // Big hand — usually raise for value, sometimes flat-call to trap.
-    if (canRaise && Math.random() < 0.72) return raiseTo(state, p.id, raiseTarget)
+  if (str > 0.82) {
+    if (canRaise && Math.random() < 0.75) return raiseTo(state, p.id, sizedRaise(0.85))
+    return checkCall(state, p.id)                                                     // trap
+  }
+  if (str >= potOdds + 0.1) {
+    if (str > 0.66 && canRaise && Math.random() < 0.45) return raiseTo(state, p.id, sizedRaise(0.7))
     return checkCall(state, p.id)
   }
-  if (str >= potOdds + 0.16) {
-    // Enough equity to continue; sometimes raise the strong end of the range.
-    if (str > 0.62 && canRaise && Math.random() < 0.4) return raiseTo(state, p.id, raiseTarget)
-    return checkCall(state, p.id)
-  }
-  // Weak — fold, with the rare post-flop bluff-raise.
-  if (canRaise && str < 0.3 && state.community.length >= 3 && Math.random() < 0.05) {
-    return raiseTo(state, p.id, raiseTarget)
-  }
+  if (canRaise && str < 0.3 && Math.random() < 0.07) return raiseTo(state, p.id, sizedRaise(0.6)) // bluff-raise
   return fold(state, p.id)
 }

@@ -17,6 +17,7 @@ import {
   PokerState, Card, rankLabel, suitSymbol,
 } from "../lib/pokerEngine"
 import { Mannequin } from "@/components/three/Mannequins"
+import { RoomBox } from "@/components/three/RoomBox"
 
 const SERIF = "var(--font-display), Georgia, serif"
 
@@ -306,11 +307,8 @@ function Scene({ state, meIndex, isSpectator, reveal }: PokerScene3DProps) {
       <pointLight position={[-8, 5, 6]} intensity={18} color="#ff9d5c" distance={24} decay={2} />
       <pointLight position={[8, 5, -6]} intensity={14} color="#ffd9a0" distance={24} decay={2} />
 
-      {/* floor */}
-      <mesh rotation-x={-Math.PI / 2} position={[0, -1.2, 0]} receiveShadow>
-        <planeGeometry args={[70, 70]} />
-        <meshStandardMaterial color="#14100c" roughness={0.9} />
-      </mesh>
+      {/* the card room itself, instead of a black void */}
+      <RoomBox size={46} height={18} y={-1.2} wall="#2b2018" floor="#17120d" accent="#40301e" glow="#ffca85" />
 
       {/* table: felt + wood rail */}
       <group scale={[TA / 5, 1, TB / 5]}>
@@ -370,9 +368,9 @@ function Scene({ state, meIndex, isSpectator, reveal }: PokerScene3DProps) {
             {/* seated player figure — opponents only (I'm the camera at my seat) */}
             {!mine && (
               <group
-                position={[Math.cos(ang) * (TA + 0.55), -1.05, Math.sin(ang) * (TB + 0.5)]}
+                position={[Math.cos(ang) * (TA + 1.9), -2.85, Math.sin(ang) * (TB + 1.9)]}
                 rotation-y={Math.atan2(-Math.cos(ang), -Math.sin(ang))}
-                scale={1.25}
+                scale={2.45}
               >
                 <Mannequin name={p.name} color={SEAT_COLORS[idx % SEAT_COLORS.length]} isBot={p.isBot} active={isCur} index={idx} showName={false} seated />
               </group>
@@ -382,8 +380,12 @@ function Scene({ state, meIndex, isSpectator, reveal }: PokerScene3DProps) {
                 not hidden behind my hole cards; opponents' by their seat. */}
             {p.chips > 0 && (
               <group position={mine
-                ? [2.5, 0.16, TB - 0.1]
-                : [Math.cos(ang) * (TA - 0.95), 0.16, Math.sin(ang) * (TB - 0.62)]}>
+                ? [2.6, 0.16, TB - 0.1]
+                : [
+                    Math.cos(ang) * (TA - 1.5) - Math.sin(ang) * 1.5,
+                    0.16,
+                    Math.sin(ang) * (TB - 1.05) + Math.cos(ang) * 1.5,
+                  ]}>
                 <ChipStack amount={p.chips} compact />
               </group>
             )}
@@ -404,7 +406,17 @@ function Scene({ state, meIndex, isSpectator, reveal }: PokerScene3DProps) {
             )}
 
             {/* seat plate */}
-            <Html position={[sx * 1.12, mine ? 0.4 : 1.05, sz * 1.12]} center distanceFactor={13} style={{ pointerEvents: "none" }}>
+            {/* Seat plate: mine sits low and in front of my cards (it used to
+                land right on top of them); opponents' float above their
+                mannequin's head rather than over their hole cards. */}
+            <Html
+              position={[
+                sx * (mine ? 1.3 : 1.12),
+                mine ? -0.25 : 2.95,
+                sz * (mine ? 1.42 : 1.12),
+              ]}
+              center distanceFactor={13} style={{ pointerEvents: "none" }}
+            >
               <div style={{
                 textAlign: "center", whiteSpace: "nowrap", opacity: p.folded || p.busted ? 0.45 : 1,
                 background: isCur ? "rgba(230,180,90,0.16)" : "rgba(0,0,0,0.55)",
@@ -458,7 +470,7 @@ export default function PokerScene3D(props: PokerScene3DProps) {
       style={{ width: "100%", height: "100%" }}
     >
       <color attach="background" args={["#0e0a08"]} />
-      <fog attach="fog" args={["#0e0a08", 24, 55]} />
+      <fog attach="fog" args={["#120c08", 34, 88]} />
       <Suspense fallback={null}>
         <Scene {...props} />
         <EffectComposer multisampling={0}>

@@ -23,6 +23,24 @@ if (typeof window !== "undefined") {
   muted = window.localStorage.getItem(MUTE_KEY) === "1"
 }
 
+// Browsers suspend an AudioContext that was created without a user gesture,
+// and can suspend it again when the tab is backgrounded or after a spell of
+// inactivity. If we don't actively wake it back up the game simply goes silent
+// mid-session and never recovers. Arm listeners once that resume it on any
+// interaction and whenever the tab becomes visible again.
+let resumeArmed = false
+function armResume() {
+  if (resumeArmed || typeof window === "undefined") return
+  resumeArmed = true
+  const kick = () => {
+    if (ctx && ctx.state !== "running") ctx.resume().catch(() => {})
+  }
+  window.addEventListener("pointerdown", kick, { passive: true })
+  window.addEventListener("keydown", kick, { passive: true })
+  window.addEventListener("touchstart", kick, { passive: true })
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) kick() })
+}
+
 function ac(): AudioContext | null {
   if (typeof window === "undefined") return null
   if (!ctx) {
@@ -32,8 +50,10 @@ function ac(): AudioContext | null {
     master = ctx.createGain()
     master.gain.value = 0.5
     master.connect(ctx.destination)
+    armResume()
   }
-  if (ctx.state === "suspended") ctx.resume().catch(() => {})
+  // Recover from a suspended (or interrupted, on iOS) context on every play.
+  if (ctx.state !== "running") ctx.resume().catch(() => {})
   return ctx
 }
 

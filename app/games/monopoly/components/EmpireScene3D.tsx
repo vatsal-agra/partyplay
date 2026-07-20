@@ -19,6 +19,7 @@ import {
   MonopolyState, Player, BOARD_SPACES, Space,
 } from "../lib/monopolyEngine"
 import { Mannequins } from "@/components/three/Mannequins"
+import { RoomBox } from "@/components/three/RoomBox"
 
 const SERIF = "var(--font-display), Georgia, serif"
 
@@ -613,10 +614,18 @@ function Scene({ state, rolling, canDrawCard, onDiceSettled, onTileClick, onDraw
       <pointLight position={[-9, 6, -6]} intensity={16} color="#ffb877" distance={26} decay={2} />
       <pointLight position={[9, 6, 6]} intensity={14} color="#ffdca8" distance={26} decay={2} />
 
-      {/* table */}
+      {/* the games room around it, instead of a black void */}
+      <RoomBox size={54} height={20} y={-3.9} wall="#2a2018" floor="#171008" accent="#3e2e1c" glow="#ffd79a" />
+
+      {/* the table the board actually sits on (a real table, not an endless plane) */}
       <mesh rotation-x={-Math.PI / 2} position={[0, -0.35, 0]} receiveShadow>
-        <planeGeometry args={[70, 70]} />
+        <planeGeometry args={[24, 24]} />
         <meshStandardMaterial map={wood} color="#211709" roughness={0.75} />
+      </mesh>
+      {/* table edge so it reads as a solid slab from the side */}
+      <mesh position={[0, -0.5, 0]} castShadow receiveShadow>
+        <boxGeometry args={[24, 0.3, 24]} />
+        <meshStandardMaterial map={wood} color="#1b1207" roughness={0.8} />
       </mesh>
 
       {/* board slab */}
@@ -719,7 +728,7 @@ function Scene({ state, rolling, canDrawCard, onDiceSettled, onTileClick, onDraw
         players={state.players.filter((p) => !p.isBankrupt).map((p) => ({
           id: p.id, name: p.name, color: p.color, isBot: p.isBot, active: p.id === cur.id,
         }))}
-        radius={8} y={-1.5} scale={1.2} startAngle={-Math.PI / 2} seated
+        radius={9.3} y={-2.9} scale={2.2} startAngle={-Math.PI / 2} seated
       />
 
       {/* dice */}
@@ -757,7 +766,7 @@ export default function EmpireScene3D(props: EmpireScene3DProps) {
       style={{ width: "100%", height: "100%" }}
     >
       <color attach="background" args={["#120d08"]} />
-      <fog attach="fog" args={["#120d08", 30, 65]} />
+      <fog attach="fog" args={["#120d08", 42, 98]} />
       <Suspense fallback={null}>
         <Scene {...props} />
         <EffectComposer multisampling={0}>

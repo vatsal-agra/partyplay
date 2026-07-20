@@ -177,7 +177,7 @@ export default function GamePlayPage() {
     // Only bail on a genuine full-history resync (reconnect). A normal turn can
     // append several lines at once — deal, blinds, a round of calls, a flop —
     // and those must still play, or the sound "randomly disappears" mid-hand.
-    if (prev === null || log.length <= prev || log.length - prev > 14) return
+    if (prev === null || log.length <= prev || log.length - prev > 40) return
 
     log.slice(prev).slice(-4).forEach((line, i) => {
       const ev = eventForLogLine(line)
