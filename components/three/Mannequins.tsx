@@ -46,6 +46,13 @@ const shinGeo = new THREE.CylinderGeometry(0.086, 0.07, 0.4, 10)
 const upperArmGeo = new THREE.CylinderGeometry(0.088, 0.072, 0.36, 10)
 const foreArmGeo = new THREE.CylinderGeometry(0.07, 0.058, 0.32, 10)
 
+// simple wooden chair for seated figures
+const chairMat = new THREE.MeshStandardMaterial({ color: "#3a2a1a", roughness: 0.6, metalness: 0.08 })
+const chairSeatGeo = new THREE.BoxGeometry(0.82, 0.09, 0.76)
+const chairBackGeo = new THREE.BoxGeometry(0.82, 0.74, 0.09)
+const chairLegGeo = new THREE.CylinderGeometry(0.05, 0.042, 0.74, 8)
+const CHAIR_LEGS: [number, number][] = [[-0.31, 0.29], [0.31, 0.29], [-0.31, -0.35], [0.31, -0.35]]
+
 const clamp01 = (v: number) => Math.max(0, Math.min(1, v))
 
 // A ball joint centred on its group origin.
@@ -113,6 +120,17 @@ function Figure({ name, color, index, isBot, active, showName = true, seated = f
     <group ref={root} scale={0}>
       {/* colour-tinted base disc (standing figures only) */}
       {!seated && <mesh geometry={baseGeo} material={tintMat} position={[0, 0.03, 0]} receiveShadow castShadow />}
+
+      {/* a real chair under seated figures, so they aren't perched on air */}
+      {seated && (
+        <group>
+          <mesh geometry={chairSeatGeo} material={chairMat} position={[0, 0.76, -0.04]} castShadow receiveShadow />
+          <mesh geometry={chairBackGeo} material={chairMat} position={[0, 1.15, -0.41]} castShadow />
+          {CHAIR_LEGS.map(([lx, lz], i) => (
+            <mesh key={i} geometry={chairLegGeo} material={chairMat} position={[lx, 0.37, lz]} castShadow />
+          ))}
+        </group>
+      )}
 
       {/* ---- legs: hip ball → thigh → knee ball → shin → foot ----
           Seated tucks the thighs forward and drops the shins, so the figure

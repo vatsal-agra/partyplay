@@ -123,10 +123,22 @@ const CW = 1.0, CH = 1.5, CT = 0.02
 
 function cardMats(card?: Card): THREE.Material[] {
   const edge = new THREE.MeshStandardMaterial({ color: "#f5f2ea", roughness: 0.7 })
-  const face = card
-    ? new THREE.MeshStandardMaterial({ map: unoFaceTexture(card.color, card.value), roughness: 0.5 })
-    : new THREE.MeshStandardMaterial({ map: unoBackTexture(), roughness: 0.5 })
-  const back = new THREE.MeshStandardMaterial({ map: unoBackTexture(), roughness: 0.5 })
+  // The printed faces are self-lit and skip tone mapping, so the colours stay
+  // bright and saturated instead of being muddied by the dim room lighting.
+  const faceTex = card ? unoFaceTexture(card.color, card.value) : unoBackTexture()
+  const face = new THREE.MeshStandardMaterial({
+    map: faceTex,
+    emissiveMap: faceTex,
+    emissive: new THREE.Color("#ffffff"),
+    emissiveIntensity: 0.62,
+    roughness: 0.5,
+    toneMapped: false,
+  })
+  const backTex = unoBackTexture()
+  const back = new THREE.MeshStandardMaterial({
+    map: backTex, emissiveMap: backTex, emissive: new THREE.Color("#ffffff"),
+    emissiveIntensity: 0.3, roughness: 0.5,
+  })
   return [edge, edge, edge, edge, face, back]
 }
 
@@ -330,9 +342,9 @@ function Scene({ state, meIndex, isSpectator, isMyTurn, canDraw, onPlayCard, onD
   // ---- draw-to-hand fly animation (visible to everyone) ----------------------
   const handAnchor = (idx: number): [number, number, number] => {
     if (idx === meIndex) return [0, 1.4, 5.0]
-    const k = opponents.findIndex((o) => o.idx === idx)
-    const deg = 180 + ((k + 1) * 180) / (opponents.length + 1)
-    const a = (deg * Math.PI) / 180
+    // same full-circle seating as the rendered hands / mannequins
+    const rel = ((idx - meIndex) % n + n) % n
+    const a = Math.PI / 2 + (rel / n) * Math.PI * 2
     return [Math.cos(a) * 5.0, 1.0, Math.sin(a) * 5.0]
   }
   const prevHands = useRef<Record<string, number>>({})
@@ -422,10 +434,11 @@ function Scene({ state, meIndex, isSpectator, isMyTurn, canDraw, onPlayCard, onD
       <DrawPile count={state.drawPile.length} canDraw={canDraw} onDraw={onDraw} />
 
       {/* opponents: card-back fans + plates */}
-      {opponents.map(({ p, idx }, k) => {
-        const count = opponents.length
-        const deg = 180 + ((k + 1) * 180) / (count + 1)
-        const a = (deg * Math.PI) / 180
+      {opponents.map(({ p, idx }) => {
+        // Spread seats evenly around the WHOLE table (me at the front) instead
+        // of cramming everyone into the far 180°, which overlapped badly.
+        const rel = ((idx - meIndex) % n + n) % n
+        const a = Math.PI / 2 + (rel / n) * Math.PI * 2
         const px = Math.cos(a) * 5.6
         const pz = Math.sin(a) * 5.6
         const isCur = state.players[state.currentPlayerIndex].id === p.id && !state.winnerId

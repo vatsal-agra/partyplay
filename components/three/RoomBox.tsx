@@ -144,9 +144,12 @@ export function RoomBox({
     { pos: [half, midY, 0], rot: -Math.PI / 2 },
   ]
 
-  const signW = size * 0.34
+  // These cameras all look DOWN at the table, so the visible slice of the far
+  // wall is the band just above the floor — a sign high up is always out of
+  // frame no matter how you orbit. Keep it low and make it large.
+  const signW = size * 0.42
   const signH = signW * (300 / 1024)
-  const signY = y + height * 0.55
+  const signY = y + height * 0.17
 
   return (
     <group>

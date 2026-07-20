@@ -195,6 +195,24 @@ export default function PokerBoard({ state, currentPlayerId, onStateChange, onBr
         )}
       </div>
 
+      {/* my seat panel — fixed in the corner instead of floating over the felt */}
+      {!isSpectator && me && (
+        <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-2xl border border-[#e6b45a]/35 bg-black/65 px-4 py-2.5 backdrop-blur">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-black text-white" style={{ fontFamily: SERIF }}>{me.name}</span>
+            {meIndex === state.dealerIndex && <span className="rounded bg-[#f2efe4] px-1 text-[9px] font-black text-[#1a120a]">D</span>}
+            {meIndex === state.smallBlindIndex && <span className="rounded bg-[#3558c9] px-1 text-[9px] font-black text-white">SB</span>}
+            {meIndex === state.bigBlindIndex && <span className="rounded bg-[#d9453a] px-1 text-[9px] font-black text-white">BB</span>}
+          </div>
+          <div className="mt-0.5 font-mono text-[13px] font-black text-[#e6b45a]">
+            🪙 {me.chips.toLocaleString()}
+            {me.bet > 0 && <span className="text-[#7fd6a8]"> · bet {me.bet}</span>}
+            {me.allIn && !me.busted && <span className="text-[#ff7a6a]"> · ALL-IN</span>}
+            {me.folded && !me.busted && <span className="text-white/45"> · folded</span>}
+          </div>
+        </div>
+      )}
+
       {/* orbit hint */}
       <div className="pointer-events-none absolute bottom-3 right-3 hidden rounded-full border border-white/10 bg-black/40 px-3 py-1 text-[10px] text-white/35 backdrop-blur lg:block">
         drag to orbit · scroll to zoom

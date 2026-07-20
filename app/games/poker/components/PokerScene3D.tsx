@@ -218,9 +218,12 @@ function ChipStack({ amount, compact }: { amount: number; compact?: boolean }) {
     let rest = amount
     for (const d of CHIP_DENOMS) {
       const n = Math.floor(rest / d.v)
-      if (n > 0) { out.push({ color: d.color, stripe: d.stripe, count: Math.min(n, compact ? 5 : 9) }); rest -= n * d.v }
+      if (n > 0) { out.push({ color: d.color, stripe: d.stripe, count: Math.min(n, compact ? 4 : 8) }); rest -= n * d.v }
     }
-    return out.slice(0, compact ? 2 : 4)
+    // Show every denomination the amount actually breaks into. Truncating to
+    // the top two made a bet display colours the player's bank never showed —
+    // chips appeared "out of nowhere". Now a bet is always a visual subset.
+    return out.slice(0, compact ? 4 : 5)
   }, [amount, compact])
   return (
     <group>
@@ -407,15 +410,13 @@ function Scene({ state, meIndex, isSpectator, reveal }: PokerScene3DProps) {
             )}
 
             {/* seat plate */}
-            {/* Seat plate: mine sits low and in front of my cards (it used to
-                land right on top of them); opponents' float above their
-                mannequin's head rather than over their hole cards. */}
+            {/* Seat plates float above each opponent's mannequin. MY OWN plate
+                is not drawn in 3D at all — it hovered awkwardly in mid-air over
+                the felt; PokerBoard renders my name/stack as a fixed HUD panel
+                in the corner instead. */}
+            {!mine && (
             <Html
-              position={[
-                sx * (mine ? 1.3 : 1.12),
-                mine ? -0.25 : 2.95,
-                sz * (mine ? 1.42 : 1.12),
-              ]}
+              position={[sx * 1.12, 2.95, sz * 1.12]}
               center distanceFactor={13} style={{ pointerEvents: "none" }}
             >
               <div style={{
@@ -438,6 +439,7 @@ function Scene({ state, meIndex, isSpectator, reveal }: PokerScene3DProps) {
                 </div>
               </div>
             </Html>
+            )}
           </group>
         )
       })}
