@@ -174,9 +174,12 @@ export default function GamePlayPage() {
     if (!Array.isArray(log)) return
     const prev = prevLogLenRef.current
     prevLogLenRef.current = log.length
-    if (prev === null || log.length <= prev || log.length - prev > 4) return
+    // Only bail on a genuine full-history resync (reconnect). A normal turn can
+    // append several lines at once — deal, blinds, a round of calls, a flop —
+    // and those must still play, or the sound "randomly disappears" mid-hand.
+    if (prev === null || log.length <= prev || log.length - prev > 14) return
 
-    log.slice(prev).slice(-2).forEach((line, i) => {
+    log.slice(prev).slice(-4).forEach((line, i) => {
       const ev = eventForLogLine(line)
       if (!ev) return
       setTimeout(() => {

@@ -16,12 +16,16 @@ import { EffectComposer, Bloom, Vignette, SMAA } from "@react-three/postprocessi
 import {
   PokerState, Card, rankLabel, suitSymbol,
 } from "../lib/pokerEngine"
+import { Mannequin } from "@/components/three/Mannequins"
 
 const SERIF = "var(--font-display), Georgia, serif"
 
 // table ellipse
 const TA = 6.3   // x radius
 const TB = 4.1   // z radius
+
+// per-seat identity colours for the seated mannequins
+const SEAT_COLORS = ["#d9453a", "#3558c9", "#3fa356", "#e8c53a", "#e05a9e", "#57b8e8", "#ef8b33", "#7a86c9"]
 
 // ---- card textures (module-level cache; bounded at 52 + back) -------------------
 const texCache = new Map<string, THREE.CanvasTexture>()
@@ -106,15 +110,19 @@ function feltTexture(): THREE.CanvasTexture {
 // ---- 3D card ---------------------------------------------------------------------
 const CARD_W = 0.72, CARD_H = 1.05, CARD_T = 0.014
 
-function Card3D({ card, faceUp, ...props }: { card?: Card; faceUp: boolean } & JSX.IntrinsicElements["group"]) {
+function Card3D({ card, faceUp, concealed, ...props }: { card?: Card; faceUp: boolean; concealed?: boolean } & JSX.IntrinsicElements["group"]) {
   const mats = useMemo(() => {
     const edge = new THREE.MeshStandardMaterial({ color: "#e8e4d8", roughness: 0.7 })
-    const face = card
-      ? new THREE.MeshStandardMaterial({ map: pokerFaceTexture(card), roughness: 0.55 })
-      : new THREE.MeshStandardMaterial({ color: "#f7f5ee", roughness: 0.55 })
     const back = new THREE.MeshStandardMaterial({ map: pokerBackTexture(), roughness: 0.55 })
+    // Concealed cards (opponents' hole cards) show the BACK on both faces, so
+    // orbiting the table can never expose a rival's hand until the showdown.
+    const face = concealed
+      ? back
+      : card
+        ? new THREE.MeshStandardMaterial({ map: pokerFaceTexture(card), roughness: 0.55 })
+        : new THREE.MeshStandardMaterial({ color: "#f7f5ee", roughness: 0.55 })
     return [edge, edge, edge, edge, face, back]
-  }, [card?.id])
+  }, [card?.id, concealed])
   return (
     <group {...props}>
       <mesh material={mats} castShadow rotation-y={faceUp ? 0 : Math.PI}>
@@ -132,7 +140,7 @@ const FELT_Y = 0.17
 function CommunityCard({ card, slot }: { card: Card; slot: number }) {
   const g = useRef<THREE.Group>(null)
   const t = useRef(0)
-  const targetX = (slot - 2) * 0.95
+  const targetX = (slot - 2) * 1.18   // wider spread so the board reads clearly
   useFrame((_, dt) => {
     if (!g.current) return
     t.current = Math.min(1, t.current + dt * 2.2)
@@ -148,7 +156,7 @@ function CommunityCard({ card, slot }: { card: Card; slot: number }) {
   })
   return (
     <group ref={g} position={[-3.4, FELT_Y, -0.35]} rotation-x={-Math.PI / 2}>
-      <Card3D card={card} faceUp />
+      <Card3D card={card} faceUp scale={1.4} />
     </group>
   )
 }
@@ -187,7 +195,7 @@ function HoleCard({ card, mine, revealed, seatAngle, offset }: {
     <group position={[bx, FELT_Y + 0.52, bz]} rotation-y={faceOut}>
       <group position={[offset * 0.34, 0, 0]} rotation-z={-offset * 0.5} rotation-x={0.34}>
         <group ref={inner}>
-          <Card3D card={card} faceUp scale={0.86} />
+          <Card3D card={card} faceUp concealed={!revealed} scale={0.86} />
         </group>
       </group>
     </group>
@@ -216,15 +224,15 @@ function ChipStack({ amount, compact }: { amount: number; compact?: boolean }) {
   return (
     <group>
       {stacks.map((s, si) => (
-        <group key={si} position={[si * 0.42 - (stacks.length - 1) * 0.21, 0, 0]}>
+        <group key={si} position={[si * 0.56 - (stacks.length - 1) * 0.28, 0, 0]}>
           {Array.from({ length: s.count }).map((_, i) => (
-            <group key={i} position={[0, 0.028 + i * 0.055, 0]}>
+            <group key={i} position={[0, 0.036 + i * 0.072, 0]}>
               <mesh castShadow>
-                <cylinderGeometry args={[0.17, 0.17, 0.05, 18]} />
+                <cylinderGeometry args={[0.24, 0.24, 0.066, 20]} />
                 <meshStandardMaterial color={s.color} roughness={0.4} metalness={0.1} />
               </mesh>
-              <mesh position={[0, 0.026, 0]} rotation-x={-Math.PI / 2}>
-                <ringGeometry args={[0.09, 0.14, 18]} />
+              <mesh position={[0, 0.035, 0]} rotation-x={-Math.PI / 2}>
+                <ringGeometry args={[0.12, 0.2, 20]} />
                 <meshStandardMaterial color={s.stripe} roughness={0.5} side={THREE.DoubleSide} />
               </mesh>
             </group>
@@ -236,19 +244,22 @@ function ChipStack({ amount, compact }: { amount: number; compact?: boolean }) {
 }
 
 // Pot pile: slides to the winner seat when the hand ends.
+// Pot rests BEHIND the community cards (toward the far rail) so it never sits
+// on top of the board from the player's camera, then slides to the winner.
+const POT_Z = -2.65
 function PotPile({ amount, winnerAngle }: { amount: number; winnerAngle: number | null }) {
   const g = useRef<THREE.Group>(null)
   useFrame((_, dt) => {
     if (!g.current) return
     const tx = winnerAngle === null ? 0 : Math.cos(winnerAngle) * (TA - 2.2)
-    const tz = winnerAngle === null ? 0.75 : Math.sin(winnerAngle) * (TB - 1.5)
+    const tz = winnerAngle === null ? POT_Z : Math.sin(winnerAngle) * (TB - 1.5)
     const k = Math.min(1, dt * 3.5)
     g.current.position.x += (tx - g.current.position.x) * k
     g.current.position.z += (tz - g.current.position.z) * k
   })
   if (amount <= 0) return null
   return (
-    <group ref={g} position={[0, FELT_Y - 0.02, 0.75]}>
+    <group ref={g} position={[0, FELT_Y - 0.02, POT_Z]}>
       <ChipStack amount={amount} />
     </group>
   )
@@ -356,9 +367,23 @@ function Scene({ state, meIndex, isSpectator, reveal }: PokerScene3DProps) {
                 revealed={revealThem} seatAngle={ang} offset={k === 0 ? -0.42 : 0.42} />
             ))}
 
-            {/* chip stack (player's bank) */}
+            {/* seated player figure — opponents only (I'm the camera at my seat) */}
+            {!mine && (
+              <group
+                position={[Math.cos(ang) * (TA + 0.4), -0.55, Math.sin(ang) * (TB + 0.4)]}
+                rotation-y={Math.atan2(-Math.cos(ang), -Math.sin(ang))}
+                scale={0.9}
+              >
+                <Mannequin name={p.name} color={SEAT_COLORS[idx % SEAT_COLORS.length]} isBot={p.isBot} active={isCur} index={idx} showName={false} />
+              </group>
+            )}
+
+            {/* chip stack (player's bank) — my own bank sits to my right so it's
+                not hidden behind my hole cards; opponents' by their seat. */}
             {p.chips > 0 && (
-              <group position={[Math.cos(ang) * (TA - 0.95), 0.16, Math.sin(ang) * (TB - 0.62)]}>
+              <group position={mine
+                ? [2.5, 0.16, TB - 0.1]
+                : [Math.cos(ang) * (TA - 0.95), 0.16, Math.sin(ang) * (TB - 0.62)]}>
                 <ChipStack amount={p.chips} compact />
               </group>
             )}
@@ -388,6 +413,9 @@ function Scene({ state, meIndex, isSpectator, reveal }: PokerScene3DProps) {
               }}>
                 <div style={{ fontFamily: SERIF, fontWeight: 900, fontSize: 13, color: "#fff" }}>
                   {p.name}{p.isBot ? " 🤖" : ""}{isWinner ? " 👑" : ""}
+                  {idx === state.dealerIndex && <span style={{ marginLeft: 5, background: "#f2efe4", color: "#1a120a", borderRadius: 4, padding: "0 4px", fontSize: 9, fontWeight: 900 }}>D</span>}
+                  {idx === state.smallBlindIndex && <span style={{ marginLeft: 4, background: "#3558c9", color: "#fff", borderRadius: 4, padding: "0 4px", fontSize: 9, fontWeight: 900 }}>SB</span>}
+                  {idx === state.bigBlindIndex && <span style={{ marginLeft: 4, background: "#d9453a", color: "#fff", borderRadius: 4, padding: "0 4px", fontSize: 9, fontWeight: 900 }}>BB</span>}
                 </div>
                 <div style={{ fontFamily: "monospace", fontSize: 11, fontWeight: 700, color: "#e6b45a" }}>
                   {p.busted ? "BUSTED" : `🪙 ${p.chips.toLocaleString()}`}
@@ -401,12 +429,12 @@ function Scene({ state, meIndex, isSpectator, reveal }: PokerScene3DProps) {
         )
       })}
 
-      {/* pot label */}
+      {/* pot label — sits above the pot pile at the far rail, clear of the board */}
       {state.pot > 0 && (
-        <Html position={[0, 1.1, 0.75]} center distanceFactor={13} style={{ pointerEvents: "none" }}>
+        <Html position={[0, 0.95, POT_Z]} center distanceFactor={13} style={{ pointerEvents: "none" }}>
           <div style={{
             fontFamily: "monospace", fontWeight: 900, fontSize: 13, color: "#e6b45a",
-            background: "rgba(0,0,0,0.55)", border: "1px solid rgba(230,180,90,0.4)",
+            background: "rgba(0,0,0,0.62)", border: "1px solid rgba(230,180,90,0.4)",
             borderRadius: 99, padding: "3px 12px", whiteSpace: "nowrap",
           }}>
             POT {state.pot.toLocaleString()}
@@ -415,7 +443,7 @@ function Scene({ state, meIndex, isSpectator, reveal }: PokerScene3DProps) {
       )}
 
       <OrbitControls
-        makeDefault enablePan={false} minDistance={7} maxDistance={22}
+        makeDefault enablePan={false} minDistance={6} maxDistance={22}
         minPolarAngle={0.25} maxPolarAngle={1.25} target={[0, 0, 0]} enableDamping dampingFactor={0.08}
       />
     </>
@@ -426,7 +454,7 @@ export default function PokerScene3D(props: PokerScene3DProps) {
   return (
     <Canvas
       shadows dpr={[1, 2]} gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
-      camera={{ position: [0, 8.2, 10.6], fov: 46, near: 0.1, far: 120 }}
+      camera={{ position: [0, 7.2, 9.2], fov: 46, near: 0.1, far: 120 }}
       style={{ width: "100%", height: "100%" }}
     >
       <color attach="background" args={["#0e0a08"]} />

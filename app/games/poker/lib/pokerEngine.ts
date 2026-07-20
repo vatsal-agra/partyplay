@@ -38,6 +38,8 @@ export interface PokerState {
   stage: Stage
   smallBlind: number
   bigBlind: number
+  smallBlindIndex: number   // seat that posted the small blind this hand
+  bigBlindIndex: number     // seat that posted the big blind this hand
   handNumber: number
   winnerIds: string[]
   winningDesc: string | null
@@ -155,7 +157,7 @@ export function initializeGame(playersData: { id: string; name: string; isBot: b
   const base: PokerState = {
     players, dealerIndex: 0, currentPlayerIndex: 0, deck: [], community: [],
     pot: 0, currentBet: 0, minRaise: 20, stage: 'HAND_OVER',
-    smallBlind: 10, bigBlind: 20, handNumber: 0,
+    smallBlind: 10, bigBlind: 20, smallBlindIndex: -1, bigBlindIndex: -1, handNumber: 0,
     winnerIds: [], winningDesc: null, lastAction: null,
     log: ["♠ Welcome to the Poker table! Good luck."],
   }
@@ -204,6 +206,8 @@ export function startHand(state: PokerState): PokerState {
 
   postBlind(s, sbIndex, s.smallBlind)
   postBlind(s, bbIndex, s.bigBlind)
+  s.smallBlindIndex = sbIndex
+  s.bigBlindIndex = bbIndex
   s.currentBet = s.bigBlind
   s.minRaise = s.bigBlind
   s.stage = 'PREFLOP'
@@ -387,19 +391,50 @@ export function nextHand(state: PokerState): PokerState {
 
 // ---- Bot --------------------------------------------------------------------
 
-// Rough hand-strength estimate in [0,1].
+const chenVal = (r: number): number =>
+  r === 14 ? 10 : r === 13 ? 8 : r === 12 ? 7 : r === 11 ? 6 : r / 2
+
+// Pre-flop hand strength in [0,1], from the Chen formula — so junk like 7-2
+// folds to a raise and premium hands play back, instead of calling everything.
+function preflopStrength(hole: Card[]): number {
+  const ranks = hole.map((c) => c.rank).sort((a, b) => b - a)
+  const [hi, lo] = ranks
+  const suited = hole[0].suit === hole[1].suit
+  if (hi === lo) return Math.min(1, Math.max(5, chenVal(hi) * 2) / 20) // pocket pair
+  let pts = chenVal(hi)
+  if (suited) pts += 2
+  const gap = hi - lo - 1
+  pts -= gap === 0 ? 0 : gap === 1 ? 1 : gap === 2 ? 2 : gap === 3 ? 4 : 5
+  if (gap <= 1 && hi < 12) pts += 1 // low-connector straight potential
+  return Math.max(0, Math.min(1, pts / 20))
+}
+
+// Extra equity from a live flush / open-ended straight draw (flop & turn only).
+function drawBonus(hole: Card[], community: Card[]): number {
+  if (community.length < 3 || community.length >= 5) return 0
+  const all = [...hole, ...community]
+  const bySuit: Record<string, number> = {}
+  all.forEach((c) => { bySuit[c.suit] = (bySuit[c.suit] || 0) + 1 })
+  const flushDraw = Object.values(bySuit).some((nn) => nn === 4)
+  const ranks = Array.from(new Set(all.map((c) => c.rank))).sort((a, b) => a - b)
+  let straightDraw = false
+  for (let i = 0; i + 3 < ranks.length; i++) {
+    if (ranks[i + 3] - ranks[i] <= 4) { straightDraw = true; break }
+  }
+  return (flushDraw ? 0.16 : 0) + (straightDraw ? 0.1 : 0)
+}
+
+// Made-hand base strength per category (high card … straight flush).
+const CAT_BASE = [0.10, 0.40, 0.62, 0.75, 0.85, 0.91, 0.96, 0.99, 1]
+
 function strength(s: PokerState, idx: number): number {
   const p = s.players[idx]
-  if (s.community.length === 0) {
-    const [a, b] = p.hole.map((c) => c.rank).sort((x, y) => y - x)
-    let str = (a + b) / 28
-    if (a === b) str += 0.35                          // pocket pair
-    if (p.hole[0].suit === p.hole[1].suit) str += 0.08
-    if (Math.abs(a - b) <= 2) str += 0.05             // connected
-    return Math.min(1, str)
-  }
+  if (s.community.length === 0) return preflopStrength(p.hole)
   const score = evaluate([...p.hole, ...s.community])
-  return Math.min(1, score[0] / 8 + 0.05)             // category-driven
+  const cat = score[0]
+  let str = (CAT_BASE[cat] ?? 0.1) + ((score[1] || 0) / 14) * 0.12 // nudge by top kicker/pair rank
+  str += drawBonus(p.hole, s.community)
+  return Math.max(0, Math.min(1, str))
 }
 
 export function playBotStep(state: PokerState): PokerState {
@@ -408,23 +443,39 @@ export function playBotStep(state: PokerState): PokerState {
   const p = state.players[idx]
   if (!p.isBot) return state
 
-  const str = strength(state, idx)
+  // A little noise so bots aren't perfectly predictable.
+  const str = Math.max(0, Math.min(1, strength(state, idx) + (Math.random() * 0.12 - 0.06)))
   const toCall = state.currentBet - p.bet
-  const potOdds = toCall / Math.max(1, state.pot + toCall)
+  const pot = Math.max(1, state.pot)
+  const potOdds = toCall / (pot + toCall)
+
+  // Standard raise sizing: ~⅔ pot, rounded to big blinds, capped at all-in.
+  const maxTotal = p.bet + p.chips
+  const raiseSize = Math.max(state.bigBlind, Math.round((pot * 0.66) / state.bigBlind) * state.bigBlind)
+  const raiseTarget = Math.min(maxTotal, state.currentBet + raiseSize)
+  const canRaise = p.chips > toCall && raiseTarget > state.currentBet
 
   if (toCall === 0) {
-    // free to act — bet with a strong hand, otherwise check
-    if (str > 0.62 && p.chips > state.bigBlind) {
-      return raiseTo(state, p.id, state.currentBet + state.bigBlind * 2)
-    }
+    // Unbet: value-bet strong hands, occasionally stab, otherwise check.
+    if (str > 0.58 && canRaise) return raiseTo(state, p.id, raiseTarget)
+    if (str > 0.34 && canRaise && Math.random() < 0.22) return raiseTo(state, p.id, raiseTarget)
     return checkCall(state, p.id)
   }
 
-  // facing a bet
-  if (str < 0.32 && potOdds > 0.25) return fold(state, p.id)
-  if (str > 0.8 && p.chips > toCall) {
-    return raiseTo(state, p.id, state.currentBet + state.bigBlind * 2)
+  // Facing a bet.
+  if (str > 0.8) {
+    // Big hand — usually raise for value, sometimes flat-call to trap.
+    if (canRaise && Math.random() < 0.72) return raiseTo(state, p.id, raiseTarget)
+    return checkCall(state, p.id)
   }
-  if (str > 0.28) return checkCall(state, p.id)
+  if (str >= potOdds + 0.16) {
+    // Enough equity to continue; sometimes raise the strong end of the range.
+    if (str > 0.62 && canRaise && Math.random() < 0.4) return raiseTo(state, p.id, raiseTarget)
+    return checkCall(state, p.id)
+  }
+  // Weak — fold, with the rare post-flop bluff-raise.
+  if (canRaise && str < 0.3 && state.community.length >= 3 && Math.random() < 0.05) {
+    return raiseTo(state, p.id, raiseTarget)
+  }
   return fold(state, p.id)
 }

@@ -105,8 +105,11 @@ export default function PokerBoard({ state, currentPlayerId, onStateChange, onBr
 
       {/* stage + hand chip */}
       <div className="pointer-events-none absolute top-3 right-3 z-10 flex flex-col items-end gap-1.5">
+        <span className="rounded-full border border-[#e6b45a]/40 bg-black/60 px-3 py-1 text-[11px] font-black uppercase tracking-widest text-[#f2d492] backdrop-blur" style={{ fontFamily: SERIF }}>
+          ♠ Texas Hold&apos;em
+        </span>
         <span className="rounded-full border border-[#e6b45a]/30 bg-black/55 px-3 py-1 font-mono text-[10px] font-bold uppercase tracking-widest text-[#e6b45a] backdrop-blur">
-          Hand #{state.handNumber} · {state.stage.replace('_', ' ')}
+          Hand #{state.handNumber} · {state.stage.replace('_', ' ')} · Blinds {state.smallBlind}/{state.bigBlind}
         </span>
         {isSpectator && (
           <span className="rounded-full border border-white/15 bg-black/55 px-3 py-1 text-[10px] text-white/60 backdrop-blur">👁 Spectating</span>

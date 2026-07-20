@@ -9,13 +9,14 @@
 "use client"
 
 import * as THREE from "three"
-import { Suspense, useMemo, useRef, useState } from "react"
+import { Suspense, useMemo, useRef, useState, useEffect } from "react"
 import { Canvas, useFrame, ThreeEvent } from "@react-three/fiber"
 import { OrbitControls, Trail } from "@react-three/drei"
 import { EffectComposer, Bloom, Vignette, SMAA } from "@react-three/postprocessing"
 import {
   BattleshipState, Ship, ShotResult, GRID, cellKey,
 } from "../lib/battleshipEngine"
+import { playSfx } from "@/lib/sfx"
 
 // ---- world mapping ------------------------------------------------------------
 const CELL = 1.15
@@ -487,7 +488,7 @@ function Missile({ flight, launchFrom, onArrive }: {
   const g = useRef<THREE.Group>(null)
   const t = useRef(0)
   const done = useRef(false)
-  const DUR = 1.15
+  const DUR = 0.9   // snappier arc so the shot doesn't feel like it hangs on impact
   const from = useMemo(() => new THREE.Vector3(launchFrom.x, 0.45, launchFrom.z), [launchFrom.x, launchFrom.z])
   const to = useMemo(() => new THREE.Vector3(
     wx(flight.targetX), 0.1,
@@ -631,6 +632,14 @@ function Scene(props: NavalScene3DProps) {
   const fxId = useRef(0)
   const shake = useRef(0)
   const [hoverTarget, setHoverTarget] = useState<{ x: number; y: number } | null>(null)
+
+  // Whoosh the instant a shell leaves the deck; the impact boom / splash comes
+  // from the result log so the two land in sequence — launch, then explosion.
+  const firedRef = useRef<number | null>(null)
+  useEffect(() => {
+    if (flight && flight.id !== firedRef.current) { firedRef.current = flight.id; playSfx("whoosh") }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flight?.id])
 
   const spawnFx = (kind: FxKind, x: number, z: number) => {
     const id = ++fxId.current
@@ -785,10 +794,18 @@ function Scene(props: NavalScene3DProps) {
           ))
         )}
         {placing && previewCells && previewCells.cells.map((c) => (
-          <mesh key={`g${c.x},${c.y}`} position={[wx(c.x), 0.1, ownZ(c.y)]}>
-            <boxGeometry args={[CELL * 0.9, 0.18, CELL * 0.9]} />
-            <PulseMat color={previewCells.ok ? "#35d07f" : "#e5484d"} opacity={0.55} />
-          </mesh>
+          <group key={`g${c.x},${c.y}`}>
+            {/* solid ghost hull so it's obvious exactly where the ship lands */}
+            <mesh position={[wx(c.x), 0.2, ownZ(c.y)]}>
+              <boxGeometry args={[CELL * 0.92, 0.4, CELL * 0.92]} />
+              <PulseMat color={previewCells.ok ? "#35d07f" : "#e5484d"} opacity={0.7} />
+            </mesh>
+            {/* bright outline ring on the water for extra clarity */}
+            <mesh position={[wx(c.x), 0.04, ownZ(c.y)]} rotation-x={-Math.PI / 2}>
+              <ringGeometry args={[CELL * 0.34, CELL * 0.46, 4]} />
+              <meshBasicMaterial color={previewCells.ok ? "#7dffbf" : "#ff9a9d"} transparent opacity={0.9} side={THREE.DoubleSide} />
+            </mesh>
+          </group>
         ))}
 
         {/* transient effects */}
@@ -811,8 +828,8 @@ function Scene(props: NavalScene3DProps) {
       )}
 
       <OrbitControls
-        makeDefault enablePan={false} minDistance={10} maxDistance={46}
-        minPolarAngle={0.2} maxPolarAngle={1.32} target={[0, 0, -1]} enableDamping dampingFactor={0.08}
+        makeDefault enablePan minDistance={8} maxDistance={46} screenSpacePanning
+        minPolarAngle={0.2} maxPolarAngle={1.52} target={[0, 0, -1]} enableDamping dampingFactor={0.08}
       />
     </>
   )
@@ -822,7 +839,7 @@ export default function NavalScene3D(props: NavalScene3DProps) {
   return (
     <Canvas
       shadows dpr={[1, 2]} gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.02 }}
-      camera={{ position: [0, 15, 21], fov: 46, near: 0.1, far: 240 }}
+      camera={{ position: [0, 13, 18], fov: 46, near: 0.1, far: 240 }}
       style={{ width: "100%", height: "100%" }}
     >
       <color attach="background" args={["#0a141d"]} />

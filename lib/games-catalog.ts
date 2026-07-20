@@ -52,8 +52,8 @@ export const GAMES_CATALOG: Game[] = [
   },
   {
     id: 'poker',
-    name: 'Poker',
-    description: 'Test your luck and bluffing skills in this classic card game of strategy and chance.',
+    name: "Texas Hold'em Poker",
+    description: "No-limit Texas Hold'em — two hole cards, five community cards, blinds and bluffs. Test your luck and read your table.",
     image: '/images/poker thumbnail.png',
     minPlayers: 2,
     maxPlayers: 8, // engine seats at most 8

@@ -24,8 +24,8 @@ export interface MannequinPlayer {
 
 const BODY = "#e9e5db"
 
-function Figure({ name, color, index, isBot, active }: {
-  name: string; color: string; index: number; isBot?: boolean; active?: boolean
+function Figure({ name, color, index, isBot, active, showName = true }: {
+  name: string; color: string; index: number; isBot?: boolean; active?: boolean; showName?: boolean
 }) {
   const g = useRef<THREE.Group>(null)
   const born = useRef<number | null>(null)
@@ -92,6 +92,7 @@ function Figure({ name, color, index, isBot, active }: {
       </mesh>
 
       {/* name plate */}
+      {showName && (
       <Html position={[0, 1.82, 0]} center distanceFactor={13} style={{ pointerEvents: "none" }}>
         <div style={{
           whiteSpace: "nowrap",
@@ -110,8 +111,17 @@ function Figure({ name, color, index, isBot, active }: {
           {name}{isBot ? " 🤖" : ""}
         </div>
       </Html>
+      )}
     </group>
   )
+}
+
+// A single figure, for scenes (like the poker ellipse) that place seats
+// themselves. Caller positions/rotates the wrapping group.
+export function Mannequin({ name, color, isBot, active, index = 0, showName = true }: {
+  name: string; color?: string; isBot?: boolean; active?: boolean; index?: number; showName?: boolean
+}) {
+  return <Figure name={name} color={color || "#8a8a8a"} index={index} isBot={isBot} active={active} showName={showName} />
 }
 
 export interface MannequinsProps {

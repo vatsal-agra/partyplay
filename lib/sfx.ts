@@ -116,17 +116,22 @@ const RECIPES: Record<SfxName, (c: AudioContext, out: AudioNode, t: number) => v
   turn: (c, o, t) => { tone(c, o, t, { freq: 587, dur: 0.12, type: "sine", gain: 0.28 }); tone(c, o, t, { freq: 880, dur: 0.16, type: "sine", gain: 0.26, delay: 0.1 }) },
   buy: (c, o, t) => tone(c, o, t, { freq: 880, to: 1320, dur: 0.16, type: "sine", gain: 0.3 }),
   cash: (c, o, t) => { tone(c, o, t, { freq: 1318, dur: 0.12, type: "sine", gain: 0.3 }); tone(c, o, t, { freq: 1760, dur: 0.18, type: "sine", gain: 0.28, delay: 0.09 }) },
-  card: (c, o, t) => noise(c, o, t, { dur: 0.16, freq: 3200, gain: 0.18, type: "highpass" }),
-  chip: (c, o, t) => tone(c, o, t, { freq: 1500, to: 900, dur: 0.06, type: "square", gain: 0.16 }),
+  // a soft paper card-flick, not a metallic clang
+  card: (c, o, t) => { noise(c, o, t, { dur: 0.08, freq: 1600, gain: 0.1, type: "bandpass" }); noise(c, o, t, { dur: 0.05, freq: 2400, gain: 0.07, type: "highpass", delay: 0.03 }) },
+  // a clean poker-chip "tik-tik" tap, not a square-wave squeal
+  chip: (c, o, t) => { noise(c, o, t, { dur: 0.03, freq: 2600, gain: 0.12, type: "highpass" }); tone(c, o, t, { freq: 420, to: 300, dur: 0.05, type: "sine", gain: 0.12 }); noise(c, o, t, { dur: 0.03, freq: 2200, gain: 0.09, type: "highpass", delay: 0.05 }) },
   correct: (c, o, t) => { tone(c, o, t, { freq: 659, dur: 0.1, type: "sine", gain: 0.28 }); tone(c, o, t, { freq: 988, dur: 0.16, type: "sine", gain: 0.28, delay: 0.09 }) },
   wrong: (c, o, t) => tone(c, o, t, { freq: 360, to: 150, dur: 0.28, type: "sawtooth", gain: 0.22 }),
   error: (c, o, t) => tone(c, o, t, { freq: 160, to: 110, dur: 0.22, type: "square", gain: 0.2 }),
-  hit: (c, o, t) => { tone(c, o, t, { freq: 180, to: 60, dur: 0.18, type: "square", gain: 0.3 }); noise(c, o, t, { dur: 0.14, freq: 800, gain: 0.22, type: "lowpass" }) },
-  miss: (c, o, t) => tone(c, o, t, { freq: 300, to: 200, dur: 0.12, type: "sine", gain: 0.16 }),
+  // a proper explosion: deep boom + rumble + an initial crack
+  hit: (c, o, t) => { tone(c, o, t, { freq: 130, to: 38, dur: 0.5, type: "sine", gain: 0.4 }); noise(c, o, t, { dur: 0.4, freq: 500, gain: 0.3, type: "lowpass" }); noise(c, o, t, { dur: 0.09, freq: 1800, gain: 0.22, type: "bandpass" }) },
+  // a water splash (missile into the sea), not a cartoon "bloop"
+  miss: (c, o, t) => { noise(c, o, t, { dur: 0.22, freq: 1100, gain: 0.2, type: "bandpass" }); tone(c, o, t, { freq: 260, to: 120, dur: 0.16, type: "sine", gain: 0.12 }); noise(c, o, t, { dur: 0.14, freq: 400, gain: 0.1, type: "lowpass", delay: 0.05 }) },
   win: (c, o, t) => { [523, 659, 784, 1047].forEach((f, i) => tone(c, o, t, { freq: f, dur: 0.22, type: "sine", gain: 0.26, delay: i * 0.1 })) },
   lose: (c, o, t) => { [440, 349, 262].forEach((f, i) => tone(c, o, t, { freq: f, dur: 0.26, type: "triangle", gain: 0.24, delay: i * 0.13 })) },
   bell: (c, o, t) => { tone(c, o, t, { freq: 1568, dur: 0.4, type: "sine", gain: 0.26 }); tone(c, o, t, { freq: 2093, dur: 0.3, type: "sine", gain: 0.14 }) },
-  whoosh: (c, o, t) => noise(c, o, t, { dur: 0.3, freq: 700, gain: 0.2, type: "bandpass" }),
+  // a missile launch: airy rush with a rising then arcing-down pitch
+  whoosh: (c, o, t) => { noise(c, o, t, { dur: 0.34, freq: 900, gain: 0.22, type: "bandpass" }); tone(c, o, t, { freq: 200, to: 1400, dur: 0.16, type: "sawtooth", gain: 0.1 }); tone(c, o, t, { freq: 1400, to: 500, dur: 0.16, type: "sine", gain: 0.08, delay: 0.16 }) },
   draw: (c, o, t) => noise(c, o, t, { dur: 0.14, freq: 2600, gain: 0.12, type: "highpass" }),
   clue: (c, o, t) => { tone(c, o, t, { freq: 784, dur: 0.18, type: "sine", gain: 0.24 }); tone(c, o, t, { freq: 1175, dur: 0.26, type: "sine", gain: 0.2, delay: 0.12 }) },
   build: (c, o, t) => { tone(c, o, t, { freq: 220, dur: 0.06, type: "square", gain: 0.22 }); tone(c, o, t, { freq: 330, dur: 0.1, type: "square", gain: 0.2, delay: 0.08 }) },
