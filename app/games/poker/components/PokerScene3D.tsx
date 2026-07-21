@@ -212,19 +212,20 @@ const CHIP_DENOMS: { v: number; color: string; stripe: string }[] = [
   { v: 1, color: "#d8d4c8", stripe: "#8a8578" },
 ]
 
-function ChipStack({ amount, compact }: { amount: number; compact?: boolean }) {
+// `wager` renders a small pile pushed forward (a bet), `compact` a seat bank,
+// neither a big centre pile. A bet is deliberately fewer, smaller chips so it
+// never reads as a duplicate of the stack it came from.
+function ChipStack({ amount, compact, wager }: { amount: number; compact?: boolean; wager?: boolean }) {
   const stacks = useMemo(() => {
     const out: { color: string; stripe: string; count: number }[] = []
     let rest = amount
+    const maxPer = wager ? 3 : compact ? 4 : 8
     for (const d of CHIP_DENOMS) {
       const n = Math.floor(rest / d.v)
-      if (n > 0) { out.push({ color: d.color, stripe: d.stripe, count: Math.min(n, compact ? 4 : 8) }); rest -= n * d.v }
+      if (n > 0) { out.push({ color: d.color, stripe: d.stripe, count: Math.min(n, maxPer) }); rest -= n * d.v }
     }
-    // Show every denomination the amount actually breaks into. Truncating to
-    // the top two made a bet display colours the player's bank never showed —
-    // chips appeared "out of nowhere". Now a bet is always a visual subset.
-    return out.slice(0, compact ? 4 : 5)
-  }, [amount, compact])
+    return out.slice(0, wager ? 2 : compact ? 4 : 5)
+  }, [amount, compact, wager])
   return (
     <group>
       {stacks.map((s, si) => (
@@ -250,7 +251,7 @@ function ChipStack({ amount, compact }: { amount: number; compact?: boolean }) {
 // Pot pile: slides to the winner seat when the hand ends.
 // Pot rests BEHIND the community cards (toward the far rail) so it never sits
 // on top of the board from the player's camera, then slides to the winner.
-const POT_Z = -2.65
+const POT_Z = -1.45
 function PotPile({ amount, winnerAngle }: { amount: number; winnerAngle: number | null }) {
   const g = useRef<THREE.Group>(null)
   useFrame((_, dt) => {
@@ -394,10 +395,11 @@ function Scene({ state, meIndex, isSpectator, reveal }: PokerScene3DProps) {
               </group>
             )}
 
-            {/* current-round bet chips */}
+            {/* current-round bet — a small pile pushed toward the pot, visibly
+                lighter than the seat's bank so the two never look duplicated */}
             {p.bet > 0 && (
-              <group position={[Math.cos(ang) * (TA - 2.7), 0.16, Math.sin(ang) * (TB - 1.85)]}>
-                <ChipStack amount={p.bet} compact />
+              <group position={[Math.cos(ang) * (TA - 2.9), 0.16, Math.sin(ang) * (TB - 1.95)]} scale={0.82}>
+                <ChipStack amount={p.bet} wager />
               </group>
             )}
 

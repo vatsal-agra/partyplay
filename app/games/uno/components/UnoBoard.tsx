@@ -61,7 +61,9 @@ export default function UnoBoard({ state, currentPlayerId, onStateChange, onBroa
     if (state.winnerId || isSpectator) return
     const cur = state.players[state.currentPlayerIndex]
     if (cur.isBot && state.phase === 'PLAY') {
-      const t = setTimeout(() => commit(playBotStep(state)), 1000)
+      // Give each bot a beat you can actually follow — at 1s a table of bots
+      // blurs past between your turns.
+      const t = setTimeout(() => commit(playBotStep(state)), 1900)
       return () => clearTimeout(t)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -123,16 +123,16 @@ const CW = 1.0, CH = 1.5, CT = 0.02
 
 function cardMats(card?: Card): THREE.Material[] {
   const edge = new THREE.MeshStandardMaterial({ color: "#f5f2ea", roughness: 0.7 })
-  // The printed faces are self-lit and skip tone mapping, so the colours stay
-  // bright and saturated instead of being muddied by the dim room lighting.
+  // Faces carry a little self-lighting so they read in the dim room, but keep
+  // tone mapping ON — skipping it blew out the discard pile, which sits right
+  // under the table spotlight, into an unreadable white blob.
   const faceTex = card ? unoFaceTexture(card.color, card.value) : unoBackTexture()
   const face = new THREE.MeshStandardMaterial({
     map: faceTex,
     emissiveMap: faceTex,
     emissive: new THREE.Color("#ffffff"),
-    emissiveIntensity: 0.62,
-    roughness: 0.5,
-    toneMapped: false,
+    emissiveIntensity: 0.3,
+    roughness: 0.55,
   })
   const backTex = unoBackTexture()
   const back = new THREE.MeshStandardMaterial({
@@ -514,7 +514,10 @@ export default function UnoScene3D(props: UnoScene3DProps) {
       <Suspense fallback={null}>
         <Scene {...props} />
         <EffectComposer multisampling={0}>
-          <Bloom intensity={0.55} luminanceThreshold={0.68} luminanceSmoothing={0.25} mipmapBlur />
+          {/* threshold raised so bright white card faces under the table
+              spotlight stop blooming into an unreadable blob — only the
+              genuinely emissive bits (colour ring, sparks) still glow */}
+          <Bloom intensity={0.5} luminanceThreshold={0.82} luminanceSmoothing={0.25} mipmapBlur />
           <Vignette eskil={false} offset={0.26} darkness={0.76} />
           <SMAA />
         </EffectComposer>

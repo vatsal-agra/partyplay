@@ -60,7 +60,8 @@ export default function PokerBoard({ state, currentPlayerId, onStateChange, onBr
     if (state.stage === 'GAME_OVER' || isSpectator) return
     const cur = state.players[state.currentPlayerIndex]
     if (inBetting && cur?.isBot) {
-      const t = setTimeout(() => commit(playBotStep(state)), 900)
+      // slow enough to actually follow the action around the table
+      const t = setTimeout(() => commit(playBotStep(state)), 1600)
       return () => clearTimeout(t)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
