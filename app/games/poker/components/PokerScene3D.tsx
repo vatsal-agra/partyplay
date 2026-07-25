@@ -140,12 +140,16 @@ const FELT_Y = 0.17
 
 function CommunityCard({ card, slot }: { card: Card; slot: number }) {
   const g = useRef<THREE.Group>(null)
-  const t = useRef(0)
+  // negative start = stagger: the flop cascades card by card instead of
+  // slapping down all three at once; turn/river get a dramatic beat too
+  const t = useRef(-slot * 0.18)
   const targetX = (slot - 2) * 1.18   // wider spread so the board reads clearly
   useFrame((_, dt) => {
     if (!g.current) return
     t.current = Math.min(1, t.current + dt * 2.2)
-    const k = t.current
+    if (t.current <= 0) { g.current.visible = false; return }
+    g.current.visible = true
+    const k = Math.max(0, t.current)
     const e = 1 - Math.pow(1 - k, 3) // ease-out
     g.current.position.set(
       -3.4 + (targetX + 3.4) * e,
@@ -156,20 +160,47 @@ function CommunityCard({ card, slot }: { card: Card; slot: number }) {
     g.current.rotation.y = Math.PI * (1 - e)   // flip during the slide
   })
   return (
-    <group ref={g} position={[-3.4, FELT_Y, -0.35]} rotation-x={-Math.PI / 2}>
+    <group ref={g} visible={false} position={[-3.4, FELT_Y, -0.35]} rotation-x={-Math.PI / 2}>
       <Card3D card={card} faceUp scale={1.4} />
     </group>
   )
 }
 
-// Hole card at a seat. Opponents hold their cards upright (like a real hand) —
-// we see the backs until they flip toward us at showdown.
-function HoleCard({ card, mine, revealed, seatAngle, offset }: {
-  card?: Card; mine: boolean; revealed: boolean; seatAngle: number; offset: number
+// Hole card at a seat. Every new hand the cards are DEALT — each one flies
+// spinning from the dealer's spot at the table centre to its seat, in true
+// dealing order (one lap around the table, then a second). Opponents hold
+// theirs upright; we see the backs until they flip toward us at showdown.
+function HoleCard({ card, mine, revealed, seatAngle, offset, dealDelay = 0 }: {
+  card?: Card; mine: boolean; revealed: boolean; seatAngle: number; offset: number; dealDelay?: number
 }) {
   const flip = useRef(0)
   const inner = useRef<THREE.Group>(null)
+  const fly = useRef<THREE.Group>(null)
+  const dealT = useRef(-dealDelay)
+
+  const finalPos = useMemo<[number, number, number]>(() => (
+    mine
+      ? [offset * 1.35, 0.62, TB - 0.35]
+      : [Math.cos(seatAngle) * (TA - 1.15), FELT_Y + 0.52, Math.sin(seatAngle) * (TB - 0.72)]
+  ), [mine, seatAngle, offset])
+
   useFrame((_, dt) => {
+    // deal-in flight from the table centre, spinning as it goes
+    if (fly.current) {
+      dealT.current = Math.min(1, dealT.current + dt * 2.6)
+      if (dealT.current <= 0) {
+        fly.current.visible = false
+      } else {
+        fly.current.visible = true
+        const e = 1 - Math.pow(1 - Math.max(0, dealT.current), 3)
+        fly.current.position.set(
+          finalPos[0] * e,
+          (FELT_Y + 0.45) + (finalPos[1] - (FELT_Y + 0.45)) * e + Math.sin(e * Math.PI) * 0.55,
+          -0.35 + (finalPos[2] + 0.35) * e,
+        )
+        fly.current.rotation.y = (1 - e) * Math.PI * 3
+      }
+    }
     if (!inner.current) return
     const target = revealed ? 1 : 0
     flip.current += (target - flip.current) * Math.min(1, dt * 5)
@@ -181,22 +212,24 @@ function HoleCard({ card, mine, revealed, seatAngle, offset }: {
   if (mine) {
     // my cards: laid toward the camera, big and readable
     return (
-      <group position={[offset * 1.35, 0.62, TB - 0.35]} rotation-x={-0.55} rotation-z={-offset * 0.12}>
-        <Card3D card={card} faceUp scale={1.35} />
+      <group ref={fly} visible={false} position={[0, FELT_Y + 0.45, -0.35]}>
+        <group rotation-x={-0.55} rotation-z={-offset * 0.12}>
+          <Card3D card={card} faceUp scale={1.35} />
+        </group>
       </group>
     )
   }
 
   // Opponent: a small standing fan just inside their seat, faces angled toward
   // the player (so the back shows to the table) until the showdown flip.
-  const bx = Math.cos(seatAngle) * (TA - 1.15)
-  const bz = Math.sin(seatAngle) * (TB - 0.72)
   const faceOut = Math.PI / 2 - seatAngle   // card front (+z) points out toward the seat
   return (
-    <group position={[bx, FELT_Y + 0.52, bz]} rotation-y={faceOut}>
-      <group position={[offset * 0.34, 0, 0]} rotation-z={-offset * 0.5} rotation-x={0.34}>
-        <group ref={inner}>
-          <Card3D card={card} faceUp concealed={!revealed} scale={0.86} />
+    <group ref={fly} visible={false} position={[0, FELT_Y + 0.45, -0.35]}>
+      <group rotation-y={faceOut}>
+        <group position={[offset * 0.34, 0, 0]} rotation-z={-offset * 0.5} rotation-x={0.34}>
+          <group ref={inner}>
+            <Card3D card={card} faceUp concealed={!revealed} scale={0.86} />
+          </group>
         </group>
       </group>
     </group>
@@ -226,8 +259,19 @@ function ChipStack({ amount, compact, wager }: { amount: number; compact?: boole
     }
     return out.slice(0, wager ? 2 : compact ? 4 : 5)
   }, [amount, compact, wager])
+  // satisfying pop whenever the amount changes — chips land, don't just morph
+  const wrap = useRef<THREE.Group>(null)
+  const prevAmt = useRef(amount)
+  const pop = useRef(0)
+  if (prevAmt.current !== amount) { prevAmt.current = amount; pop.current = 1 }
+  useFrame((_, dt) => {
+    if (!wrap.current) return
+    pop.current = Math.max(0, pop.current - dt * 3.2)
+    const s = 1 + Math.sin(pop.current * Math.PI) * 0.3
+    wrap.current.scale.set(s, 1 + Math.sin(pop.current * Math.PI) * 0.45, s)
+  })
   return (
-    <group>
+    <group ref={wrap}>
       {stacks.map((s, si) => (
         <group key={si} position={[si * 0.56 - (stacks.length - 1) * 0.28, 0, 0]}>
           {Array.from({ length: s.count }).map((_, i) => (
@@ -266,6 +310,42 @@ function PotPile({ amount, winnerAngle }: { amount: number; winnerAngle: number 
   return (
     <group ref={g} position={[0, FELT_Y - 0.02, POT_Z]}>
       <ChipStack amount={amount} />
+    </group>
+  )
+}
+
+// Rising golden sparkles over a winning seat while the hand result shows.
+const sparkGeo = new THREE.SphereGeometry(1, 6, 5)
+const sparkMat = new THREE.MeshStandardMaterial({
+  color: "#ffd76a", emissive: "#ffb62e", emissiveIntensity: 2.6,
+  transparent: true, opacity: 0.95, depthWrite: false,
+})
+
+function WinnerBurst({ x, z }: { x: number; z: number }) {
+  const g = useRef<THREE.Group>(null)
+  const parts = useMemo(() =>
+    Array.from({ length: 14 }, (_, i) => ({
+      a: (i / 14) * Math.PI * 2 + (i % 3) * 0.4,
+      r: 0.35 + ((i * 29) % 10) / 16,
+      speed: 0.5 + ((i * 13) % 7) / 11,
+      ph: ((i * 37) % 10) / 10,
+    })), [])
+  useFrame(({ clock }) => {
+    if (!g.current) return
+    const t = clock.elapsedTime
+    g.current.children.forEach((m, i) => {
+      const p = parts[i]
+      const k = (t * p.speed + p.ph) % 1
+      m.position.set(Math.cos(p.a + k * 2) * p.r, 0.2 + k * 2.1, Math.sin(p.a + k * 2) * p.r)
+      const s = Math.max(0.001, 0.085 * (1 - k))
+      m.scale.set(s, s, s)
+    })
+  })
+  return (
+    <group position={[x, FELT_Y, z]}>
+      <group ref={g}>
+        {parts.map((_, i) => <mesh key={i} geometry={sparkGeo} material={sparkMat} />)}
+      </group>
     </group>
   )
 }
@@ -362,12 +442,15 @@ function Scene({ state, meIndex, isSpectator, reveal }: PokerScene3DProps) {
                 <meshStandardMaterial color="#e6b45a" emissive="#e6b45a" emissiveIntensity={0.9} transparent opacity={0.85} side={THREE.DoubleSide} />
               </mesh>
             )}
-            {isWinner && <pointLight position={[sx, 1.4, sz]} intensity={9} color="#ffd76a" distance={5} decay={2} />}
+            {/* winner glow is sparkles, NOT a mounted pointLight — adding or
+                removing a light recompiles every shader (visible hitch) */}
+            {isWinner && <WinnerBurst x={Math.cos(ang) * (TA - 1.6)} z={Math.sin(ang) * (TB - 1.1)} />}
 
-            {/* hole cards */}
+            {/* hole cards — dealt in true order: one lap, then the second */}
             {showCards && !p.folded && p.hole.map((c, k) => (
               <HoleCard key={c.id} card={c} mine={mine}
-                revealed={revealThem} seatAngle={ang} offset={k === 0 ? -0.42 : 0.42} />
+                revealed={revealThem} seatAngle={ang} offset={k === 0 ? -0.42 : 0.42}
+                dealDelay={(((idx - state.dealerIndex - 1 + n) % n) + k * n) * 0.13} />
             ))}
 
             {/* seated player figure — opponents only (I'm the camera at my seat) */}
