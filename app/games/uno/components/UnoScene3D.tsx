@@ -208,8 +208,11 @@ function DiscardPile({ cards }: { cards: Card[] }) {
     if (!g.current) return
     t.current = Math.min(1, t.current + dt * 2.4)
     const e = 1 - Math.pow(1 - t.current, 3)
-    g.current.position.y = 0.4 + (1 - e) * 1.6
-    g.current.rotation.z = jitter(top?.id || "") + (1 - e) * Math.PI * 2
+    // slams down from high with a double spin and a scale punch that settles
+    g.current.position.y = 0.4 + (1 - e) * 2.4
+    g.current.rotation.z = jitter(top?.id || "") + (1 - e) * Math.PI * 4
+    const s = 1 + (1 - e) * 0.4
+    g.current.scale.set(s, s, s)
   })
   const jitter = (id: string) => {
     let h = 0
@@ -270,11 +273,16 @@ function DrawPile({ count, canDraw, onDraw }: { count: number; canDraw: boolean;
   )
 }
 
-// Rotating direction indicator around the center piles.
+// Rotating direction indicator around the center piles. A reverse card sends
+// it into a fast celebratory spin the opposite way that decays back to cruise.
 function DirectionRing({ direction, color }: { direction: 1 | -1; color: string }) {
   const g = useRef<THREE.Group>(null)
+  const prevDir = useRef(direction)
+  const boost = useRef(0)
+  if (prevDir.current !== direction) { prevDir.current = direction; boost.current = 1 }
   useFrame((_, dt) => {
-    if (g.current) g.current.rotation.y -= dt * 0.9 * direction
+    boost.current = Math.max(0, boost.current - dt * 0.7)
+    if (g.current) g.current.rotation.y -= dt * (0.9 + boost.current * 9) * direction
   })
   return (
     <group ref={g} position={[0, 0.06, -0.4]}>
@@ -365,8 +373,34 @@ function Scene({ state, meIndex, isSpectator, isMyTurn, canDraw, onPlayCard, onD
   }, [state.players])
 
   const colorLight = useRef<THREE.PointLight>(null)
-  useFrame(({ clock }) => {
+
+  // Colour shockwave: when the active colour changes, an emissive ring blasts
+  // outward across the felt in the NEW colour. One persistent mesh, animated
+  // via refs — never mounted/unmounted, so it can't cause a shader recompile.
+  const burstMesh = useRef<THREE.Mesh>(null)
+  const burstT = useRef(0)
+  const prevColor = useRef(state.activeColor)
+  if (prevColor.current !== state.activeColor) { prevColor.current = state.activeColor; burstT.current = 1 }
+
+  // "one card left!" alarm ring at the table rim
+  const alarmMesh = useRef<THREE.Mesh>(null)
+  const someoneAtUno = state.players.some((p) => p.hand.length === 1) && !state.winnerId
+
+  useFrame(({ clock }, dt) => {
     if (colorLight.current) colorLight.current.intensity = 26 + Math.sin(clock.elapsedTime * 2.2) * 6
+    if (burstMesh.current) {
+      burstT.current = Math.max(0, burstT.current - dt * 1.4)
+      const k = 1 - burstT.current
+      const s = 0.6 + k * 6.4
+      burstMesh.current.scale.set(s, s, 1)
+      const mat = burstMesh.current.material as THREE.MeshBasicMaterial
+      mat.opacity = burstT.current * 0.85
+      mat.color.set(activeHex)
+    }
+    if (alarmMesh.current) {
+      const mat = alarmMesh.current.material as THREE.MeshBasicMaterial
+      mat.opacity = someoneAtUno ? 0.35 + Math.abs(Math.sin(clock.elapsedTime * 5)) * 0.5 : 0
+    }
   })
 
   return (
@@ -380,6 +414,18 @@ function Scene({ state, meIndex, isSpectator, isMyTurn, canDraw, onPlayCard, onD
 
       {/* games room (wider than OrbitControls maxDistance 22) */}
       <RoomBox size={54} height={20} y={-1.2} floor="#12131a" glow="#9fb0ff" />
+
+      {/* colour-change shockwave (persistent, ref-driven) */}
+      <mesh ref={burstMesh} position={[0, 0.18, -0.4]} rotation-x={-Math.PI / 2}>
+        <ringGeometry args={[0.85, 1.05, 48]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0} depthWrite={false} side={THREE.DoubleSide} />
+      </mesh>
+
+      {/* someone is one card from victory — the whole rim throbs red */}
+      <mesh ref={alarmMesh} position={[0, 0.155, 0]} rotation-x={-Math.PI / 2}>
+        <ringGeometry args={[7.05, 7.45, 64]} />
+        <meshBasicMaterial color="#ff3b30" transparent opacity={0} depthWrite={false} side={THREE.DoubleSide} />
+      </mesh>
 
       {/* the other players seated around the table (I'm the camera) */}
       {state.players.map((p, idx) => {
