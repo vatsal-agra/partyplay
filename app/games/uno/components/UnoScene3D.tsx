@@ -398,7 +398,7 @@ function Scene({ state, meIndex, isSpectator, isMyTurn, canDraw, onPlayCard, onD
             <Mannequin
               name={p.name} color={UNO_SEAT_COLORS[idx % UNO_SEAT_COLORS.length]}
               isBot={p.isBot} active={state.players[state.currentPlayerIndex]?.id === p.id}
-              index={idx} seated showName={false}
+              index={idx} seated showName={false} walkLift={0.66}
             />
           </group>
         )
