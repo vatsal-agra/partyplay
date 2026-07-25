@@ -150,7 +150,11 @@ function WordCard({ index, word, color, revealed, keyGlow, clickable, onGuess }:
     flip.current += (target - flip.current) * Math.min(1, dt * 4.5)
     const f = flip.current
     flipG.current.rotation.x = Math.PI * f
+    // an extra half-turn of showmanship and a swell at the top of the arc
+    flipG.current.rotation.z = Math.sin(f * Math.PI) * 0.35
     flipG.current.position.y = 0.03 + Math.sin(f * Math.PI) * 0.9 + (hover && clickable ? 0.14 : 0)
+    const s = 1 + Math.sin(f * Math.PI) * 0.28
+    flipG.current.scale.set(s, s, s)
   })
 
   return (

@@ -258,8 +258,8 @@ function Dice({ dice, rolling }: { dice: [number, number] | null; rolling: boole
 function performanceNow() { return typeof performance !== "undefined" ? performance.now() : 0 }
 
 // ---- room ------------------------------------------------------------------
-function Room({ room, reachable, wood, onEnter }: {
-  room: (typeof ROOMS)[number]; reachable: boolean; wood: THREE.Texture; onEnter: () => void
+function Room({ room, reachable, spotlit, wood, onEnter }: {
+  room: (typeof ROOMS)[number]; reachable: boolean; spotlit?: boolean; wood: THREE.Texture; onEnter: () => void
 }) {
   const r = room.rect
   const cx = gw((r.x1 + r.x2) / 2), cz = gz((r.y1 + r.y2) / 2)
@@ -267,7 +267,16 @@ function Room({ room, reachable, wood, onEnter }: {
   const felt = useMemo(() => feltTexture(ROOM_FELT[room.id]), [room.id])
   const floorMat = useRef<THREE.MeshStandardMaterial>(null)
   useFrame(({ clock }) => {
-    if (floorMat.current) floorMat.current.emissiveIntensity = reachable ? 0.25 + Math.sin(clock.elapsedTime * 3) * 0.15 : 0
+    if (!floorMat.current) return
+    if (spotlit) {
+      // a suggestion names this room — it throbs crimson while the accusation
+      // hangs in the air and the disprove is resolved
+      floorMat.current.emissive.set("#c8352b")
+      floorMat.current.emissiveIntensity = 0.5 + Math.abs(Math.sin(clock.elapsedTime * 4.2)) * 0.45
+    } else {
+      floorMat.current.emissive.set(GOLD)
+      floorMat.current.emissiveIntensity = reachable ? 0.25 + Math.sin(clock.elapsedTime * 3) * 0.15 : 0
+    }
   })
   const p = usePointer()
   const wallH = 0.42, tk = 0.16
@@ -417,7 +426,9 @@ function Scene({ state, currentPlayerId, reachCellKeys, reachRoomIds, onMoveCell
       {/* rooms */}
       {ROOMS.map((room) => (
         <Room key={room.id} room={room} wood={boardWood}
-          reachable={reachRoomIds.has(room.id)} onEnter={() => onMoveRoom(room.id)} />
+          reachable={reachRoomIds.has(room.id)}
+          spotlit={state.pending?.room === room.id}
+          onEnter={() => onMoveRoom(room.id)} />
       ))}
 
       {/* reachable corridor tiles */}
