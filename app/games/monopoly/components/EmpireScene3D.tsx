@@ -273,12 +273,24 @@ function woodTexture(): THREE.CanvasTexture {
 
 // ---- pieces -------------------------------------------------------------------------
 
-// Little green house / red hotel on the color band.
+// Little green house / red hotel on the color band. New buildings pop in with
+// an overshoot spring, like a piece being pressed onto the board.
 function Building({ hotel }: { hotel?: boolean }) {
   const col = hotel ? "#c8352b" : "#2f9e53"
-  const s = hotel ? 1.5 : 1
+  const base = hotel ? 1.5 : 1
+  const g = useRef<THREE.Group>(null)
+  const t = useRef(0)
+  useFrame((_, dt) => {
+    if (!g.current) return
+    t.current = Math.min(1, t.current + dt * 2.8)
+    const p = t.current
+    const c1 = 1.70158, c3 = c1 + 1
+    const e = 1 + c3 * Math.pow(p - 1, 3) + c1 * Math.pow(p - 1, 2)  // easeOutBack
+    const s = base * Math.max(0.001, e)
+    g.current.scale.set(s, s, s)
+  })
   return (
-    <group scale={s}>
+    <group ref={g} scale={0.001}>
       <mesh position={[0, 0.05, 0]} castShadow>
         <boxGeometry args={[0.14, 0.1, 0.12]} />
         <meshStandardMaterial color={col} roughness={0.35} metalness={0.1} />
@@ -353,6 +365,10 @@ function PlayerToken({ player, seat, isCurrent, stackIndex, stackCount }: {
   const shown = useRef<number>(player.position)   // continuously displayed index
   const hop = useRef(0)                           // 0..1 progress of current hop
   const ring = useRef<THREE.Mesh>(null)
+  const body = useRef<THREE.Group>(null)          // squash-and-stretch target
+  const landRing = useRef<THREE.Mesh>(null)       // dust ring on touchdown
+  const landT = useRef(0)
+  const wasMoving = useRef(false)
 
   // A lone token sits dead-center on its tile; when several share a tile they
   // fan out along the tile's depth (perpendicular to its edge) so they queue
@@ -388,13 +404,25 @@ function PlayerToken({ player, seat, isCurrent, stackIndex, stackCount }: {
       const k = Math.min(1, hop.current)
       const e = k * k * (3 - 2 * k)
       g.current.position.set(a.x + (b.x - a.x) * e, BOARD_Y + Math.sin(k * Math.PI) * 0.35, a.z + (b.z - a.z) * e)
+      wasMoving.current = true
     } else {
+      // the moment the journey ends: THUMP — squash + dust ring
+      if (wasMoving.current) { wasMoving.current = false; landT.current = 1 }
       hop.current = 0
       const p = posOf(cur)
       const k = Math.min(1, dt * 8)
       g.current.position.x += (p.x - g.current.position.x) * k
       g.current.position.z += (p.z - g.current.position.z) * k
       g.current.position.y += (BOARD_Y - g.current.position.y) * k
+    }
+    // landing squash-and-stretch on the token body + expanding dust ring
+    landT.current = Math.max(0, landT.current - dt * 3.4)
+    const squash = Math.sin(landT.current * Math.PI)
+    if (body.current) body.current.scale.set(1 + squash * 0.28, 1 - squash * 0.38, 1 + squash * 0.28)
+    if (landRing.current) {
+      const s = 0.35 + (1 - landT.current) * 1.3
+      landRing.current.scale.set(s, s, 1)
+      ;(landRing.current.material as THREE.MeshBasicMaterial).opacity = landT.current * 0.65
     }
     if (ring.current) {
       const s = 1 + Math.sin(clock.elapsedTime * 3) * 0.12
@@ -406,7 +434,13 @@ function PlayerToken({ player, seat, isCurrent, stackIndex, stackCount }: {
   const start = posOf(player.position)
   return (
     <group ref={g} position={[start.x, BOARD_Y, start.z]} scale={1.22}>
-      <TokenShape seat={seat} color={player.color} />
+      <group ref={body}>
+        <TokenShape seat={seat} color={player.color} />
+      </group>
+      <mesh ref={landRing} rotation-x={-Math.PI / 2} position={[0, 0.018, 0]}>
+        <ringGeometry args={[0.3, 0.4, 24]} />
+        <meshBasicMaterial color="#e8dcc0" transparent opacity={0} depthWrite={false} side={THREE.DoubleSide} />
+      </mesh>
       {isCurrent && (
         <mesh ref={ring} rotation-x={-Math.PI / 2} position={[0, 0.012, 0]}>
           <ringGeometry args={[0.24, 0.31, 28]} />
@@ -590,6 +624,32 @@ function Scene({ state, rolling, canDrawCard, onDiceSettled, onTileClick, onDraw
     }
   }, [state.players])
 
+  // Drawing a Fortune/Treasury card: a glowing card rises off the deck and
+  // fades as it's read. Persistent mesh, ref-driven (no mount/unmount churn).
+  const ghostMesh = useRef<THREE.Mesh>(null)
+  const ghostT = useRef(0)
+  const ghostKind = useRef<'CHANCE' | 'COMMUNITY_CHEST'>('CHANCE')
+  const prevCardKey = useRef<string | null>(null)
+  const cardKey = state.lastCardDrawn
+    ? state.lastCardDrawn.type + state.lastCardDrawn.text + (state.lastCardDrawn.by || "")
+    : null
+  if (prevCardKey.current !== cardKey) {
+    prevCardKey.current = cardKey
+    if (cardKey && state.lastCardDrawn) { ghostT.current = 1; ghostKind.current = state.lastCardDrawn.type }
+  }
+  useFrame((_, dt) => {
+    if (!ghostMesh.current) return
+    if (ghostT.current <= 0) { ghostMesh.current.visible = false; return }
+    ghostT.current = Math.max(0, ghostT.current - dt * 0.75)
+    const k = 1 - ghostT.current
+    ghostMesh.current.visible = true
+    ghostMesh.current.position.set(ghostKind.current === 'CHANCE' ? -2.6 : 2.6, BOARD_Y + 0.3 + k * 1.7, -1.9)
+    ghostMesh.current.rotation.y = k * 1.2
+    const mat = ghostMesh.current.material as THREE.MeshBasicMaterial
+    mat.map = deckTexture(ghostKind.current === 'CHANCE' ? "FORTUNE" : "TREASURY", ghostKind.current === 'CHANCE' ? "#ef8b33" : "#e8c53a")
+    mat.opacity = Math.min(1, ghostT.current * 1.6)
+  })
+
   // "Passed GO" celebration — a golden +$200 burst over the GO corner.
   const [goBursts, setGoBursts] = useState<number[]>([])
   const goId = useRef(0)
@@ -640,6 +700,12 @@ function Scene({ state, rolling, canDrawCard, onDiceSettled, onTileClick, onDraw
       <mesh position={[0, BOARD_Y - 0.004, 0]} rotation-x={-Math.PI / 2}>
         <planeGeometry args={[9, 9]} />
         <meshBasicMaterial map={center} toneMapped={false} />
+      </mesh>
+
+      {/* drawn-card ghost rising off its deck */}
+      <mesh ref={ghostMesh} visible={false} rotation-x={-0.5}>
+        <planeGeometry args={[1.15, 1.7]} />
+        <meshBasicMaterial transparent opacity={0} toneMapped={false} side={THREE.DoubleSide} />
       </mesh>
 
       {/* deck stacks — click to draw when you land on a card tile */}
