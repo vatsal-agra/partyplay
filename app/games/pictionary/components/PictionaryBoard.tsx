@@ -234,8 +234,19 @@ export default function PictionaryBoard({ state, currentPlayerId, onStateChange,
               {isFinish ? '🏁' : m.short}
               {(redHere || blueHere) && (
                 <span className="absolute -top-1.5 left-1/2 flex -translate-x-1/2 gap-0.5">
-                  {redHere && <span className="h-2 w-2 rounded-full ring-1 ring-black/40" style={{ background: TEAM_META.red.hex }} />}
-                  {blueHere && <span className="h-2 w-2 rounded-full ring-1 ring-black/40" style={{ background: TEAM_META.blue.hex }} />}
+                  {/* layoutId makes the token FLY across the board when it advances */}
+                  {redHere && (
+                    <motion.span layoutId="track-token-red"
+                      transition={{ type: "spring", stiffness: 260, damping: 22 }}
+                      className="h-2.5 w-2.5 rounded-full ring-1 ring-black/40"
+                      style={{ background: TEAM_META.red.hex, boxShadow: `0 0 8px ${TEAM_META.red.hex}` }} />
+                  )}
+                  {blueHere && (
+                    <motion.span layoutId="track-token-blue"
+                      transition={{ type: "spring", stiffness: 260, damping: 22 }}
+                      className="h-2.5 w-2.5 rounded-full ring-1 ring-black/40"
+                      style={{ background: TEAM_META.blue.hex, boxShadow: `0 0 8px ${TEAM_META.blue.hex}` }} />
+                  )}
                 </span>
               )}
             </div>
