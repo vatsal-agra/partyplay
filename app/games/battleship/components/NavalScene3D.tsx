@@ -264,13 +264,26 @@ function WarshipModel({ ship }: { ship: Ship }) {
 // A placed ship: positioned/rotated on my grid, bobbing; burns when hit, sinks when sunk.
 function FleetShip({ ship, shotsOnMe, phase }: { ship: Ship; shotsOnMe: Record<string, ShotResult>; phase: number }) {
   const g = useRef<THREE.Group>(null)
+  const outer = useRef<THREE.Group>(null)
   const sunkT = useRef(0)
   const cx = ship.cells.reduce((a, c) => a + c.x, 0) / ship.cells.length
   const cy = ship.cells.reduce((a, c) => a + c.y, 0) / ship.cells.length
   const px = wx(cx), pz = ownZ(cy)
   const rotY = ship.orientation === "H" ? Math.PI / 2 : 0
+  // Ships SAIL to their berth: on first placement they cruise in from open
+  // water east of the grid; re-positioning glides instead of teleporting.
+  const sailFrom = useRef<{ x: number; z: number } | null>(null)
+  if (sailFrom.current === null) sailFrom.current = { x: px + 16, z: pz + 2 }
 
   useFrame(({ clock }, dt) => {
+    // damped cruise toward the berth (sail-in + placement moves)
+    if (outer.current && sailFrom.current) {
+      const k = Math.min(1, dt * 3.2)
+      sailFrom.current.x += (px - sailFrom.current.x) * k
+      sailFrom.current.z += (pz - sailFrom.current.z) * k
+      outer.current.position.x = sailFrom.current.x
+      outer.current.position.z = sailFrom.current.z
+    }
     if (!g.current) return
     if (ship.sunk) {
       sunkT.current = Math.min(1, sunkT.current + dt * 0.42)
@@ -298,7 +311,7 @@ function FleetShip({ ship, shotsOnMe, phase }: { ship: Ship; shotsOnMe: Record<s
   })
 
   return (
-    <group position={[px, 0, pz]}>
+    <group ref={outer} position={[sailFrom.current.x, 0, sailFrom.current.z]}>
       <group ref={g} rotation-y={rotY}>
         <WarshipModel ship={ship} />
         {/* fires on damaged sections (local coords along ship axis) */}
@@ -383,9 +396,20 @@ function Boom({ x, z, big }: { x: number; z: number; big?: boolean }) {
       }
     }), [N])
   const group = useRef<THREE.Group>(null)
+  const debris = useRef<THREE.Group>(null)
   const ring = useRef<THREE.Mesh>(null)
+  const flash = useRef<THREE.Mesh>(null)
   const t = useRef(0)
   const s = big ? 1.6 : 1
+  const chunks = useMemo(() =>
+    Array.from({ length: big ? 10 : 7 }, (_, i) => {
+      const a = (i / (big ? 10 : 7)) * Math.PI * 2 + 0.7
+      const v = 1.6 + ((i * 41) % 9) / 5
+      return {
+        vx: Math.cos(a) * v, vy: 3.4 + ((i * 31) % 12) / 4, vz: Math.sin(a) * v,
+        rx: ((i * 17) % 10) - 5, rz: ((i * 23) % 10) - 5,
+      }
+    }), [big])
   useFrame((_, dt) => {
     t.current += dt
     const tt = t.current
@@ -399,6 +423,23 @@ function Boom({ x, z, big }: { x: number; z: number; big?: boolean }) {
         mat.opacity = Math.max(0, 1 - tt * 0.7)
       })
     }
+    // hull debris: dark chunks tumbling out on ballistic arcs
+    if (debris.current) {
+      debris.current.children.forEach((m, i) => {
+        const c = chunks[i]
+        m.position.set(c.vx * tt * s, (c.vy * tt - 5.2 * tt * tt) * s, c.vz * tt * s)
+        m.rotation.x += dt * c.rx
+        m.rotation.z += dt * c.rz
+        const sc = Math.max(0.001, (0.09 - tt * 0.032) * s)
+        m.scale.set(sc, sc, sc)
+      })
+    }
+    // white-hot core flash, gone in a fifth of a second
+    if (flash.current) {
+      const fs = Math.max(0.001, (0.4 + tt * 9) * s)
+      flash.current.scale.set(fs, fs, fs)
+      ;(flash.current.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 0.95 - tt * 5.2)
+    }
     if (ring.current) {
       const rs = 0.3 + tt * (big ? 7 : 4.6)
       ring.current.scale.set(rs, rs, rs)
@@ -408,6 +449,18 @@ function Boom({ x, z, big }: { x: number; z: number; big?: boolean }) {
   })
   return (
     <group position={[x, 0.25, z]}>
+      <mesh ref={flash}>
+        <sphereGeometry args={[1, 10, 8]} />
+        <meshBasicMaterial color="#fff6d8" transparent opacity={0.95} depthWrite={false} />
+      </mesh>
+      <group ref={debris}>
+        {chunks.map((_, i) => (
+          <mesh key={i}>
+            <boxGeometry args={[1, 0.7, 1.3]} />
+            <meshStandardMaterial color="#23262c" roughness={0.8} />
+          </mesh>
+        ))}
+      </group>
       <group ref={group}>
         {parts.map((_, i) => (
           <mesh key={i}>
