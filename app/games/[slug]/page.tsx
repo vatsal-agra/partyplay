@@ -1224,10 +1224,12 @@ export default function GamePlayPage() {
                   <Button
                     onClick={() => setShowRules(true)}
                     variant="outline"
+                    title="Press ? for rules"
                     className="text-white border-white/20 hover:bg-white/10 flex items-center gap-1.5"
                   >
                     <BookOpen className="w-4 h-4 text-pink-400" />
                     Game Rules
+                    <span className="hidden sm:inline text-[10px] font-normal uppercase tracking-wider text-white/40">?</span>
                   </Button>
                 </div>
               </div>
