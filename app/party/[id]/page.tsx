@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
-import { Copy, Share2, ArrowLeft, Crown, Trophy, Vote as VoteIcon, Rocket } from "lucide-react"
+import { Copy, Check, Share2, ArrowLeft, Crown, Trophy, Vote as VoteIcon, Rocket } from "lucide-react"
 import { useRouter, useParams } from "next/navigation"
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Image from "next/image";
@@ -64,6 +64,9 @@ export default function PartyPage() {
   const [guestName, setGuestName] = useState("");
   const [guestLoading, setGuestLoading] = useState(false);
   const [guestError, setGuestError] = useState<string | null>(null);
+  // Which share control was last used, so the button itself confirms the copy
+  // instead of throwing a browser alert() at the host.
+  const [copied, setCopied] = useState<"code" | "link" | null>(null);
   const launchChannelRef = useRef<RealtimeChannel | null>(null);
   // Last known party status — so only a genuine transition INTO "ready" (a fresh
   // launch) auto-redirects, not an in-progress "playing"/"ready" heartbeat.
@@ -108,6 +111,13 @@ export default function PartyPage() {
     [votes, session]
   )
   const myVoteName: string | null = myVote ? (myVote.game_name || getGameById(myVote.game_id)?.name || null) : null
+
+  // Turnout, for the "who is winning" banner. Guests can outnumber the member
+  // rows in odd states, so clamp rather than render a >100% bar.
+  const totalVotes = votes.length
+  const undecidedCount = Math.max(0, members.length - totalVotes)
+  const everyoneVoted = members.length > 0 && undecidedCount === 0
+  const turnoutPct = members.length ? Math.min(100, Math.round((totalVotes / members.length) * 100)) : 0
 
   useEffect(() => {
     const getSession = async () => {
@@ -428,22 +438,33 @@ export default function PartyPage() {
 
   const partyCode = partyId ? partyId.substring(0, 6).toUpperCase() : "------"
 
+  const inviteLink = typeof window !== 'undefined' ? `${window.location.origin}/party/${partyId}` : ''
+  const shareText = `Join my Dice Alley game night! Party code: ${partyCode}`
+
+  const flashCopied = (what: "code" | "link") => {
+    setCopied(what)
+    setTimeout(() => setCopied((current) => (current === what ? null : current)), 1800)
+  }
+
   const copyPartyCode = () => {
-    navigator.clipboard.writeText(partyCode)
-    alert("Party code copied! Share this code with your friends to invite them.")
+    navigator.clipboard.writeText(partyCode).then(() => flashCopied("code")).catch(() => {})
+  }
+
+  const copyInviteLink = () => {
+    navigator.clipboard.writeText(`${shareText} ${inviteLink}`).then(() => flashCopied("link")).catch(() => {})
   }
 
   const shareParty = () => {
-    const shareText = `Join my gaming party! Use code: ${partyCode}`
+    // Native share sheet where it exists (tablets, some laptops), clipboard
+    // everywhere else so the button always does something useful.
     if (typeof navigator !== 'undefined' && navigator.share) {
       navigator.share({
-        title: 'Join my gaming party!',
+        title: 'Join my Dice Alley game night!',
         text: shareText,
-        url: window.location.href,
-      }).catch(err => console.error(err))
+        url: inviteLink,
+      }).catch(() => {})
     } else {
-      navigator.clipboard.writeText(`${shareText} - ${window.location.href}`)
-      alert("Share link copied to clipboard!")
+      copyInviteLink()
     }
   }
 
@@ -476,27 +497,41 @@ export default function PartyPage() {
                     {members.length}/{party?.max_players} players
                   </p>
                   
-                  {/* Party Code Display */}
-                  <div className="mt-4 flex items-center gap-2 bg-black/25 px-3 py-1.5 rounded-lg border border-white/10 w-fit">
-                    <span className="text-sm text-gray-300 font-mono">Code: <span className="font-bold text-cyan-300 tracking-wider">{partyCode}</span></span>
-                    <Button 
-                      size="icon" 
-                      variant="ghost" 
-                      className="h-6 w-6 text-gray-300 hover:text-white hover:bg-white/10"
-                      onClick={copyPartyCode}
-                      title="Copy Party Code"
-                    >
-                      <Copy className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button 
-                      size="icon" 
-                      variant="ghost" 
-                      className="h-6 w-6 text-gray-300 hover:text-white hover:bg-white/10"
-                      onClick={shareParty}
-                      title="Invite Friends"
-                    >
-                      <Share2 className="h-3.5 w-3.5" />
-                    </Button>
+                  {/* Invite card: the one thing a host needs to hand out */}
+                  <div className="mt-4 w-fit max-w-full rounded-xl border border-white/15 bg-black/30 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-white/50">
+                      Invite your friends
+                    </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={copyPartyCode}
+                        title="Copy the party code"
+                        className="inline-flex items-center gap-3 rounded-lg border border-white/15 bg-black/40 px-3 py-1.5 transition-colors hover:border-cyan-300/60 hover:bg-black/60"
+                      >
+                        <span className="font-mono text-xl font-bold tracking-[0.35em] text-cyan-300">{partyCode}</span>
+                        {copied === "code"
+                          ? <Check className="h-4 w-4 text-emerald-400" />
+                          : <Copy className="h-4 w-4 text-white/60" />}
+                      </button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-1.5 bg-white/10 text-white hover:bg-white/20"
+                        onClick={shareParty}
+                        title="Share the invite link"
+                      >
+                        {copied === "link"
+                          ? <Check className="h-4 w-4 text-emerald-400" />
+                          : <Share2 className="h-4 w-4" />}
+                        {copied === "link" ? "Link copied" : "Share invite link"}
+                      </Button>
+                    </div>
+                    <p className="mt-2 text-xs text-white/60">
+                      {copied === "code"
+                        ? "Code copied. Paste it in the group chat."
+                        : "Friends can join as guests, no account needed."}
+                    </p>
                   </div>
                 </div>
                 <Button
@@ -517,16 +552,77 @@ export default function PartyPage() {
                   <VoteIcon className="h-6 w-6 text-cyan-300" />
                   Game Voting
                 </h2>
-                <span className="text-sm text-gray-300">
-                  {votes.length} / {members.length} voted
-                </span>
+                {myVoteName && (
+                  <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white">
+                    Your vote: {myVoteName}
+                  </span>
+                )}
+              </div>
+
+              {/* Who is actually winning, stated plainly before the tally, plus
+                  how many players are still deciding. */}
+              <div
+                className={`mb-5 rounded-xl border p-4 ${
+                  maxVotes === 0
+                    ? 'border-white/10 bg-white/5'
+                    : isTie
+                      ? 'border-amber-300/50 bg-amber-400/10'
+                      : 'border-emerald-400/50 bg-emerald-400/10'
+                }`}
+              >
+                {maxVotes === 0 ? (
+                  <p className="text-sm text-gray-300">No votes yet. The first vote sets the pace.</p>
+                ) : isTie ? (
+                  <>
+                    <p className="text-xs font-semibold uppercase tracking-widest text-amber-200/80">
+                      Tied at {maxVotes} {maxVotes === 1 ? 'vote' : 'votes'}
+                    </p>
+                    <p className="mt-1 font-display text-2xl font-bold text-white">
+                      {winners.map((w) => w.name).join(' vs ')}
+                    </p>
+                    <p className="mt-1 text-sm text-amber-100/80">
+                      {isLeader ? 'Pick the winner below to launch it.' : 'The host will break the tie.'}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs font-semibold uppercase tracking-widest text-emerald-200/80">
+                      {everyoneVoted ? 'Winner' : 'Currently winning'}
+                    </p>
+                    <div className="mt-1 flex items-center gap-2">
+                      <Crown className="h-6 w-6 shrink-0 text-yellow-300" />
+                      <p className="font-display text-2xl font-bold text-white">{winners[0].name}</p>
+                    </div>
+                    <p className="mt-1 text-sm text-emerald-100/80">
+                      {winners[0].count} of {totalVotes} {totalVotes === 1 ? 'vote' : 'votes'}
+                      {isLeader ? '. Start it below whenever you are ready.' : '. Waiting for the host to launch.'}
+                    </p>
+                  </>
+                )}
+
+                <div className="mt-3">
+                  <div className="flex items-center justify-between text-xs text-white/60">
+                    <span>{totalVotes} of {members.length} players voted</span>
+                    <span>
+                      {undecidedCount > 0
+                        ? `${undecidedCount} still deciding`
+                        : 'Everyone has voted'}
+                    </span>
+                  </div>
+                  <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-emerald-400 transition-all duration-500"
+                      style={{ width: `${turnoutPct}%` }}
+                    />
+                  </div>
+                </div>
               </div>
 
               {voteTally.length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-gray-300 mb-1">No votes yet.</p>
+                  <p className="text-gray-300 mb-1">Nobody has voted yet.</p>
                   <p className="text-sm text-gray-400 mb-5">
-                    Head to the games page and vote for what you want to play — the most-voted game wins!
+                    Head to the games page and vote for what you want to play. The most-voted game wins.
                   </p>
                   <Button
                     onClick={() => router.push('/games')}
@@ -540,18 +636,20 @@ export default function PartyPage() {
                 <div className="space-y-3">
                   {voteTally.map((t) => {
                     const isWinner = t.count === maxVotes
-                    const pct = maxVotes > 0 ? Math.round((t.count / maxVotes) * 100) : 0
+                    // Share of all votes cast, so the bar lengths tell the real
+                    // story instead of pinning the leader at 100%.
+                    const pct = totalVotes > 0 ? Math.round((t.count / totalVotes) * 100) : 0
                     const gameImg = getGameById(t.gameId)?.image
                     return (
                       <div
                         key={t.gameId}
                         className={`relative overflow-hidden rounded-lg border p-3 ${
-                          isWinner ? 'border-yellow-400/70 bg-yellow-400/10' : 'border-white/10 bg-white/5'
+                          isWinner ? 'border-yellow-400/70 bg-yellow-400/10 shadow-lg shadow-yellow-400/5' : 'border-white/10 bg-white/5'
                         }`}
                       >
                         {/* progress fill */}
                         <div
-                          className={`absolute inset-y-0 left-0 ${isWinner ? 'bg-yellow-400/15' : 'bg-cyan-400/10'}`}
+                          className={`absolute inset-y-0 left-0 transition-all duration-500 ${isWinner ? 'bg-yellow-400/20' : 'bg-cyan-400/10'}`}
                           style={{ width: `${pct}%` }}
                         />
                         <div className="relative flex items-center gap-3">
@@ -564,12 +662,20 @@ export default function PartyPage() {
                             <div className="flex items-center gap-2">
                               {isWinner && <Crown className="h-4 w-4 text-yellow-300 flex-shrink-0" />}
                               <span className="font-semibold text-white truncate">{t.name}</span>
+                              {isWinner && (
+                                <span className="shrink-0 rounded-full bg-yellow-400/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-yellow-200">
+                                  {isTie ? 'Tied' : everyoneVoted ? 'Winner' : 'Leading'}
+                                </span>
+                              )}
                             </div>
                             <p className="text-xs text-gray-300 truncate">{t.voters.join(', ')}</p>
                           </div>
-                          <span className="font-bold text-white whitespace-nowrap">
-                            {t.count} {t.count === 1 ? 'vote' : 'votes'}
-                          </span>
+                          <div className="text-right">
+                            <span className="block font-bold text-white whitespace-nowrap">
+                              {t.count} {t.count === 1 ? 'vote' : 'votes'}
+                            </span>
+                            <span className="block text-xs text-gray-400">{pct}%</span>
+                          </div>
                         </div>
                       </div>
                     )
@@ -630,10 +736,10 @@ export default function PartyPage() {
                   <div className="text-center">
                     {effectiveWinner ? (
                       <p className="text-sm text-gray-200 mb-3">
-                        <span className="text-yellow-200 font-semibold">{effectiveWinner.name}</span> is winning — waiting for the host to launch.
+                        <span className="text-yellow-200 font-semibold">{effectiveWinner.name}</span> is winning. Waiting for the host to launch.
                       </p>
                     ) : isTie ? (
-                      <p className="text-sm text-gray-200 mb-3">It&apos;s a tie — the host will pick the winner.</p>
+                      <p className="text-sm text-gray-200 mb-3">It&apos;s a tie. The host will pick the winner.</p>
                     ) : (
                       <p className="text-sm text-gray-200 mb-3">Cast your vote to help decide the game!</p>
                     )}
