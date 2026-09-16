@@ -12,10 +12,13 @@ import * as THREE from "three"
 import { Suspense, useMemo, useRef } from "react"
 import { Canvas, useFrame, ThreeEvent } from "@react-three/fiber"
 import { OrbitControls, ContactShadows, Environment, Lightformer } from "@react-three/drei"
-import { EffectComposer, Bloom, Vignette, SMAA } from "@react-three/postprocessing"
+import { SceneFX, canvasDefaults, shadowDefaults } from "@/components/three/SceneFX"
 import {
   CatanState, TerrainType, getBoardLayout,
 } from "../lib/catanEngine"
+
+// hexes, ports, roads and settlements all in frame — see components/three/SceneFX.tsx for what each tier costs
+const QUALITY = "high" as const
 
 // ---- layout → world -----------------------------------------------------------
 const S = 2 // world units per layout unit (hex circumradius = S)
@@ -492,7 +495,7 @@ function Scene(props: HexIsland3DProps) {
       <hemisphereLight args={["#bfe3f2", "#1a2a1c", 0.55]} />
       <directionalLight
         position={[14, 18, 8]} intensity={2.3} color="#ffdf9e" castShadow
-        shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004}
+        {...shadowDefaults(QUALITY)}
         shadow-camera-left={-18} shadow-camera-right={18} shadow-camera-top={18} shadow-camera-bottom={-18}
         shadow-camera-near={1} shadow-camera-far={60}
       />
@@ -678,19 +681,16 @@ function Scene(props: HexIsland3DProps) {
 export default function HexIsland3D(props: HexIsland3DProps) {
   return (
     <Canvas
-      shadows dpr={[1, 2]} gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
-      camera={{ position: [0, 17, 15], fov: 44, near: 0.1, far: 220 }}
+      {...canvasDefaults(QUALITY, 1.05)}
+      camera={{ position: [0, 17, 15], fov: 44, near: 0.3, far: 220 }}
       style={{ width: "100%", height: "100%" }}
     >
       <color attach="background" args={["#0b1c24"]} />
       <fog attach="fog" args={["#0b1c24", 42, 90]} />
       <Suspense fallback={null}>
         <Scene {...props} />
-        <EffectComposer multisampling={0}>
-          <Bloom intensity={0.5} luminanceThreshold={0.65} luminanceSmoothing={0.2} mipmapBlur />
-          <Vignette eskil={false} offset={0.24} darkness={0.7} />
-          <SMAA />
-        </EffectComposer>
+        <SceneFX quality={QUALITY} intensity={0.5} threshold={0.65} smoothing={0.2}
+          vignetteOffset={0.24} vignetteDarkness={0.7} />
       </Suspense>
     </Canvas>
   )

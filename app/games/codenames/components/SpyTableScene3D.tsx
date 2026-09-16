@@ -12,8 +12,11 @@ import * as THREE from "three"
 import { Suspense, useMemo, useRef, useState } from "react"
 import { Canvas, useFrame, ThreeEvent } from "@react-three/fiber"
 import { OrbitControls } from "@react-three/drei"
-import { EffectComposer, Bloom, Vignette, SMAA } from "@react-three/postprocessing"
+import { SceneFX, canvasDefaults, shadowDefaults } from "@/components/three/SceneFX"
 import { SpymasterState, CellColor } from "../lib/spymasterEngine"
+
+// a flat grid of 25 cards on felt — see components/three/SceneFX.tsx for what each tier costs
+const QUALITY = "low" as const
 
 const CARD_W = 1.9
 const CARD_H = 1.3
@@ -218,7 +221,7 @@ function Scene({ state, showKey, canGuess, onGuess }: SpyTableScene3DProps) {
       <ambientLight intensity={0.3} color="#cdd3e0" />
       <hemisphereLight args={["#5a6274", "#08090c", 0.5]} />
       <spotLight position={[0, 13, 1.5]} angle={0.62} penumbra={0.45} intensity={280} color="#f2ead2" castShadow
-        shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004} />
+        {...shadowDefaults(QUALITY)} />
       <pointLight position={[-9, 4, 0]} intensity={9} color={CELL_HEX.red} distance={16} decay={2} />
       <pointLight position={[9, 4, 0]} intensity={9} color={CELL_HEX.blue} distance={16} decay={2} />
 
@@ -269,19 +272,16 @@ function Scene({ state, showKey, canGuess, onGuess }: SpyTableScene3DProps) {
 export default function SpyTableScene3D(props: SpyTableScene3DProps) {
   return (
     <Canvas
-      shadows dpr={[1, 2]} gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.04 }}
-      camera={{ position: [0, 10.2, 8.2], fov: 45, near: 0.1, far: 120 }}
+      {...canvasDefaults(QUALITY, 1.04)}
+      camera={{ position: [0, 10.2, 8.2], fov: 45, near: 0.3, far: 120 }}
       style={{ width: "100%", height: "100%" }}
     >
       <color attach="background" args={["#0b0c10"]} />
       <fog attach="fog" args={["#0b0c10", 24, 55]} />
       <Suspense fallback={null}>
         <Scene {...props} />
-        <EffectComposer multisampling={0}>
-          <Bloom intensity={0.5} luminanceThreshold={0.7} luminanceSmoothing={0.25} mipmapBlur />
-          <Vignette eskil={false} offset={0.26} darkness={0.78} />
-          <SMAA />
-        </EffectComposer>
+        <SceneFX quality={QUALITY} intensity={0.5} threshold={0.7} smoothing={0.25}
+          vignetteOffset={0.26} vignetteDarkness={0.78} />
       </Suspense>
     </Canvas>
   )

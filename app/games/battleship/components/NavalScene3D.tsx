@@ -12,11 +12,14 @@ import * as THREE from "three"
 import { Suspense, useMemo, useRef, useState, useEffect } from "react"
 import { Canvas, useFrame, ThreeEvent } from "@react-three/fiber"
 import { OrbitControls, Trail } from "@react-three/drei"
-import { EffectComposer, Bloom, Vignette, SMAA } from "@react-three/postprocessing"
+import { SceneFX, canvasDefaults, shadowDefaults } from "@/components/three/SceneFX"
 import {
   BattleshipState, Ship, ShotResult, GRID, cellKey,
 } from "../lib/battleshipEngine"
 import { playSfx } from "@/lib/sfx"
+
+// two grids, ships, sea and explosion FX — see components/three/SceneFX.tsx for what each tier costs
+const QUALITY = "high" as const
 
 // ---- world mapping ------------------------------------------------------------
 // Still a 10x10 fleet grid — the cells are simply bigger so the battleground
@@ -786,7 +789,7 @@ function Scene(props: NavalScene3DProps) {
       <hemisphereLight args={["#9fb6cc", "#123244", 0.7]} />
       <directionalLight
         position={[-6, 14, -24]} intensity={1.05} color="#ffc49a" castShadow
-        shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004}
+        {...shadowDefaults(QUALITY)}
         shadow-camera-left={-20} shadow-camera-right={20} shadow-camera-top={24} shadow-camera-bottom={-24}
         shadow-camera-near={1} shadow-camera-far={70}
       />
@@ -926,7 +929,7 @@ function Scene(props: NavalScene3DProps) {
 export default function NavalScene3D(props: NavalScene3DProps) {
   return (
     <Canvas
-      shadows dpr={[1, 2]} gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.02 }}
+      {...canvasDefaults(QUALITY, 1.02)}
       camera={{ position: [0, 27, 23], fov: 46, near: 0.1, far: 240 }}
       style={{ width: "100%", height: "100%" }}
     >
@@ -934,11 +937,8 @@ export default function NavalScene3D(props: NavalScene3DProps) {
       <fog attach="fog" args={["#0a141d", 46, 110]} />
       <Suspense fallback={null}>
         <Scene {...props} />
-        <EffectComposer multisampling={0}>
-          <Bloom intensity={0.75} luminanceThreshold={0.6} luminanceSmoothing={0.25} mipmapBlur />
-          <Vignette eskil={false} offset={0.22} darkness={0.72} />
-          <SMAA />
-        </EffectComposer>
+        <SceneFX quality={QUALITY} intensity={0.75} threshold={0.6} smoothing={0.25}
+          vignetteOffset={0.22} vignetteDarkness={0.72} />
       </Suspense>
     </Canvas>
   )

@@ -172,8 +172,11 @@ export function RoomBox({
       </mesh>
 
       {/* panelled walls — lightly self-lit so they never fall to pure black */}
+      {/* No receiveShadow: these sit 23-48 units out, far outside every scene's
+          shadow camera, so sampling the shadow map on them only ever returned
+          "lit" while still costing the lookup on a full-screen-tall quad. */}
       {walls.map((w, i) => (
-        <mesh key={i} position={w.pos} rotation-y={w.rot} receiveShadow>
+        <mesh key={i} position={w.pos} rotation-y={w.rot}>
           <planeGeometry args={[size, height]} />
           <meshStandardMaterial
             map={wallTex}
