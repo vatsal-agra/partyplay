@@ -1,4 +1,4 @@
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import Script from "next/script"
 import { Plus_Jakarta_Sans, Playfair_Display } from "next/font/google"
 import "./globals.css"
@@ -27,6 +27,19 @@ export const metadata: Metadata = {
   title: "Dice Alley — Game Night, Anywhere",
   description: "Create a party, rally your friends, vote on a game, and play together in real time. 9 free games, voice chat, no installs — the funnest way to host game night online.",
   applicationName: "Dice Alley",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
+  appleWebApp: {
+    capable: true,
+    title: "Dice Alley",
+    statusBarStyle: "black-translucent",
+  },
   openGraph: {
     type: "website",
     siteName: "Dice Alley",
@@ -39,6 +52,12 @@ export const metadata: Metadata = {
     title: "Dice Alley — Game Night, Anywhere",
     description: "Rally your crew, vote on a game, and play together in real time. Free, in your browser.",
   },
+}
+
+// Honey gold matches the theme_color in app/manifest.ts.
+export const viewport: Viewport = {
+  themeColor: "#d6a85c",
+  colorScheme: "dark",
 }
 
 export default function RootLayout({
