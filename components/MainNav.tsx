@@ -1,10 +1,12 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "./ui/button"
-import { Home, Gamepad2, LogIn, LogOut, UserPlus, Dice5, ShoppingBag } from "lucide-react"
+import { Home, Gamepad2, LogIn, LogOut, UserPlus, Dice5, ShoppingBag, Volume2, VolumeX } from "lucide-react"
+import { isSfxMuted, toggleSfxMuted, onSfxMutedChange } from "@/lib/sfx"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 import { useRouter } from "next/navigation"
 
@@ -12,6 +14,12 @@ export function MainNav() {
   const pathname = usePathname()
   const supabase = getSupabaseBrowserClient()
   const router = useRouter()
+  const [sfxMuted, setSfxMuted] = useState(false)
+
+  useEffect(() => {
+    setSfxMuted(isSfxMuted())
+    return onSfxMutedChange(setSfxMuted)
+  }, [])
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -66,6 +74,17 @@ export function MainNav() {
 
         {/* Right side */}
         <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="text-muted-foreground hover:text-white"
+            onClick={() => toggleSfxMuted()}
+            title={sfxMuted ? "Unmute sound effects" : "Mute sound effects"}
+            aria-label={sfxMuted ? "Unmute sound effects" : "Mute sound effects"}
+          >
+            {sfxMuted ? <VolumeX className="h-4 w-4" aria-hidden="true" /> : <Volume2 className="h-4 w-4" aria-hidden="true" />}
+          </Button>
           {pathname === "/" ? (
             <>
               <Link href="/auth/sign-in">
