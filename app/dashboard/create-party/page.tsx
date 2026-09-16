@@ -8,7 +8,9 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useSessionContext } from "@supabase/auth-helpers-react"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
-import { playAsGuest } from "@/lib/guest"
+import { playAsGuest, isGuestSession } from "@/lib/guest"
+import Link from "next/link"
+import { ShieldCheck } from "lucide-react"
 import { Auth } from "@supabase/auth-ui-react"
 import { ThemeSupa } from "@supabase/auth-ui-shared"
 
@@ -181,6 +183,21 @@ export default function CreateParty() {
           </h1>
           <p className="text-muted-foreground text-lg">Set up your game night and invite friends</p>
         </div>
+
+        {/* Guests own the parties they create through an anonymous session. If they
+            lose it the party is orphaned, so nudge them inline before they host. */}
+        {isGuestSession(session) && (
+          <div className="mb-6 flex flex-wrap items-center gap-3 rounded-xl border border-aqua-400/30 bg-aqua-500/10 px-4 py-3">
+            <ShieldCheck className="h-5 w-5 shrink-0 text-aqua-400" />
+            <p className="min-w-0 flex-1 text-sm text-white/90">
+              <span className="font-bold text-white">Save this account.</span>{" "}
+              You are playing as a guest. Add an email so you keep your parties and progress.
+            </p>
+            <Button asChild variant="brand" size="sm" className="shrink-0">
+              <Link href="/auth/sign-up">Save this account</Link>
+            </Button>
+          </div>
+        )}
 
         <Card className="p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
