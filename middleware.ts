@@ -9,6 +9,9 @@ import type { NextRequest } from "next/server"
 // again every time they reopen the site — even in the same browser.
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next()
+  // Shop APIs validate Bearer tokens server-side and do not use session cookies.
+  // Keep their configuration/error responses reachable without cookie refresh.
+  if (req.nextUrl.pathname.startsWith("/api/shop/")) return res
   const supabase = createMiddlewareClient({ req, res })
   // Touching the session triggers a refresh + Set-Cookie on the response.
   await supabase.auth.getSession()

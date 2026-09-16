@@ -6,11 +6,12 @@ const isDev = process.env.NODE_ENV !== "production"
 // In dev we permit 'unsafe-eval' (Next's HMR needs it); production omits it.
 const csp = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} https://www.clarity.ms https://*.clarity.ms`,
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} https://www.clarity.ms https://*.clarity.ms https://checkout.razorpay.com`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' data: https://fonts.gstatic.com",
   "img-src 'self' data: blob: https:",
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://www.clarity.ms https://*.clarity.ms https://c.clarity.ms https://api.web3forms.com",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://www.clarity.ms https://*.clarity.ms https://c.clarity.ms https://api.web3forms.com https://api.razorpay.com https://checkout.razorpay.com",
+  "frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com",
   "media-src 'self' blob:",
   "worker-src 'self' blob:",
   "frame-ancestors 'self'",

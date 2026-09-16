@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "./ui/button"
-import { Home, Gamepad2, LogIn, LogOut, UserPlus, Dice5 } from "lucide-react"
+import { Home, Gamepad2, LogIn, LogOut, UserPlus, Dice5, ShoppingBag } from "lucide-react"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 import { useRouter } from "next/navigation"
 
@@ -22,6 +22,7 @@ export function MainNav() {
 
   const navLinks = [
     { href: "/dashboard", label: "Dashboard", icon: Home },
+    { href: "/dashboard/shop", label: "Shop", icon: ShoppingBag },
     { href: "/games", label: "Games", icon: Gamepad2 },
   ]
 
