@@ -12,12 +12,15 @@ import * as THREE from "three"
 import { Suspense, useMemo, useRef } from "react"
 import { Canvas, useFrame } from "@react-three/fiber"
 import { OrbitControls, Html } from "@react-three/drei"
-import { EffectComposer, Bloom, Vignette, SMAA } from "@react-three/postprocessing"
+import { SceneFX, canvasDefaults, shadowDefaults } from "@/components/three/SceneFX"
 import {
   PokerState, Card, rankLabel, suitSymbol,
 } from "../lib/pokerEngine"
 import { Mannequin } from "@/components/three/Mannequins"
 import { RoomBox } from "@/components/three/RoomBox"
+
+// felt, chips and a handful of cards — see components/three/SceneFX.tsx for what each tier costs
+const QUALITY = "low" as const
 
 const SERIF = "var(--font-display), Georgia, serif"
 
@@ -387,7 +390,7 @@ function Scene({ state, meIndex, isSpectator, reveal }: PokerScene3DProps) {
       <ambientLight intensity={0.32} color="#ffe9cf" />
       <hemisphereLight args={["#8a7a5e", "#0c0a08", 0.4]} />
       <spotLight position={[0, 12, 0]} angle={0.75} penumbra={0.55} intensity={260} color="#ffe2b0" castShadow
-        shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004} />
+        {...shadowDefaults(QUALITY)} />
       <pointLight position={[-8, 5, 6]} intensity={18} color="#ff9d5c" distance={24} decay={2} />
       <pointLight position={[8, 5, -6]} intensity={14} color="#ffd9a0" distance={24} decay={2} />
 
@@ -553,19 +556,16 @@ function Scene({ state, meIndex, isSpectator, reveal }: PokerScene3DProps) {
 export default function PokerScene3D(props: PokerScene3DProps) {
   return (
     <Canvas
-      shadows dpr={[1, 2]} gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
-      camera={{ position: [0, 7.2, 9.2], fov: 46, near: 0.1, far: 120 }}
+      {...canvasDefaults(QUALITY, 1.05)}
+      camera={{ position: [0, 7.2, 9.2], fov: 46, near: 0.3, far: 120 }}
       style={{ width: "100%", height: "100%" }}
     >
       <color attach="background" args={["#0e0a08"]} />
       <fog attach="fog" args={["#120c08", 34, 88]} />
       <Suspense fallback={null}>
         <Scene {...props} />
-        <EffectComposer multisampling={0}>
-          <Bloom intensity={0.5} luminanceThreshold={0.7} luminanceSmoothing={0.25} mipmapBlur />
-          <Vignette eskil={false} offset={0.26} darkness={0.78} />
-          <SMAA />
-        </EffectComposer>
+        <SceneFX quality={QUALITY} intensity={0.5} threshold={0.7} smoothing={0.25}
+          vignetteOffset={0.26} vignetteDarkness={0.78} />
       </Suspense>
     </Canvas>
   )

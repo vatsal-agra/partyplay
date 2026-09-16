@@ -68,8 +68,13 @@ const WALK_DIST = 4.3     // local units walked (scaled by the figure's scale)
 const STAGGER = 0.65      // delay between successive players entering
 
 // A ball joint centred on its group origin.
+//
+// No castShadow: every joint is a small sphere sunk between two limb segments
+// that already cast, so its silhouette is fully contained in theirs. With eight
+// joints plus the neck on every figure, dropping them takes roughly nine shadow
+// draws per seat off the shadow pass and changes nothing you can see.
 function Ball({ r }: { r: number }) {
-  return <mesh geometry={ballGeo} material={jointMat} scale={r} castShadow />
+  return <mesh geometry={ballGeo} material={jointMat} scale={r} />
 }
 
 function Figure({ name, color, index, isBot, active, showName = true, seated = false, entrance = "walk", walkLift = 0 }: {
@@ -197,8 +202,9 @@ function Figure({ name, color, index, isBot, active, showName = true, seated = f
         <group>
           <mesh geometry={chairSeatGeo} material={chairMat} position={[0, 0.76, -0.04]} castShadow receiveShadow />
           <mesh geometry={chairBackGeo} material={chairMat} position={[0, 1.15, -0.41]} castShadow />
+          {/* legs don't cast: they sit under the seat, inside its own shadow */}
           {CHAIR_LEGS.map(([lx, lz], i) => (
-            <mesh key={i} geometry={chairLegGeo} material={chairMat} position={[lx, 0.37, lz]} castShadow />
+            <mesh key={i} geometry={chairLegGeo} material={chairMat} position={[lx, 0.37, lz]} />
           ))}
         </group>
       )}
@@ -252,7 +258,7 @@ function Figure({ name, color, index, isBot, active, showName = true, seated = f
 
           {/* ---- neck + head ---- */}
           <group position={[0, 0.44, 0]}>
-            <mesh geometry={neckGeo} material={jointMat} castShadow />
+            <mesh geometry={neckGeo} material={jointMat} />
             <group ref={head} position={[0, 0.2, 0]}>
               {/* egg head — sphere stretched slightly on Y, no face */}
               <mesh geometry={headGeo} material={bodyMat} scale={[1, 1.18, 0.94]} castShadow />

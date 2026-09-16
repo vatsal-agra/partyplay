@@ -14,12 +14,15 @@ import * as THREE from "three"
 import { Suspense, useEffect, useMemo, useRef, useState } from "react"
 import { Canvas, useFrame, ThreeEvent } from "@react-three/fiber"
 import { OrbitControls, Html } from "@react-three/drei"
-import { EffectComposer, Bloom, Vignette, SMAA } from "@react-three/postprocessing"
+import { SceneFX, canvasDefaults, shadowDefaults } from "@/components/three/SceneFX"
 import {
   MonopolyState, Player, BOARD_SPACES, Space,
 } from "../lib/monopolyEngine"
 import { Mannequins } from "@/components/three/Mannequins"
 import { RoomBox } from "@/components/three/RoomBox"
+
+// the full board: 40 tiles, houses, hotels, six figures — see components/three/SceneFX.tsx for what each tier costs
+const QUALITY = "high" as const
 
 const SERIF = "var(--font-display), Georgia, serif"
 
@@ -670,7 +673,7 @@ function Scene({ state, rolling, canDrawCard, onDiceSettled, onTileClick, onDraw
       <ambientLight intensity={0.5} color="#fff2df" />
       <hemisphereLight args={["#e8d9c0", "#141009", 0.45]} />
       <spotLight position={[0, 16, 3]} angle={0.72} penumbra={0.5} intensity={300} color="#ffe9c4" castShadow
-        shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004} />
+        {...shadowDefaults(QUALITY)} />
       <pointLight position={[-9, 6, -6]} intensity={16} color="#ffb877" distance={26} decay={2} />
       <pointLight position={[9, 6, 6]} intensity={14} color="#ffdca8" distance={26} decay={2} />
 
@@ -825,19 +828,16 @@ function Scene({ state, rolling, canDrawCard, onDiceSettled, onTileClick, onDraw
 export default function EmpireScene3D(props: EmpireScene3DProps) {
   return (
     <Canvas
-      shadows dpr={[1, 2]} gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.03 }}
-      camera={{ position: [0, 12.5, 12.5], fov: 45, near: 0.1, far: 140 }}
+      {...canvasDefaults(QUALITY, 1.03)}
+      camera={{ position: [0, 12.5, 12.5], fov: 45, near: 0.3, far: 140 }}
       style={{ width: "100%", height: "100%" }}
     >
       <color attach="background" args={["#120d08"]} />
       <fog attach="fog" args={["#120d08", 42, 98]} />
       <Suspense fallback={null}>
         <Scene {...props} />
-        <EffectComposer multisampling={0}>
-          <Bloom intensity={0.35} luminanceThreshold={0.75} luminanceSmoothing={0.3} mipmapBlur />
-          <Vignette eskil={false} offset={0.24} darkness={0.72} />
-          <SMAA />
-        </EffectComposer>
+        <SceneFX quality={QUALITY} intensity={0.35} threshold={0.75} smoothing={0.3}
+          vignetteOffset={0.24} vignetteDarkness={0.72} />
       </Suspense>
     </Canvas>
   )

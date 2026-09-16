@@ -11,13 +11,16 @@ import * as THREE from "three"
 import { Suspense, useMemo, useRef } from "react"
 import { Canvas, useFrame, ThreeEvent } from "@react-three/fiber"
 import { OrbitControls, RoundedBox, Html, Environment, Lightformer, ContactShadows, useTexture } from "@react-three/drei"
-import { EffectComposer, Bloom, Vignette, SMAA } from "@react-three/postprocessing"
+import { SceneFX, canvasDefaults, shadowDefaults } from "@/components/three/SceneFX"
 import { Mannequins } from "@/components/three/Mannequins"
 import { RoomBox } from "@/components/three/RoomBox"
 import {
   ROOMS, SUSPECTS, WEAPONS, CELLAR_RECT, BOARD_W, BOARD_H, getRoom, RoomId,
 } from "../lib/mansionLayout"
 import type { MysteryState } from "../lib/mysteryEngine"
+
+// mansion floor, weapons, pawns and an IBL rig — see components/three/SceneFX.tsx for what each tier costs
+const QUALITY = "high" as const
 
 // ---- grid → world -----------------------------------------------------------
 const gw = (gx: number) => gx - BOARD_W / 2 + 0.5
@@ -364,7 +367,7 @@ function Scene({ state, currentPlayerId, reachCellKeys, reachRoomIds, onMoveCell
       <hemisphereLight args={["#fff1d8", "#1a1208", 0.5]} />
       <directionalLight
         position={[9, 20, 7]} intensity={2.1} color="#fff2d4" castShadow
-        shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004}
+        {...shadowDefaults(QUALITY)}
         shadow-camera-left={-16} shadow-camera-right={16} shadow-camera-top={16} shadow-camera-bottom={-16}
         shadow-camera-near={1} shadow-camera-far={60}
       />
@@ -470,19 +473,16 @@ interface SceneProps {
 export default function MansionScene3D(props: SceneProps) {
   return (
     <Canvas
-      shadows dpr={[1, 2]} gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
-      camera={{ position: [0, 18, 17], fov: 42, near: 0.1, far: 200 }}
+      {...canvasDefaults(QUALITY, 1.05)}
+      camera={{ position: [0, 18, 17], fov: 42, near: 0.3, far: 200 }}
       style={{ width: "100%", height: "100%" }}
     >
       <color attach="background" args={["#140d07"]} />
       <fog attach="fog" args={["#140d07", 34, 70]} />
       <Suspense fallback={null}>
         <Scene {...props} />
-        <EffectComposer multisampling={0}>
-          <Bloom intensity={0.55} luminanceThreshold={0.62} luminanceSmoothing={0.2} mipmapBlur />
-          <Vignette eskil={false} offset={0.25} darkness={0.75} />
-          <SMAA />
-        </EffectComposer>
+        <SceneFX quality={QUALITY} intensity={0.55} threshold={0.62} smoothing={0.2}
+          vignetteOffset={0.25} vignetteDarkness={0.75} />
       </Suspense>
     </Canvas>
   )

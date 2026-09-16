@@ -11,7 +11,7 @@ import * as THREE from "three"
 import { Suspense, useEffect, useMemo, useRef, useState } from "react"
 import { Canvas, useFrame, ThreeEvent } from "@react-three/fiber"
 import { OrbitControls, Html } from "@react-three/drei"
-import { EffectComposer, Bloom, Vignette, SMAA } from "@react-three/postprocessing"
+import { SceneFX, canvasDefaults, shadowDefaults } from "@/components/three/SceneFX"
 import { Mannequin } from "@/components/three/Mannequins"
 import { RoomBox } from "@/components/three/RoomBox"
 
@@ -20,6 +20,9 @@ const UNO_SEAT_COLORS = ["#d9453a", "#3558c9", "#3fa356", "#e8c53a", "#e05a9e", 
 import {
   UnoState, Card, Color, symbolFor,
 } from "../lib/unoEngine"
+
+// felt, a fan of cards and two piles — see components/three/SceneFX.tsx for what each tier costs
+const QUALITY = "low" as const
 
 const SERIF = "var(--font-display), Georgia, serif"
 
@@ -409,7 +412,7 @@ function Scene({ state, meIndex, isSpectator, isMyTurn, canDraw, onPlayCard, onD
       <ambientLight intensity={0.35} color="#cdd3e0" />
       <hemisphereLight args={["#6a7284", "#0a0b10", 0.5]} />
       <spotLight position={[0, 12, 2]} angle={0.7} penumbra={0.6} intensity={230} color="#f2ead2" castShadow
-        shadow-mapSize={[2048, 2048]} shadow-bias={-0.0004} />
+        {...shadowDefaults(QUALITY)} />
       <pointLight ref={colorLight} position={[0, 4.5, -0.4]} intensity={26} color={activeHex} distance={16} decay={2} />
 
       {/* games room (wider than OrbitControls maxDistance 22) */}
@@ -551,22 +554,19 @@ function Scene({ state, meIndex, isSpectator, isMyTurn, canDraw, onPlayCard, onD
 export default function UnoScene3D(props: UnoScene3DProps) {
   return (
     <Canvas
-      shadows dpr={[1, 2]} gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.04 }}
-      camera={{ position: [0, 7.6, 10.8], fov: 47, near: 0.1, far: 120 }}
+      {...canvasDefaults(QUALITY, 1.04)}
+      camera={{ position: [0, 7.6, 10.8], fov: 47, near: 0.3, far: 120 }}
       style={{ width: "100%", height: "100%" }}
     >
       <color attach="background" args={["#0a0b10"]} />
       <fog attach="fog" args={["#0a0b10", 26, 55]} />
       <Suspense fallback={null}>
         <Scene {...props} />
-        <EffectComposer multisampling={0}>
-          {/* threshold raised so bright white card faces under the table
-              spotlight stop blooming into an unreadable blob — only the
-              genuinely emissive bits (colour ring, sparks) still glow */}
-          <Bloom intensity={0.5} luminanceThreshold={0.82} luminanceSmoothing={0.25} mipmapBlur />
-          <Vignette eskil={false} offset={0.26} darkness={0.76} />
-          <SMAA />
-        </EffectComposer>
+        {/* threshold raised so bright white card faces under the table
+            spotlight stop blooming into an unreadable blob — only the
+            genuinely emissive bits (colour ring, sparks) still glow */}
+        <SceneFX quality={QUALITY} intensity={0.5} threshold={0.82} smoothing={0.25}
+          vignetteOffset={0.26} vignetteDarkness={0.76} />
       </Suspense>
     </Canvas>
   )
