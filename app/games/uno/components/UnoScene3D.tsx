@@ -8,6 +8,7 @@
 "use client"
 
 import * as THREE from "three"
+import { useEquippedCosmetics } from "@/lib/useEquippedCosmetics"
 import { Suspense, useEffect, useMemo, useRef, useState } from "react"
 import { Canvas, useFrame, ThreeEvent } from "@react-three/fiber"
 import { OrbitControls, Html } from "@react-three/drei"
@@ -344,6 +345,7 @@ function FlyingCard({ to, onDone }: { to: [number, number, number]; onDone: () =
 }
 
 function Scene({ state, meIndex, isSpectator, isMyTurn, canDraw, onPlayCard, onDraw }: UnoScene3DProps) {
+  const { feltHex } = useEquippedCosmetics()
   const felt = useMemo(feltTexture, [])
   const me = state.players[meIndex]
   const n = state.players.length
@@ -466,7 +468,7 @@ function Scene({ state, meIndex, isSpectator, isMyTurn, canDraw, onPlayCard, onD
       </mesh>
       <mesh position={[0, 0.01, 0]} receiveShadow>
         <cylinderGeometry args={[7.0, 7.0, 0.24, 48]} />
-        <meshStandardMaterial map={felt} color="#3a4152" roughness={0.9} />
+        <meshStandardMaterial map={feltHex ? null : felt} color={feltHex ?? "#3a4152"} roughness={0.9} />
       </mesh>
       {/* active-color rim glow */}
       <mesh position={[0, 0.14, 0]} rotation-x={-Math.PI / 2}>
