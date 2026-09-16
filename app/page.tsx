@@ -9,6 +9,7 @@ import Link from "next/link"
 import { Gamepad2, Users, MessageSquare, Zap, Trophy, Vote, Sparkles, ArrowRight, Mic } from "lucide-react"
 import { GAMES_CATALOG, gamePath } from "@/lib/games-catalog"
 import { FloatingPieces } from "@/components/FloatingPieces"
+import { LandingJsonLd } from "@/components/LandingJsonLd"
 
 const fadeIn = {
   hidden: { opacity: 0, y: 24 },
@@ -50,6 +51,7 @@ export default function Home() {
 
   return (
     <main className="relative min-h-screen overflow-hidden">
+      <LandingJsonLd />
       {/* Hero */}
       <section className="relative">
         <FloatingPieces />
@@ -89,18 +91,25 @@ export default function Home() {
                 live in your browser.
               </motion.p>
 
+              {/* Above-fold CTAs. Real anchors (asChild) so they are crawlable
+                  and open in a new tab on middle click, not router.push only. */}
               <motion.div className="mt-9 flex flex-col sm:flex-row gap-4 justify-center lg:justify-start" variants={fadeIn}>
-                <Button variant="brand" size="lg" className="gap-2" onClick={() => router.push("/dashboard/create-party")}>
-                  Start a free game night
-                  <ArrowRight className="h-5 w-5" />
+                <Button asChild variant="brand" size="lg" className="gap-2">
+                  <Link href="/dashboard/create-party">
+                    Start a party
+                    <ArrowRight className="h-5 w-5" />
+                  </Link>
                 </Button>
-                <Button variant="outline" size="lg" onClick={() => router.push("/games")}>
-                  See all {GAME_COUNT} games
+                <Button asChild variant="outline" size="lg">
+                  <Link href="/auth/sign-in">Play as guest</Link>
                 </Button>
               </motion.div>
 
               <motion.p className="mt-4 text-sm text-muted-foreground" variants={fadeIn}>
-                Free forever. Your friends can join as guests with no account at all.
+                Free forever. Guests just pick a name, no account and no card.{" "}
+                <Link href="/games" className="font-medium text-white underline underline-offset-4 hover:text-grape-200">
+                  See all {GAME_COUNT} games
+                </Link>
               </motion.p>
 
               <motion.div className="mt-8 flex flex-wrap items-center gap-6 justify-center lg:justify-start text-sm text-muted-foreground" variants={fadeIn}>
