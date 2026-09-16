@@ -69,6 +69,12 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning className={`${jakarta.variable} ${grotesk.variable}`}>
       <body className="font-sans">
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-[#d6a85c] focus:px-4 focus:py-2 focus:font-semibold focus:text-[#2b2118] focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-[#d6a85c]"
+        >
+          Skip to content
+        </a>
         {/* Microsoft Clarity — web analytics / session insights */}
         <Script id="ms-clarity" strategy="afterInteractive">
           {`(function(c,l,a,r,i,t,y){c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);})(window,document,"clarity","script","x9464swtge");`}
@@ -77,7 +83,7 @@ export default function RootLayout({
         <div className="aurora" aria-hidden />
         <Providers>
           <MainNav />
-          <main className="pt-16 min-h-screen">
+          <main id="main-content" tabIndex={-1} className="pt-16 min-h-screen">
             {children}
             <Toaster position="top-right" richColors theme="dark" />
           </main>
