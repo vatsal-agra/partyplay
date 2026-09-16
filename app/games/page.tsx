@@ -401,7 +401,7 @@ export default function GamesPage() {
                           </h2>
                           <p className="text-sm text-white/80">
                             {myVoteGameId
-                              ? "Your vote is in — tap another game to change it, or tap it again to undo."
+                              ? "Your vote is in. Tap another game to change it, or tap it again to undo."
                               : "Tap Vote on the game you want to play. Most votes wins!"}
                             {leadingGameName && (
                               <>
@@ -446,7 +446,7 @@ export default function GamesPage() {
                   </h1>
                   <p className="text-gray-200">
                     {votingEnabled
-                      ? "Rally your party around a favourite — the most-voted game gets played."
+                      ? "Rally your party around a favourite. The most-voted game gets played."
                       : "Browse our collection of board games and start playing with friends"}
                   </p>
                 </div>

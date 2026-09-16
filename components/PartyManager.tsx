@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
-import { Plus, Trash2, Users, Lock, Unlock, RefreshCw, Loader2, Group, LogOut } from "lucide-react"
+import { Plus, Trash2, Users, Lock, Unlock, RefreshCw, Loader2, Group, LogOut, Copy, Check, Link2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { motion, AnimatePresence } from "framer-motion"
@@ -25,8 +25,65 @@ export default function PartyManager() {
   const [isJoining, setIsJoining] = useState(false)
   const [joinCode, setJoinCode] = useState("")
   const [joinError, setJoinError] = useState<string | null>(null)
+  // Which share button last fired, keyed "<partyId>:code" / "<partyId>:link",
+  // so only the button that was pressed flips to the confirmation tick.
+  const [copied, setCopied] = useState<string | null>(null)
+  const [copyError, setCopyError] = useState<string | null>(null)
   const supabase = getSupabaseBrowserClient()
   const router = useRouter()
+
+  const copyToClipboard = async (key: string, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopyError(null)
+      setCopied(key)
+      setTimeout(() => setCopied((current) => (current === key ? null : current)), 1800)
+    } catch {
+      setCopyError("Your browser blocked the clipboard. Select the code and copy it manually.")
+    }
+  }
+
+  // Code + invite link chips shown on every party card. Both stop propagation
+  // so tapping them never also opens the party.
+  const renderShareRow = (party: Party) => {
+    const code = party.id.substring(0, 6).toUpperCase()
+    const link = typeof window !== "undefined"
+      ? `${window.location.origin}/party/${party.id}`
+      : `/party/${party.id}`
+    const stop = (e: React.MouseEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    return (
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          title="Copy the party code"
+          onClick={(e) => { stop(e); copyToClipboard(`${party.id}:code`, code) }}
+          className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-black/25 px-2.5 py-1 font-mono text-sm font-bold tracking-[0.2em] text-cyan-300 transition-colors hover:border-cyan-300/50 hover:bg-black/40"
+        >
+          {code}
+          {copied === `${party.id}:code`
+            ? <Check className="h-3.5 w-3.5 text-emerald-400" />
+            : <Copy className="h-3.5 w-3.5 text-white/50" />}
+        </button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 gap-1.5 px-2 text-xs text-white/70 hover:bg-white/10 hover:text-white"
+          onClick={(e) => { stop(e); copyToClipboard(`${party.id}:link`, link) }}
+        >
+          {copied === `${party.id}:link`
+            ? <Check className="h-3.5 w-3.5 text-emerald-400" />
+            : <Link2 className="h-3.5 w-3.5" />}
+          {copied === `${party.id}:link` ? "Link copied" : "Copy invite link"}
+        </Button>
+        {copied === `${party.id}:code` && (
+          <span className="text-xs font-medium text-emerald-400">Code copied, paste it in the group chat</span>
+        )}
+      </div>
+    )
+  }
 
   // Fetch the user's active parties (hosted or joined)
   const fetchUserParty = async () => {
@@ -262,16 +319,27 @@ export default function PartyManager() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
       >
-        <h2 className="font-display text-xl font-bold text-white mb-4 flex items-center gap-2">
+        <h2 className="font-display text-xl font-bold text-white mb-1 flex items-center gap-2">
           <Users className="h-5 w-5 text-aqua-400" />
           Join Party via Code
         </h2>
+        <p className="mb-4 text-sm text-white/60">
+          Got a code from a friend? Paste the code or the whole invite link, either one works.
+        </p>
         <form onSubmit={handleJoinParty} className="flex flex-col sm:flex-row gap-3">
           <Input
             type="text"
             placeholder="Enter party code (e.g. A1B2C3)"
             value={joinCode}
-            onChange={(e) => setJoinCode(e.target.value.slice(0, 6))}
+            onChange={(e) => {
+              // Friends paste all sorts of things: a bare code, a code with
+              // spaces, or the full /party/<uuid> invite link. Take the code
+              // out of whatever arrives.
+              const raw = e.target.value.trim()
+              const fromLink = raw.match(/\/party\/([0-9a-f-]{6,})/i)
+              const value = fromLink ? fromLink[1] : raw
+              setJoinCode(value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 6))
+            }}
             className="flex-1 uppercase font-mono tracking-[0.3em] text-center text-lg"
             disabled={isJoining}
           />
@@ -314,6 +382,10 @@ export default function PartyManager() {
           </Button>
         </div>
 
+        {copyError && (
+          <p className="mb-4 text-sm font-medium text-amber-300">{copyError}</p>
+        )}
+
         <AnimatePresence mode="wait">
           {isLoading ? (
             <motion.div 
@@ -354,13 +426,12 @@ export default function PartyManager() {
                   }}
                 >
                   <div className="flex justify-between items-center relative z-10">
-                    <div>
+                    <div className="min-w-0">
                       <h3 className="font-bold text-lg text-white">{party.name}</h3>
-                      <p className="text-sm text-white/60 mt-1 flex items-center gap-2">
-                        <span>Code: <span className="font-mono font-bold text-cyan-300">{party.id.substring(0, 6).toUpperCase()}</span></span>
-                        <span>•</span>
-                        <span>Created: {new Date(party.created_at).toLocaleDateString()}</span>
+                      <p className="text-sm text-white/60 mt-1">
+                        Created {new Date(party.created_at).toLocaleDateString()}
                       </p>
+                      {renderShareRow(party)}
                     </div>
                     <Button
                       variant="ghost"
@@ -432,13 +503,10 @@ export default function PartyManager() {
                   }}
                 >
                   <div className="flex justify-between items-center relative z-10">
-                    <div>
+                    <div className="min-w-0">
                       <h3 className="font-bold text-lg text-white">{party.name}</h3>
-                      <p className="text-sm text-white/60 mt-1 flex items-center gap-2">
-                        <span>Code: <span className="font-mono font-bold text-cyan-300">{party.id.substring(0, 6).toUpperCase()}</span></span>
-                        <span>•</span>
-                        <span>Joined</span>
-                      </p>
+                      <p className="text-sm text-white/60 mt-1">Joined</p>
+                      {renderShareRow(party)}
                     </div>
                     <Button
                       variant="ghost"
