@@ -7,6 +7,7 @@ import { touchParty } from "@/lib/partyActivity"
 import { getGameRules, hasSeenRules, markRulesSeen } from "@/lib/game-rules"
 import { recordGameResult, fetchUserStats } from "@/lib/gameStats"
 import { getGameSummary } from "@/lib/gameSummary"
+import { isYourTurn } from "@/lib/gameTurn"
 import { evaluateAchievements, recordAchievements } from "@/lib/achievements"
 import { GameOverScreen } from "@/components/GameOverScreen"
 import { VoiceChat } from "@/components/VoiceChat"
@@ -110,6 +111,11 @@ const BOT_SUPPORT: Record<string, string[]> = {
   manhunt:    ['Det. Vox', 'Det. Cyan', 'Det. Onyx', 'Det. Vale', 'Det. Sigma'],
 }
 
+// Tab title shown while the local player is on the clock, and the fallback we
+// restore to if we ever find our own marker still sitting in the title.
+const TURN_TITLE = "Your turn | Dice Alley"
+const DEFAULT_TITLE = "Dice Alley"
+
 export default function GamePlayPage() {
   const params = useParams()
   const router = useRouter()
@@ -174,6 +180,28 @@ export default function GamePlayPage() {
     if (!isPlaying || !monopolyState?.players || !currentUserId) return false
     return !monopolyState.players.some((p: any) => p.id === currentUserId)
   }, [isPlaying, monopolyState, currentUserId])
+
+  // ---- "Your turn" tab title ----------------------------------------------
+  // Players sit in another tab while the others move, so the turn has to reach
+  // them where they are looking. The tab title is the one bit of UI still
+  // visible from outside the page.
+  const isMyTurn = useMemo(
+    () => isPlaying && isYourTurn(gameData?.id || "", monopolyState, currentUserId),
+    [isPlaying, gameData?.id, monopolyState, currentUserId]
+  )
+
+  // Captured once so the restore always lands on the real page title rather
+  // than on whatever we last wrote. Guarded against reading back our own
+  // marker, which a remount mid-turn would otherwise bake in permanently.
+  const baseTitleRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (baseTitleRef.current === null) {
+      baseTitleRef.current = document.title === TURN_TITLE ? DEFAULT_TITLE : document.title
+    }
+    const base = baseTitleRef.current
+    document.title = isMyTurn ? TURN_TITLE : base
+    return () => { document.title = base }
+  }, [isMyTurn])
 
   // ---- Sound effects + floating event animations ---------------------------
   const [sfxMuted, setSfxMutedState] = useState(false)
