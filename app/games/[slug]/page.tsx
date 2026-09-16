@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from "react"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 import { touchParty } from "@/lib/partyActivity"
-import { getGameRules } from "@/lib/game-rules"
+import { getGameRules, hasSeenRules, markRulesSeen } from "@/lib/game-rules"
 import { recordGameResult, fetchUserStats } from "@/lib/gameStats"
 import { getGameSummary } from "@/lib/gameSummary"
 import { evaluateAchievements, recordAchievements } from "@/lib/achievements"
@@ -140,6 +140,9 @@ export default function GamePlayPage() {
   const [liveEvent, setLiveEvent] = useState<LiveEvent | null>(null)
   const [lobbyBots, setLobbyBots] = useState<{ id: string; name: string }[]>([])
   const [showRules, setShowRules] = useState(false)
+  // Auto-open the rules only once per game id, so a re-render or a state
+  // resync mid-game can never pop the modal back up on the player.
+  const rulesNudgedRef = useRef(false)
   const [copiedLink, setCopiedLink] = useState(false)
   
   const partyMembersRef = useRef(partyMembers)
@@ -182,6 +185,20 @@ export default function GamePlayPage() {
     setSfxMutedState(isSfxMuted())
     return onSfxMutedChange(setSfxMutedState)
   }, [])
+
+  // First time this player ever starts a given game, show them how it works.
+  // Runs off isPlaying so it covers every way a game begins: the host hitting
+  // start, a guest receiving the game_start broadcast, or a rejoin restoring
+  // state. Flagged in localStorage immediately on open, so a refresh doesn't
+  // bring it back. Closing it works exactly like the manual modal.
+  useEffect(() => {
+    const id = gameData?.id
+    if (!isPlaying || !id || rulesNudgedRef.current) return
+    rulesNudgedRef.current = true
+    if (hasSeenRules(id)) return
+    markRulesSeen(id)
+    setShowRules(true)
+  }, [isPlaying, gameData?.id])
 
   // Watch the engine log: each newly-appended line carries a leading emoji that
   // identifies the event (🎲 dice, 💰 cash, ✅ correct, 💥 hit, 🏆 win …). Play
