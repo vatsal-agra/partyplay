@@ -7,9 +7,11 @@ import { fetchLeaderboard, fetchUserStats, type LeaderboardRow } from "@/lib/gam
 import { ACHIEVEMENTS, fetchUserAchievements, isKnownAchievement } from "@/lib/achievements"
 import { levelFromXp } from "@/lib/progression"
 import { randomLoading } from "@/lib/copy"
+import { isGuestSession } from "@/lib/guest"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
-import { Plus, RefreshCw, Trophy, Medal, Award, Sparkles } from "lucide-react"
+import { Plus, RefreshCw, Trophy, Medal, Award, Sparkles, ShieldCheck } from "lucide-react"
 import PartyManager from "@/components/PartyManager"
 import { motion } from "framer-motion"
 import { Card } from "@/components/ui/card"
@@ -151,6 +153,26 @@ export default function Dashboard() {
             </motion.div>
           </motion.div>
         </motion.div>
+
+        {/* Guests own their parties through an anonymous session. If they lose it
+            the party is orphaned, so nudge them (once, inline, no modal) to keep it. */}
+        {isGuestSession(session) && (
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3, duration: 0.4 }}
+            className="mb-6 flex flex-wrap items-center gap-3 rounded-xl border border-aqua-400/30 bg-aqua-500/10 px-4 py-3"
+          >
+            <ShieldCheck className="h-5 w-5 shrink-0 text-aqua-400" />
+            <p className="min-w-0 flex-1 text-sm text-white/90">
+              <span className="font-bold text-white">Save this account.</span>{" "}
+              You are playing as a guest. Add an email so you keep your parties and progress.
+            </p>
+            <Button asChild variant="brand" size="sm" className="shrink-0">
+              <Link href="/auth/sign-up">Save this account</Link>
+            </Button>
+          </motion.div>
+        )}
 
         {/* Player card — level, streak, flair */}
         <motion.div
