@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useState } from "react"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { AnimatePresence, motion } from "framer-motion"
-import { Users, RefreshCw, DoorOpen, Loader2 } from "lucide-react"
+import { Users, RefreshCw, DoorOpen, Loader2, Plus } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import { getGameById } from "@/lib/games-catalog"
 import { OPEN_PARTIES_EMPTY } from "@/lib/copy"
 
@@ -109,6 +111,12 @@ export function OpenPartiesBoard({ client, userId }: { client: SupabaseClient; u
           <div className="px-4 py-8 text-center">
             <p className="font-medium text-white">{OPEN_PARTIES_EMPTY.title}</p>
             <p className="mt-1 text-sm text-white/50">{OPEN_PARTIES_EMPTY.body}</p>
+            <Button asChild variant="brand" className="mt-4 gap-2">
+              <Link href="/dashboard/create-party">
+                <Plus className="h-4 w-4" />
+                {OPEN_PARTIES_EMPTY.cta}
+              </Link>
+            </Button>
           </div>
         ) : (
           <AnimatePresence initial={false}>

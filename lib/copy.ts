@@ -26,6 +26,7 @@ export const DASHBOARD_EMPTY = {
 export const OPEN_PARTIES_EMPTY = {
   title: "Nobody's looking for players right now",
   body: "Be the trendsetter — open a party and friends can drop in.",
+  cta: "Create a party",
 }
 
 export const LEADERBOARD_EMPTY = {
