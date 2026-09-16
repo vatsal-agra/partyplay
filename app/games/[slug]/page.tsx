@@ -19,26 +19,44 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Loader2, Send, Gamepad2, Users, MessageSquare, BookOpen } from "lucide-react"
-import MonopolyBoard from "../monopoly/components/MonopolyBoard"
-import { initializeGame } from "../monopoly/lib/monopolyEngine"
-import CatanBoard from "../catan/components/CatanBoard"
-import { initializeGame as initializeCatan } from "../catan/lib/catanEngine"
-import MysteryBoard from "../cluedo/components/MysteryBoard"
-import { initializeGame as initializeMystery } from "../cluedo/lib/mysteryEngine"
-import BattleshipBoard from "../battleship/components/BattleshipBoard"
-import { initializeGame as initializeBattleship } from "../battleship/lib/battleshipEngine"
-import PictionaryBoard, { LiveEvent } from "../pictionary/components/PictionaryBoard"
-import { initializeGame as initializePictionary } from "../pictionary/lib/pictionaryEngine"
-import UnoBoard from "../uno/components/UnoBoard"
-import { initializeGame as initializeUno } from "../uno/lib/unoEngine"
-import PokerBoard from "../poker/components/PokerBoard"
-import { initializeGame as initializePoker } from "../poker/lib/pokerEngine"
-import SpymasterBoard from "../codenames/components/SpymasterBoard"
-import { initializeGame as initializeSpymaster } from "../codenames/lib/spymasterEngine"
-import DoodleDashBoard from "../scribbleio/components/DoodleDashBoard"
-import { initializeGame as initializeDoodle } from "../scribbleio/lib/doodleEngine"
-import ManhuntBoard from "../manhunt/components/ManhuntBoard"
-import { initializeGame as initializeManhunt } from "../manhunt/lib/manhuntEngine"
+import dynamic from "next/dynamic"
+import type { LiveEvent } from "../pictionary/components/PictionaryBoard"
+
+// Each board is a heavy bundle (canvas, 3D scenes, per-game UI) and only one of
+// them can ever render on this route, so they load on demand instead of being
+// baked into the page's first load. ssr:false because every board is
+// browser-only anyway.
+const BoardLoading = () => (
+  <div className="flex h-full w-full items-center justify-center">
+    <Loader2 className="h-8 w-8 animate-spin text-white/60" />
+  </div>
+)
+const MonopolyBoard = dynamic(() => import("../monopoly/components/MonopolyBoard"), { ssr: false, loading: BoardLoading })
+const CatanBoard = dynamic(() => import("../catan/components/CatanBoard"), { ssr: false, loading: BoardLoading })
+const MysteryBoard = dynamic(() => import("../cluedo/components/MysteryBoard"), { ssr: false, loading: BoardLoading })
+const BattleshipBoard = dynamic(() => import("../battleship/components/BattleshipBoard"), { ssr: false, loading: BoardLoading })
+const PictionaryBoard = dynamic(() => import("../pictionary/components/PictionaryBoard"), { ssr: false, loading: BoardLoading })
+const UnoBoard = dynamic(() => import("../uno/components/UnoBoard"), { ssr: false, loading: BoardLoading })
+const PokerBoard = dynamic(() => import("../poker/components/PokerBoard"), { ssr: false, loading: BoardLoading })
+const SpymasterBoard = dynamic(() => import("../codenames/components/SpymasterBoard"), { ssr: false, loading: BoardLoading })
+const DoodleDashBoard = dynamic(() => import("../scribbleio/components/DoodleDashBoard"), { ssr: false, loading: BoardLoading })
+const ManhuntBoard = dynamic(() => import("../manhunt/components/ManhuntBoard"), { ssr: false, loading: BoardLoading })
+
+// Engines ship with their board rather than with the page — start-game pulls the
+// one engine it needs, which is already warm by the time the board renders.
+type Initializer = (players: { id: string; name: string; isBot: boolean }[]) => any
+const engineLoaders: Record<string, () => Promise<Initializer>> = {
+  monopoly: () => import("../monopoly/lib/monopolyEngine").then(m => m.initializeGame),
+  catan: () => import("../catan/lib/catanEngine").then(m => m.initializeGame),
+  cluedo: () => import("../cluedo/lib/mysteryEngine").then(m => m.initializeGame),
+  battleship: () => import("../battleship/lib/battleshipEngine").then(m => m.initializeGame),
+  pictionary: () => import("../pictionary/lib/pictionaryEngine").then(m => m.initializeGame),
+  uno: () => import("../uno/lib/unoEngine").then(m => m.initializeGame),
+  poker: () => import("../poker/lib/pokerEngine").then(m => m.initializeGame),
+  codenames: () => import("../codenames/lib/spymasterEngine").then(m => m.initializeGame),
+  scribbleio: () => import("../scribbleio/lib/doodleEngine").then(m => m.initializeGame),
+  manhunt: () => import("../manhunt/lib/manhuntEngine").then(m => m.initializeGame),
+}
 
 
 // Define types
@@ -629,20 +647,8 @@ export default function GamePlayPage() {
     if (!gameData || !currentUserId) return
 
     // Build the player list: real party members + any AI bots added in the lobby.
-    const initializers: Record<string, (players: { id: string; name: string; isBot: boolean }[]) => any> = {
-      monopoly: initializeGame,
-      catan: initializeCatan,
-      cluedo: initializeMystery,
-      battleship: initializeBattleship,
-      pictionary: initializePictionary,
-      uno: initializeUno,
-      poker: initializePoker,
-      codenames: initializeSpymaster,
-      scribbleio: initializeDoodle,
-      manhunt: initializeManhunt,
-    }
-
-    const init = initializers[gameData.id]
+    const loadEngine = engineLoaders[gameData.id]
+    const init = loadEngine ? await loadEngine() : undefined
     if (init) {
       const humans = partyMembers.map(m => ({
         id: m.user_id,
