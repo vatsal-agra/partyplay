@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Confetti } from "@/components/Confetti"
 import { getAchievement } from "@/lib/achievements"
 import type { GameSummary } from "@/lib/gameSummary"
+import { SITE_URL } from "@/lib/site"
 import { Trophy, RotateCcw, LogOut, Share2, Crown, X } from "lucide-react"
 import { useState } from "react"
 
@@ -25,7 +26,7 @@ export function GameOverScreen({ gameName, summary, newAchievements, canRematch,
 
   const shareResult = async () => {
     const top = summary.standings.slice(0, 3).map((s, i) => `${medals[i] || `${i + 1}.`} ${s.name}${s.detail ? ` — ${s.detail}` : ""}`).join("\n")
-    const text = `🎲 ${gameName} on Dice Alley\n🏆 ${summary.winnerLabel} wins!\n\n${top}\n\nPlay free at Dice Alley`
+    const text = `🎲 ${gameName} on Dice Alley\n🏆 ${summary.winnerLabel} wins!\n\n${top}\n\nPlay free at Dice Alley: ${SITE_URL}`
     try {
       if (typeof navigator !== "undefined" && navigator.share) {
         await navigator.share({ title: `${gameName} — Dice Alley`, text })
