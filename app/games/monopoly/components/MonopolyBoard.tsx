@@ -225,6 +225,7 @@ export default function MonopolyBoard({ state, currentPlayerId, onStateChange, o
       {/* 3D BOARD */}
       <div className="relative h-full min-w-0 flex-1 overflow-hidden rounded-2xl border border-[#6b5230]/30">
         <EmpireScene3D
+          currentPlayerId={currentPlayerId}
           state={pendingRoll ? { ...state, lastDice: pendingRoll.lastDice } : state}
           rolling={isRolling}
           canDrawCard={isMyTurn && !curPlayer.isBot && state.phase === 'DRAW_CARD'}

@@ -9,6 +9,7 @@
 "use client"
 
 import * as THREE from "three"
+import { useEquippedCosmetics } from "@/lib/useEquippedCosmetics"
 import { Suspense, useMemo, useRef } from "react"
 import { Canvas, useFrame } from "@react-three/fiber"
 import { OrbitControls, Html } from "@react-three/drei"
@@ -362,6 +363,7 @@ export interface PokerScene3DProps {
 }
 
 function Scene({ state, meIndex, isSpectator, reveal }: PokerScene3DProps) {
+  const { feltHex } = useEquippedCosmetics()
   const felt = useMemo(feltTexture, [])
   const n = state.players.length
   const inBetting = ["PREFLOP", "FLOP", "TURN", "RIVER"].includes(state.stage)
@@ -406,7 +408,7 @@ function Scene({ state, meIndex, isSpectator, reveal }: PokerScene3DProps) {
         </mesh>
         <mesh position={[0, 0.02, 0]} receiveShadow>
           <cylinderGeometry args={[5.05, 5.05, 0.26, 48]} />
-          <meshStandardMaterial map={felt} color="#2a7a52" roughness={0.9} />
+          <meshStandardMaterial map={feltHex ? null : felt} color={feltHex ?? "#2a7a52"} roughness={0.9} />
         </mesh>
         {/* inner betting line */}
         <mesh position={[0, 0.155, 0]} rotation-x={-Math.PI / 2}>

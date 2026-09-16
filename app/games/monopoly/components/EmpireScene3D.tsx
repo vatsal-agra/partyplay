@@ -11,6 +11,7 @@
 "use client"
 
 import * as THREE from "three"
+import { useEquippedCosmetics } from "@/lib/useEquippedCosmetics"
 import { Suspense, useEffect, useMemo, useRef, useState } from "react"
 import { Canvas, useFrame, ThreeEvent } from "@react-three/fiber"
 import { OrbitControls, Html } from "@react-three/drei"
@@ -361,8 +362,8 @@ function TokenShape({ seat, color }: { seat: number; color: string }) {
 }
 
 // Board-track player token: hops tile-by-tile toward its target space.
-function PlayerToken({ player, seat, isCurrent, stackIndex, stackCount }: {
-  player: Player; seat: number; isCurrent: boolean; stackIndex: number; stackCount: number
+function PlayerToken({ player, seat, isCurrent, stackIndex, stackCount, tokenHex }: {
+  player: Player; seat: number; isCurrent: boolean; stackIndex: number; stackCount: number; tokenHex?: string | null
 }) {
   const g = useRef<THREE.Group>(null)
   const shown = useRef<number>(player.position)   // continuously displayed index
@@ -438,7 +439,7 @@ function PlayerToken({ player, seat, isCurrent, stackIndex, stackCount }: {
   return (
     <group ref={g} position={[start.x, BOARD_Y, start.z]} scale={1.22}>
       <group ref={body}>
-        <TokenShape seat={seat} color={player.color} />
+        <TokenShape seat={seat} color={tokenHex ?? player.color} />
       </group>
       <mesh ref={landRing} rotation-x={-Math.PI / 2} position={[0, 0.018, 0]}>
         <ringGeometry args={[0.3, 0.4, 24]} />
@@ -595,6 +596,7 @@ function Deck({ x, rotY, label, bg, active, onDraw }: {
 
 export interface EmpireScene3DProps {
   state: MonopolyState
+  currentPlayerId: string
   rolling: boolean
   canDrawCard: boolean
   onDiceSettled: () => void
@@ -602,7 +604,8 @@ export interface EmpireScene3DProps {
   onDrawCard: () => void
 }
 
-function Scene({ state, rolling, canDrawCard, onDiceSettled, onTileClick, onDrawCard }: EmpireScene3DProps) {
+function Scene({ state, currentPlayerId, rolling, canDrawCard, onDiceSettled, onTileClick, onDrawCard }: EmpireScene3DProps) {
+  const { feltHex, tokenHex } = useEquippedCosmetics()
   const wood = useMemo(woodTexture, [])
   const center = useMemo(centerTexture, [])
   const cur = state.players[state.currentPlayerIndex]
@@ -683,10 +686,10 @@ function Scene({ state, rolling, canDrawCard, onDiceSettled, onTileClick, onDraw
           orbits outside the inward-facing walls and they disappear. */}
       <RoomBox size={70} height={24} y={-0.36} floor="#171008" glow="#ffd79a" />
 
-      {/* table (unchanged) */}
+      {/* table surface */}
       <mesh rotation-x={-Math.PI / 2} position={[0, -0.35, 0]} receiveShadow>
         <planeGeometry args={[70, 70]} />
-        <meshStandardMaterial map={wood} color="#211709" roughness={0.75} />
+        <meshStandardMaterial map={feltHex ? null : wood} color={feltHex ?? "#211709"} roughness={0.75} />
       </mesh>
 
       {/* board slab */}
@@ -696,7 +699,7 @@ function Scene({ state, rolling, canDrawCard, onDiceSettled, onTileClick, onDraw
       </mesh>
       <mesh position={[0, 0.075, 0]} receiveShadow>
         <boxGeometry args={[12.35, 0.1, 12.35]} />
-        <meshStandardMaterial color="#e5ddc4" roughness={0.85} />
+        <meshStandardMaterial color={feltHex ?? "#e5ddc4"} roughness={0.85} />
       </mesh>
 
       {/* center art */}
@@ -784,7 +787,7 @@ function Scene({ state, rolling, canDrawCard, onDiceSettled, onTileClick, onDraw
         return state.players.map((p, i) => {
           const mates = onTile[p.position] || [p.id]
           return (
-            <PlayerToken key={p.id} player={p} seat={i} isCurrent={p.id === cur.id && !p.isBankrupt}
+            <PlayerToken key={p.id} tokenHex={p.id === currentPlayerId ? tokenHex : null} player={p} seat={i} isCurrent={p.id === cur.id && !p.isBankrupt}
               stackIndex={Math.max(0, mates.indexOf(p.id))} stackCount={mates.length} />
           )
         })
