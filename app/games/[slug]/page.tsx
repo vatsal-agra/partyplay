@@ -237,12 +237,16 @@ export default function GamePlayPage() {
   useEffect(() => {
     if (!isPlaying) return
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== "?" || e.ctrlKey || e.metaKey || e.altKey) return
       const target = e.target as HTMLElement | null
       if (target) {
         const tag = target.tagName
         if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable) return
       }
+      if (e.key === "Escape") {
+        setShowRules(false)
+        return
+      }
+      if (e.key !== "?" || e.ctrlKey || e.metaKey || e.altKey) return
       e.preventDefault()
       setShowRules((open) => !open)
     }
