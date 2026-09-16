@@ -28,10 +28,27 @@
 // passes to one.
 "use client"
 
+import { useSyncExternalStore } from "react"
 import * as THREE from "three"
 import { EffectComposer, Bloom, Vignette, SMAA } from "@react-three/postprocessing"
 
 export type SceneQuality = "high" | "low"
+
+const reducedMotionQuery = "(prefers-reduced-motion: reduce)"
+
+function subscribeToReducedMotion(onChange: () => void) {
+  const mediaQuery = window.matchMedia(reducedMotionQuery)
+  mediaQuery.addEventListener("change", onChange)
+  return () => mediaQuery.removeEventListener("change", onChange)
+}
+
+function getReducedMotionSnapshot() {
+  return window.matchMedia(reducedMotionQuery).matches
+}
+
+function getServerReducedMotionSnapshot() {
+  return true
+}
 
 /** Canvas props shared by every table. Spread this, then add camera/style. */
 export function canvasDefaults(quality: SceneQuality, exposure = 1.04) {
@@ -90,6 +107,14 @@ export function SceneFX({
   vignetteOffset = 0.25,
   vignetteDarkness = 0.75,
 }: SceneFXProps) {
+  const reducedMotion = useSyncExternalStore(
+    subscribeToReducedMotion,
+    getReducedMotionSnapshot,
+    getServerReducedMotionSnapshot,
+  )
+
+  if (reducedMotion) return null
+
   return (
     <EffectComposer multisampling={quality === "high" ? 0 : 4}>
       <Bloom
