@@ -99,7 +99,7 @@ export function SceneFX({
         mipmapBlur
       />
       <Vignette eskil={false} offset={vignetteOffset} darkness={vignetteDarkness} />
-      {quality === "high" ? <SMAA /> : <></>}
+      {quality === "high" && <SMAA />}
     </EffectComposer>
   )
 }
