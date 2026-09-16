@@ -13,6 +13,9 @@ import Link from "next/link"
 import { ShieldCheck } from "lucide-react"
 import { Auth } from "@supabase/auth-ui-react"
 import { ThemeSupa } from "@supabase/auth-ui-shared"
+import { motion } from "framer-motion"
+import { Mascot } from "@/components/Mascot"
+import { randomLoading } from "@/lib/copy"
 
 export default function CreateParty() {
   const router = useRouter()
@@ -26,6 +29,7 @@ export default function CreateParty() {
 
   const [guestName, setGuestName] = useState("")
   const [guestLoading, setGuestLoading] = useState(false)
+  const [loadingLine] = useState(randomLoading())
 
   const handleGuest = async () => {
     if (guestLoading) return
@@ -42,7 +46,32 @@ export default function CreateParty() {
   }
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[70vh]">
+        <Mascot mood="think" size={120} className="mb-4" />
+        <motion.p
+          className="text-white text-xl font-medium"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+        >
+          {loadingLine}
+        </motion.p>
+        <motion.div
+          className="mt-6 w-24 h-1 bg-white/20 rounded-full overflow-hidden"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+        >
+          <motion.div
+            className="h-full bg-brand"
+            initial={{ width: 0 }}
+            animate={{ width: '100%' }}
+            transition={{ duration: 1.6, repeat: Infinity, repeatType: 'reverse', ease: 'easeInOut' }}
+          />
+        </motion.div>
+      </div>
+    )
   }
 
   // No session: host as a guest right here instead of bouncing to sign-in.
