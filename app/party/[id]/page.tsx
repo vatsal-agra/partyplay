@@ -406,7 +406,7 @@ export default function PartyPage() {
         <div className="glass-strong w-full max-w-sm p-6 text-center shadow-soft">
           <div className="mx-auto mb-3 grid h-14 w-14 place-items-center rounded-2xl bg-brand text-2xl shadow-glow-grape">🎉</div>
           <h2 className="text-xl font-black text-white">You're invited to a party!</h2>
-          <p className="mt-1 text-sm text-white/60">Pick a name and jump straight in — no sign-up needed.</p>
+          <p className="mt-1 text-sm text-white/60">Pick a name and jump straight in. No sign-up needed.</p>
           <Input
             placeholder="Your name"
             value={guestName}
@@ -526,6 +526,24 @@ export default function PartyPage() {
                           : <Share2 className="h-4 w-4" />}
                         {copied === "link" ? "Link copied" : "Share invite link"}
                       </Button>
+                      <a
+                        href={`https://wa.me/?text=${encodeURIComponent(`${shareText} ${inviteLink}`)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex h-8 items-center justify-center rounded-lg border border-[#d6a85c]/40 bg-background px-3 text-xs font-semibold text-[#efd9a4] transition-colors hover:border-[#d6a85c] hover:bg-[#d6a85c]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d6a85c] focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                        aria-label="Share invite on WhatsApp (opens in a new tab)"
+                      >
+                        WhatsApp
+                      </a>
+                      <a
+                        href={`https://t.me/share/url?url=${encodeURIComponent(inviteLink)}&text=${encodeURIComponent(shareText)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex h-8 items-center justify-center rounded-lg border border-[#d6a85c]/40 bg-background px-3 text-xs font-semibold text-[#efd9a4] transition-colors hover:border-[#d6a85c] hover:bg-[#d6a85c]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d6a85c] focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                        aria-label="Share invite on Telegram (opens in a new tab)"
+                      >
+                        Telegram
+                      </a>
                     </div>
                     <p className="mt-2 text-xs text-white/60">
                       {copied === "code"
