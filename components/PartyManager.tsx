@@ -6,6 +6,7 @@ import { Plus, Trash2, Users, Lock, Unlock, RefreshCw, Loader2, Group, LogOut, C
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { motion, AnimatePresence } from "framer-motion"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 
 interface Party {
@@ -405,6 +406,12 @@ export default function PartyManager() {
               key="empty-hosted"
             >
               <p>You are not hosting any active parties.</p>
+              <Button asChild variant="brand" className="mt-4 gap-2">
+                <Link href="/dashboard/create-party">
+                  <Plus className="h-4 w-4" />
+                  Create a party
+                </Link>
+              </Button>
             </motion.div>
           ) : (
             <motion.div 
