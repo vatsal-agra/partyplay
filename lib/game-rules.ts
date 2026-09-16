@@ -123,3 +123,31 @@ export function getGameRules(id: string | null | undefined): GameRules | null {
   if (!id) return null
   return GAME_RULES[id] ?? null
 }
+
+// ---- First-play nudge -----------------------------------------------------
+// The rules modal opens by itself the very first time a player starts a given
+// game, so nobody has to hunt for the Game Rules button to learn the basics.
+// One flag per game id, kept in localStorage: seeing it once is enough, and a
+// player who already knows Property Empire should not be interrupted again.
+
+const SEEN_KEY_PREFIX = "pp_rules_seen_"
+
+export function hasSeenRules(id: string): boolean {
+  if (typeof window === "undefined") return true   // never auto-open during SSR
+  try {
+    return window.localStorage.getItem(SEEN_KEY_PREFIX + id) === "1"
+  } catch {
+    // Private mode or storage disabled: treat as seen rather than nagging on
+    // every single game start.
+    return true
+  }
+}
+
+export function markRulesSeen(id: string): void {
+  if (typeof window === "undefined") return
+  try {
+    window.localStorage.setItem(SEEN_KEY_PREFIX + id, "1")
+  } catch {
+    /* storage unavailable, so the nudge just will not persist */
+  }
+}
