@@ -136,6 +136,7 @@ export default function GamePlayPage() {
   }
 
   const [isPlaying, setIsPlaying] = useState(false)
+  const [connectionLost, setConnectionLost] = useState(false)
   const [showEndConfirm, setShowEndConfirm] = useState(false)
   const [liveEvent, setLiveEvent] = useState<LiveEvent | null>(null)
   const [lobbyBots, setLobbyBots] = useState<{ id: string; name: string }[]>([])
@@ -501,8 +502,10 @@ export default function GamePlayPage() {
 
   // Listen for real-time game broadcasts & db changes
   useEffect(() => {
+    setConnectionLost(false)
     if (!partyId || !currentUserId) return
 
+    let disposed = false
     const channel = supabase.channel(`game-${partyId}`)
     activeChannelRef.current = channel
     
@@ -540,7 +543,14 @@ export default function GamePlayPage() {
           })
         }
       })
-      .subscribe()
+      .subscribe((status) => {
+        if (disposed) return
+        if (status === 'SUBSCRIBED') {
+          setConnectionLost(false)
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          setConnectionLost(true)
+        }
+      })
 
     // Database changes channel
     const dbChannel = supabase.channel(`game-db-${partyId}`)
@@ -588,6 +598,7 @@ export default function GamePlayPage() {
     timers.push(setTimeout(askForSync, 1500))
 
     return () => {
+      disposed = true
       activeChannelRef.current = null
       supabase.removeChannel(channel)
       supabase.removeChannel(dbChannel)
@@ -796,6 +807,12 @@ export default function GamePlayPage() {
                 </button>
               )}
             </div>
+
+            {inRealParty && connectionLost && (
+              <div role="status" className="shrink-0 border-b border-amber-400/20 bg-amber-950/60 px-3 py-2 text-center text-sm text-amber-200">
+                Connection lost. Reconnecting...
+              </div>
+            )}
 
             {/* End / leave game confirmation */}
             {showEndConfirm && (
