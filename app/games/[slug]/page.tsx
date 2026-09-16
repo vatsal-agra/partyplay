@@ -229,6 +229,27 @@ export default function GamePlayPage() {
     setShowRules(true)
   }, [isPlaying, gameData?.id])
 
+  // "?" is the usual "what are the controls" key, so it opens and closes the
+  // same How to Play panel the Game Rules button drives. The page keeps a chat
+  // box and other text fields alive during a match, so anything typed into a
+  // field is left alone, and so is a "?" that is part of a browser or OS
+  // shortcut.
+  useEffect(() => {
+    if (!isPlaying) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "?" || e.ctrlKey || e.metaKey || e.altKey) return
+      const target = e.target as HTMLElement | null
+      if (target) {
+        const tag = target.tagName
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable) return
+      }
+      e.preventDefault()
+      setShowRules((open) => !open)
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [isPlaying])
+
   // Watch the engine log: each newly-appended line carries a leading emoji that
   // identifies the event (🎲 dice, 💰 cash, ✅ correct, 💥 hit, 🏆 win …). Play
   // its mapped sound and pop the emoji on screen. Big jumps (a full state sync)
