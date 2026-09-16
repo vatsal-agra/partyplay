@@ -7,16 +7,19 @@ Server environment (never commit real values):
 - Existing `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 - `SUPABASE_SERVICE_ROLE_KEY` for server-only order storage and verified grants. Never use a `NEXT_PUBLIC_` prefix for this key.
 - `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` from the same Razorpay account/mode.
+- `RAZORPAY_WEBHOOK_SECRET`, matching the secret configured for this endpoint in the Razorpay dashboard (separate from the API key secret).
 
 Without Razorpay keys, the order API returns HTTP 503 with `{"error":"payments_unconfigured"}` and paid buttons show “Payments coming online”. Free unlocks and equip require only Supabase and the migration. Without the service-role key, order creation fails closed with `shop_unconfigured`.
 
-Enable automatic capture in Razorpay. The server checks the authenticated user, stored order, HMAC signature, fetched payment ID, order ID, amount, INR currency and captured status before invoking the service-only atomic fulfillment function. Prices and entitlements never come from checkout input. A proof saved in browser storage lets a signed-in user retry verification after a reload or delayed capture; it cannot authorize a grant without server verification. Fulfillment retries do not duplicate entitlements. No webhook is included: if checkout never delivers a proof, reconcile captured orders using the provider dashboard before granting or refunding through trusted administration.
+Enable automatic capture in Razorpay. The server checks the authenticated user, stored order, HMAC signature, fetched payment ID, order ID, amount, INR currency and captured status before invoking the service-only atomic fulfillment function. Prices and entitlements never come from checkout input. A proof saved in browser storage lets a signed-in user retry verification after a reload or delayed capture; it cannot authorize a grant without server verification. Fulfillment retries do not duplicate entitlements. Configure a Razorpay webhook at `https://<your-domain>/api/shop/webhook` and subscribe to `payment.captured` so fulfillment completes even if the checkout tab closes before browser verification. The endpoint verifies `X-Razorpay-Signature` against the exact raw body with `RAZORPAY_WEBHOOK_SECRET` before parsing any event. It matches the payment order ID, amount, currency and captured status against the stored shop order, then calls the same atomic `fulfill_shop_order` function. Duplicate deliveries and races with browser verification are safe. Signed unrelated events return 200 without fulfillment. Missing Razorpay keys or webhook secret returns HTTP 503 with `{"error":"payments_unconfigured"}`. Unknown orders and storage/fulfillment failures return non-2xx so delivery can be retried; monitor failed deliveries in the provider dashboard.
 
 The coin ledger is reserved for trusted server awards and spending. Clients can only read their own entries. Gameplay coin awards, coin purchases and coin redemption are not wired up in this slice; existing game results are client-reported and are not sufficient proof for economic awards.
 
-Before enabling live payments, test with Razorpay test keys: purchase, cancel, failed payment, delayed capture/retry, duplicate verification, another user's order, tampered signature/amount and missing keys. Verify starter unlocks are idempotent and equips survive reload. Keep keys in deployment environment settings only.
+Before enabling live payments, test with Razorpay test keys: purchase, cancel, failed payment, delayed capture/retry, duplicate verification, signed webhook delivery after closing checkout, duplicate webhook delivery, invalid/missing webhook signatures, missing webhook secret, another user's order, tampered signature/amount and missing keys. Verify starter unlocks are idempotent and equips survive reload. Keep keys in deployment environment settings only.
 
 Provider reference: https://razorpay.com/docs/payments/payment-gateway/web-integration/standard/integration-steps/
+
+Webhook signature reference: https://razorpay.com/docs/webhooks/validate-test/
 
 ## Local checks
 

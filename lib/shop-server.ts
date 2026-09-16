@@ -47,3 +47,9 @@ export function shopError(error: unknown) {
   if (message === "shop_unconfigured") return NextResponse.json({ error: message }, { status: 503 })
   return NextResponse.json({ error: "shop_request_failed" }, { status: 502 })
 }
+
+export function validWebhookSignature(body: Buffer, signature: string, secret: string) {
+  if (!/^[a-f0-9]{64}$/i.test(signature)) return false
+  const expected = createHmac("sha256", secret).update(body).digest()
+  return timingSafeEqual(expected, Buffer.from(signature, "hex"))
+}
