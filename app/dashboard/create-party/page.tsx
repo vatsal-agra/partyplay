@@ -113,40 +113,7 @@ export default function CreateParty() {
     }
 
     try {
-      // First, find and delete any existing party for this user
-      const { data: existingParties, error: fetchError } = await supabaseClient
-        .from('parties')
-        .select('id')
-        .eq('created_by', session.user.id)
-      
-      if (fetchError) {
-        console.error("Error fetching existing parties:", fetchError)
-        // Continue anyway, we'll try to create the new party
-      } else if (existingParties && existingParties.length > 0) {
-        // Delete all party members for the existing parties
-        const { error: deleteMembersError } = await supabaseClient
-          .from('party_members')
-          .delete()
-          .in('party_id', existingParties.map(p => p.id))
-        
-        if (deleteMembersError) {
-          console.error("Error deleting party members:", deleteMembersError)
-          // Continue anyway, we'll try to delete the party
-        }
-        
-        // Now delete the parties
-        const { error: deletePartiesError } = await supabaseClient
-          .from('parties')
-          .delete()
-          .eq('created_by', session.user.id)
-        
-        if (deletePartiesError) {
-          console.error("Error deleting existing parties:", deletePartiesError)
-          // Continue anyway, we'll try to create the new party
-        }
-      }
-
-      // Now create the new party
+      // Create a new party without changing existing parties or their members.
       const { data, error } = await supabaseClient
         .from('parties')
         .insert({
