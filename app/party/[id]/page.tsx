@@ -880,10 +880,7 @@ export default function PartyPage() {
                   <div className="text-center text-gray-400">
                     <p>{party?.max_players - members.length} spots remaining</p>
                     <Button
-                      onClick={() => {
-                        // TODO: Implement invite friends functionality
-                        alert('Invite friends feature coming soon!')
-                      }}
+                      onClick={shareParty}
                       variant="outline"
                       className="mt-4 w-full text-white hover:bg-purple-900"
                     >
