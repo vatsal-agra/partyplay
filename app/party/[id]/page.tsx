@@ -68,6 +68,8 @@ export default function PartyPage() {
   // instead of throwing a browser alert() at the host.
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
   const launchChannelRef = useRef<RealtimeChannel | null>(null);
+  const unreadChatCountRef = useRef(0);
+  const originalTitleRef = useRef<string | null>(null);
   // Last known party status — so only a genuine transition INTO "ready" (a fresh
   // launch) auto-redirects, not an in-progress "playing"/"ready" heartbeat.
   const prevPartyStatusRef = useRef<string | null>(null);
@@ -118,6 +120,25 @@ export default function PartyPage() {
   const undecidedCount = Math.max(0, members.length - totalVotes)
   const everyoneVoted = members.length > 0 && undecidedCount === 0
   const turnoutPct = members.length ? Math.min(100, Math.round((totalVotes / members.length) * 100)) : 0
+
+  useEffect(() => {
+    const restoreTitle = () => {
+      if (originalTitleRef.current !== null) {
+        document.title = originalTitleRef.current;
+        originalTitleRef.current = null;
+      }
+      unreadChatCountRef.current = 0;
+    };
+    const handleVisibilityChange = () => {
+      if (!document.hidden) restoreTitle();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      restoreTitle();
+    };
+  }, [partyId]);
 
   useEffect(() => {
     const getSession = async () => {
@@ -306,7 +327,15 @@ export default function PartyPage() {
             schema: 'public',
             table: 'messages',
             filter: `party_id=eq.${partyId}`,
-          }, () => {
+          }, (payload) => {
+            if (payload.eventType === 'INSERT' &&
+                payload.new.user_id !== session.user.id && document.hidden) {
+              if (originalTitleRef.current === null) {
+                originalTitleRef.current = document.title;
+              }
+              unreadChatCountRef.current += 1;
+              document.title = `(${unreadChatCountRef.current}) ${originalTitleRef.current}`;
+            }
             getParty(session)
           })
           .on('postgres_changes', {
