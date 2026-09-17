@@ -83,6 +83,21 @@ export default function PartyPage() {
     // onAuthStateChange picks up the new session and loads the party.
   };
 
+  const sendPartyChat = async () => {
+    const text = newMessage.trim()
+    if (!text || !session?.user?.id) return
+    await supabase.from("messages").insert([
+      {
+        party_id: partyId,
+        user_id: session.user.id,
+        content: text,
+        created_at: new Date().toISOString(),
+      },
+    ])
+    touchParty(supabase, partyId)
+    setNewMessage("")
+  }
+
   // Aggregate the party's votes into a per-game tally.
   const voteTally = useMemo(() => {
     const map: Record<string, { gameId: string; name: string; count: number; voters: string[] }> = {}
@@ -834,27 +849,16 @@ export default function PartyPage() {
                   <Input
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault()
+                        void sendPartyChat()
+                      }
+                    }}
                     placeholder="Type a message..."
                     className="flex-1 bg-white/5 border-white/20 hover:border-white/50 focus:border-purple-300 focus:ring-purple-300"
                   />
-                  <Button
-                    onClick={async () => {
-                      if (!newMessage.trim()) return
-
-                      await supabase.from('messages').insert([
-                        {
-                          party_id: partyId,
-                          user_id: session?.user?.id,
-                          content: newMessage,
-                          created_at: new Date().toISOString()
-                        }
-                      ])
-                      touchParty(supabase, partyId)
-
-                      setNewMessage('')
-                    }}
-                    variant="brand"
-                  >
+                  <Button onClick={() => void sendPartyChat()} variant="brand">
                     Send
                   </Button>
                 </div>
