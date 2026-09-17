@@ -15,11 +15,13 @@ import { playSfx, eventForLogLine, isSfxMuted, toggleSfxMuted, onSfxMutedChange 
 import { toast } from "sonner"
 import { Eye, Volume2, VolumeX } from "lucide-react"
 import Image from "next/image"
+import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Loader2, Send, Gamepad2, Users, MessageSquare, BookOpen } from "lucide-react"
+import { Mascot } from "@/components/Mascot"
 import dynamic from "next/dynamic"
 import type { LiveEvent } from "../pictionary/components/PictionaryBoard"
 
@@ -835,12 +837,19 @@ export default function GamePlayPage() {
   
   if (!gameData) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
+      <div className="flex min-h-screen items-center justify-center bg-background px-4">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-white mb-4">Game not found</h2>
-          <Button onClick={() => router.push('/games')}>
-            Back to Games
-          </Button>
+          <Mascot mood="think" size={120} className="mx-auto mb-6" />
+          <h2 className="font-display text-3xl font-bold text-white">That game is not on the table</h2>
+          <p className="mt-3 text-muted-foreground">The link may be old, or that title is still in the workshop.</p>
+          <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+            <Button asChild variant="brand">
+              <Link href="/games">Browse the games</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/">Home</Link>
+            </Button>
+          </div>
         </div>
       </div>
     )
@@ -1221,6 +1230,7 @@ export default function GamePlayPage() {
                     onClick={() => toggleSfxMuted()}
                     variant="outline"
                     title={sfxMuted ? "Unmute sound effects" : "Mute sound effects"}
+                    aria-label={sfxMuted ? "Unmute sound effects" : "Mute sound effects"}
                     className="text-white border-white/20 hover:bg-white/10 px-2.5"
                   >
                     {sfxMuted ? <VolumeX className="w-4 h-4 text-white/60" /> : <Volume2 className="w-4 h-4 text-aqua-400" />}
