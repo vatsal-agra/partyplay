@@ -21,8 +21,16 @@ import { StreakFlame } from "@/components/StreakFlame"
 import { Avatar } from "@/components/Avatar"
 import { OpenPartiesBoard } from "@/components/OpenPartiesBoard"
 import { FlairPicker, type Flair } from "@/components/FlairPicker"
+import { DisplayNamePrompt } from "@/components/DisplayNamePrompt"
 
 type LeaderboardEntry = LeaderboardRow
+
+// Profiles created before the name prompt (and guests who never typed one) sit
+// on an empty display_name or the placeholder "Guest", so both need asking.
+function needsDisplayName(raw: string | null | undefined): boolean {
+  const name = (raw || "").trim()
+  return name === "" || name.toLowerCase() === "guest"
+}
 
 export default function Dashboard() {
   const router = useRouter()
@@ -36,6 +44,7 @@ export default function Dashboard() {
   const [flair, setFlair] = useState<Flair>({ emoji: null, color: null, badge: null })
   const [displayName, setDisplayName] = useState("Player")
   const [showFlair, setShowFlair] = useState(false)
+  const [needsName, setNeedsName] = useState(false)
 
   useEffect(() => {
     const getSession = async () => {
@@ -58,6 +67,7 @@ export default function Dashboard() {
           .then(({ data }: any) => {
             if (data) {
               setDisplayName(data.display_name || data.username || "Player")
+              setNeedsName(needsDisplayName(data.display_name))
               setFlair({ emoji: data.avatar_emoji, color: data.avatar_color, badge: data.equipped_badge })
             }
           })
@@ -172,6 +182,17 @@ export default function Dashboard() {
               <Link href="/auth/sign-up">Save this account</Link>
             </Button>
           </motion.div>
+        )}
+
+        {needsName && session?.user?.id && (
+          <DisplayNamePrompt
+            client={supabaseClient}
+            userId={session.user.id}
+            onSaved={(name) => {
+              setDisplayName(name)
+              setNeedsName(false)
+            }}
+          />
         )}
 
         {/* Player card — level, streak, flair */}
