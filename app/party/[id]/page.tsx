@@ -96,6 +96,10 @@ export default function PartyPage() {
   const [memberToPromote, setMemberToPromote] = useState<PartyMember | null>(null);
   const [passingHost, setPassingHost] = useState(false);
   const [hostError, setHostError] = useState<string | null>(null);
+  // Kicking: the member the host picked, held until they confirm.
+  const [memberToKick, setMemberToKick] = useState<PartyMember | null>(null);
+  const [kicking, setKicking] = useState(false);
+  const [kickError, setKickError] = useState<string | null>(null);
   const launchChannelRef = useRef<RealtimeChannel | null>(null);
   const unreadChatCountRef = useRef(0);
   const originalTitleRef = useRef<string | null>(null);
@@ -143,6 +147,26 @@ export default function PartyPage() {
     }
     touchParty(supabase, partyId)
     await getParty(session)
+  }
+
+  // Remove a seated member. Host only, and only once they have confirmed.
+  const confirmKick = async () => {
+    const target = memberToKick
+    if (!target) return
+    setKicking(true)
+    setKickError(null)
+    const { error } = await supabase
+      .from('party_members')
+      .delete()
+      .eq('id', target.id)
+    setKicking(false)
+    setMemberToKick(null)
+    if (error) {
+      setKickError(`Could not kick that member: ${error.message}`)
+      return
+    }
+    touchParty(supabase, partyId)
+    if (session) await getParty(session)
   }
 
   // Aggregate the party's votes into a per-game tally.
@@ -934,6 +958,9 @@ export default function PartyPage() {
               {hostError && (
                 <p className="mb-4 text-sm font-medium text-red-300">{hostError}</p>
               )}
+              {kickError && (
+                <p className="mb-4 text-sm font-medium text-red-300">{kickError}</p>
+              )}
               <div className="space-y-4">
                 {members.map((member) => {
                   const isHostMember = member.user_id === party?.created_by
@@ -973,13 +1000,12 @@ export default function PartyPage() {
                           Pass host
                         </Button>
                         <Button
-                          onClick={async () => {
-                            await supabase
-                              .from('party_members')
-                              .delete()
-                              .eq('id', member.id)
+                          onClick={() => {
+                            setKickError(null)
+                            setMemberToKick(member)
                           }}
                           variant="ghost"
+                          disabled={kicking}
                           className="bg-red-500/20 hover:bg-red-500/30 text-red-300 hover:text-white"
                         >
                           Kick
@@ -1015,6 +1041,15 @@ export default function PartyPage() {
         title="Pass host"
         message={`Make ${memberToPromote?.user?.username || memberToPromote?.user?.email || 'this member'} the host? They get the host controls and you stay in the party as a member.`}
         confirmButtonText={passingHost ? 'Passing...' : 'Pass host'}
+      />
+
+      <ConfirmationModal
+        isOpen={memberToKick !== null}
+        onClose={() => setMemberToKick(null)}
+        onConfirm={() => { void confirmKick() }}
+        title="Kick member"
+        message={`Remove ${memberToKick?.user?.username || memberToKick?.user?.email || 'this member'} from the party? They can rejoin with the party code.`}
+        confirmButtonText={kicking ? 'Kicking...' : 'Kick member'}
       />
 
       <PartyInactivityWarning
