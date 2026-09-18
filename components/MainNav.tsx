@@ -8,6 +8,7 @@ import { Button } from "./ui/button"
 import { Home, Gamepad2, LogIn, LogOut, UserPlus, Dice5, ShoppingBag, Volume2, VolumeX } from "lucide-react"
 import { isSfxMuted, toggleSfxMuted, onSfxMutedChange } from "@/lib/sfx"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
+import { InstallPrompt } from "./InstallPrompt"
 import { useRouter } from "next/navigation"
 
 export function MainNav() {
@@ -35,6 +36,7 @@ export function MainNav() {
   ]
 
   return (
+    <>
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-background/70 backdrop-blur-xl">
       <div className="px-4 sm:px-6 flex h-16 items-center justify-between mx-auto max-w-7xl">
         {/* Logo */}
@@ -113,5 +115,7 @@ export function MainNav() {
         </div>
       </div>
     </header>
+    <InstallPrompt />
+    </>
   )
 }
