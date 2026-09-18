@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
-import { Copy, Check, Share2, ArrowLeft, Crown, Trophy, Vote as VoteIcon, Rocket } from "lucide-react"
+import { Copy, Check, Share2, ArrowLeft, Crown, Trophy, Vote as VoteIcon, Rocket, LogOut } from "lucide-react"
 import { useRouter, useParams } from "next/navigation"
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Image from "next/image";
@@ -13,7 +13,7 @@ import { PartyInactivityWarning } from "@/components/PartyInactivityWarning";
 import { VoiceChat } from "@/components/VoiceChat";
 import { playAsGuest } from "@/lib/guest";
 import { touchParty } from "@/lib/partyActivity";
-import { passHost } from "@/lib/partyHost";
+import { passHost, leaveParty } from "@/lib/partyHost";
 import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
 import type { Session } from "@supabase/auth-helpers-nextjs";
 import type { RealtimeChannel } from "@supabase/supabase-js";
@@ -100,6 +100,10 @@ export default function PartyPage() {
   const [memberToKick, setMemberToKick] = useState<PartyMember | null>(null);
   const [kicking, setKicking] = useState(false);
   const [kickError, setKickError] = useState<string | null>(null);
+  // Leaving yourself: held open until the confirmation comes back.
+  const [confirmingLeave, setConfirmingLeave] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const [leaveError, setLeaveError] = useState<string | null>(null);
   const launchChannelRef = useRef<RealtimeChannel | null>(null);
   const unreadChatCountRef = useRef(0);
   const originalTitleRef = useRef<string | null>(null);
@@ -167,6 +171,24 @@ export default function PartyPage() {
     }
     touchParty(supabase, partyId)
     if (session) await getParty(session)
+  }
+
+  // Leave the party yourself. leaveParty already hands the host role on when
+  // the leaver is the host and somebody is still seated, and takes the party
+  // down when the leaver is the last one out, so there is nothing to redo here.
+  const confirmLeave = async () => {
+    if (!session?.user?.id) return
+    setLeaving(true)
+    setLeaveError(null)
+    const result = await leaveParty(supabase, partyId, session.user.id)
+    setLeaving(false)
+    if (result.error) {
+      setConfirmingLeave(false)
+      setLeaveError(`Could not leave the party: ${result.error}`)
+      return
+    }
+    setConfirmingLeave(false)
+    router.push('/dashboard')
   }
 
   // Aggregate the party's votes into a per-game tally.
@@ -583,6 +605,16 @@ export default function PartyPage() {
     }
   }
 
+  // Only somebody actually seated can leave, and what leaving costs depends on
+  // whether they are the host and whether anyone else is left behind.
+  const isSeated = members.some((m) => m.user_id === session?.user?.id)
+  const isLastMember = isSeated && members.length === 1
+  const leaveMessage = isLastMember
+    ? "Leave this party? You are the last one here, so the party will be closed."
+    : isLeader
+      ? "Leave this party? The host role passes to the longest-seated member. You can rejoin with the party code."
+      : "Leave this party? You can rejoin with the party code."
+
   return (
     <div className="min-h-screen">
       <div className="container mx-auto px-4 py-8">
@@ -596,7 +628,24 @@ export default function PartyPage() {
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Dashboard
           </Button>
+          {isSeated && (
+            <Button
+              variant="ghost"
+              disabled={leaving}
+              className="bg-red-500/20 hover:bg-red-500/30 text-red-300 hover:text-white"
+              onClick={() => {
+                setLeaveError(null)
+                setConfirmingLeave(true)
+              }}
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Leave party
+            </Button>
+          )}
         </div>
+        {leaveError && (
+          <p className="mb-6 text-sm font-medium text-red-300">{leaveError}</p>
+        )}
 
         <div className="flex flex-col md:flex-row gap-8">
           {/* Main Content */}
@@ -1050,6 +1099,15 @@ export default function PartyPage() {
         title="Kick member"
         message={`Remove ${memberToKick?.user?.username || memberToKick?.user?.email || 'this member'} from the party? They can rejoin with the party code.`}
         confirmButtonText={kicking ? 'Kicking...' : 'Kick member'}
+      />
+
+      <ConfirmationModal
+        isOpen={confirmingLeave}
+        onClose={() => setConfirmingLeave(false)}
+        onConfirm={() => { void confirmLeave() }}
+        title={isLastMember ? 'Leave and close party' : 'Leave party'}
+        message={leaveMessage}
+        confirmButtonText={leaving ? 'Leaving...' : 'Leave party'}
       />
 
       <PartyInactivityWarning
