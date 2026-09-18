@@ -19,7 +19,8 @@ interface Party {
   created_by: string
 }
 
-export default function PartyManager() {
+export default function PartyManager({ showJumpBackIn = false }: { showJumpBackIn?: boolean }) {
+  const [lastParty, setLastParty] = useState<Party | null>(null)
   const [parties, setParties] = useState<Party[]>([])
   const [joinedParties, setJoinedParties] = useState<Party[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -91,6 +92,7 @@ export default function PartyManager() {
   const fetchUserParty = async () => {
     try {
       setIsLoading(true)
+      setLastParty(null)
       setJoinError(null)
       const { data: { session }, error: sessionError } = await supabase.auth.getSession()
       
@@ -118,7 +120,7 @@ export default function PartyManager() {
       // 2. Fetch parties where the user is a member (but not the host)
       const { data: membershipData, error: membershipError } = await supabase
         .from('party_members')
-        .select('party_id')
+        .select('party_id, joined_at')
         .eq('user_id', userId)
 
       if (membershipError) throw membershipError
@@ -141,6 +143,15 @@ export default function PartyManager() {
 
       setParties(hosted || [])
       setJoinedParties(joined)
+      const joinedAt = new Map<string, string>(
+        (membershipData || []).map(m => [m.party_id, m.joined_at])
+      )
+      const candidates = [
+        ...(hosted || []).map(party => ({ party, timestamp: party.created_at })),
+        ...joined.map(party => ({ party, timestamp: joinedAt.get(party.id) || party.created_at }))
+      ]
+      candidates.sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
+      setLastParty(candidates[0]?.party || null)
     } catch (error: any) {
       console.error("Error in fetchUserParty:", error)
       setJoinError(`Failed to load parties: ${error.message}`)
@@ -314,6 +325,18 @@ export default function PartyManager() {
 
   return (
     <div className="space-y-6">
+      {showJumpBackIn && !isLoading && lastParty && (
+        <div className="flex flex-col gap-4 rounded-xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur-md sm:flex-row sm:items-center">
+          <div className="min-w-0 flex-1">
+            <h2 className="font-display text-xl font-bold text-white">Your latest party</h2>
+            <p className="mt-1 truncate text-sm text-white/60">{lastParty.name}</p>
+          </div>
+          <Button asChild variant="brand" className="shrink-0">
+            <Link href={`/party/${lastParty.id}`}>Jump back in</Link>
+          </Button>
+        </div>
+      )}
+
       {/* Join Party Panel */}
       <motion.div 
         className="w-full bg-white/5 backdrop-blur-md rounded-xl border border-white/10 p-6 shadow-xl"
