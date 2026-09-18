@@ -13,6 +13,8 @@ import { PartyInactivityWarning } from "@/components/PartyInactivityWarning";
 import { VoiceChat } from "@/components/VoiceChat";
 import { playAsGuest } from "@/lib/guest";
 import { touchParty } from "@/lib/partyActivity";
+import { passHost } from "@/lib/partyHost";
+import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
 import type { Session } from "@supabase/auth-helpers-nextjs";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import type { Party, PartyMember, Message, Vote, UserProfile } from "@/app/types";
@@ -67,6 +69,10 @@ export default function PartyPage() {
   // Which share control was last used, so the button itself confirms the copy
   // instead of throwing a browser alert() at the host.
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
+  // Host handoff: the member the host picked, held until they confirm.
+  const [memberToPromote, setMemberToPromote] = useState<PartyMember | null>(null);
+  const [passingHost, setPassingHost] = useState(false);
+  const [hostError, setHostError] = useState<string | null>(null);
   const launchChannelRef = useRef<RealtimeChannel | null>(null);
   const unreadChatCountRef = useRef(0);
   const originalTitleRef = useRef<string | null>(null);
@@ -96,6 +102,24 @@ export default function PartyPage() {
     ])
     touchParty(supabase, partyId)
     setNewMessage("")
+  }
+
+  // Hand the host role to another seated member. The old host stays in the
+  // party as an ordinary member until they leave on their own.
+  const confirmPassHost = async () => {
+    const target = memberToPromote
+    if (!target || !session?.user?.id) return
+    setPassingHost(true)
+    setHostError(null)
+    const { error } = await passHost(supabase, partyId, session.user.id, target.user_id)
+    setPassingHost(false)
+    setMemberToPromote(null)
+    if (error) {
+      setHostError(`Could not pass the host: ${error}`)
+      return
+    }
+    touchParty(supabase, partyId)
+    await getParty(session)
   }
 
   // Aggregate the party's votes into a per-game tally.
@@ -870,8 +894,13 @@ export default function PartyPage() {
           <div className="w-full md:w-96">
             <Card className="bg-white/5 backdrop-blur-md border border-white/20 hover:border-purple-300 transition-all duration-300 p-6 rounded-xl shadow-lg">
               <h2 className="text-2xl font-bold text-white mb-4">Party Members</h2>
+              {hostError && (
+                <p className="mb-4 text-sm font-medium text-red-300">{hostError}</p>
+              )}
               <div className="space-y-4">
-                {members.map((member) => (
+                {members.map((member) => {
+                  const isHostMember = member.user_id === party?.created_by
+                  return (
                   <div
                     key={member.id}
                     className="flex items-center justify-between p-4 bg-white/10 rounded-lg"
@@ -887,27 +916,42 @@ export default function PartyPage() {
                           {member.user?.username || member.user?.email || 'Unknown User'}
                         </h3>
                         <p className="text-sm text-gray-300">
-                          {member.role === 'leader' ? 'Party Leader' : 'Member'}
+                          {isHostMember ? 'Party Leader' : 'Member'}
                           {member.user_id === session?.user?.id && ' (You)'}
                         </p>
                       </div>
                     </div>
-                    {isLeader && member.role !== 'leader' && (
-                      <Button
-                        onClick={async () => {
-                          await supabase
-                            .from('party_members')
-                            .delete()
-                            .eq('id', member.id)
-                        }}
-                        variant="ghost"
-                        className="bg-red-500/20 hover:bg-red-500/30 text-red-300 hover:text-white"
-                      >
-                        Kick
-                      </Button>
+                    {isLeader && !isHostMember && (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          onClick={() => {
+                            setHostError(null)
+                            setMemberToPromote(member)
+                          }}
+                          variant="ghost"
+                          disabled={passingHost}
+                          className="bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-200 hover:text-white"
+                        >
+                          <Crown className="h-4 w-4 mr-1" />
+                          Pass host
+                        </Button>
+                        <Button
+                          onClick={async () => {
+                            await supabase
+                              .from('party_members')
+                              .delete()
+                              .eq('id', member.id)
+                          }}
+                          variant="ghost"
+                          className="bg-red-500/20 hover:bg-red-500/30 text-red-300 hover:text-white"
+                        >
+                          Kick
+                        </Button>
+                      </div>
                     )}
                   </div>
-                ))}
+                  )
+                })}
                 
                 {members.length < party?.max_players && (
                   <div className="text-center text-gray-400">
@@ -926,6 +970,15 @@ export default function PartyPage() {
           </div>
         </div>
       </div>
+
+      <ConfirmationModal
+        isOpen={memberToPromote !== null}
+        onClose={() => setMemberToPromote(null)}
+        onConfirm={() => { void confirmPassHost() }}
+        title="Pass host"
+        message={`Make ${memberToPromote?.user?.username || memberToPromote?.user?.email || 'this member'} the host? They get the host controls and you stay in the party as a member.`}
+        confirmButtonText={passingHost ? 'Passing...' : 'Pass host'}
+      />
 
       <PartyInactivityWarning
         partyId={partyId}

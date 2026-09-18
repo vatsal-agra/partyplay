@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
+import { leaveParty } from "@/lib/partyHost"
 import { Plus, Trash2, Users, Lock, Unlock, RefreshCw, Loader2, Group, LogOut, Copy, Check, Link2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -237,7 +238,8 @@ export default function PartyManager() {
     }
   }
 
-  // Leave a party
+  // Leave a party. If the leaver is the host and somebody else is still
+  // seated, the host role moves on first so the party is never left ownerless.
   const handleLeaveParty = async (partyId: string) => {
     if (!confirm("Are you sure you want to leave this party?")) return
 
@@ -246,14 +248,13 @@ export default function PartyManager() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.user?.id) return
 
-      const { error } = await supabase
-        .from('party_members')
-        .delete()
-        .eq('party_id', partyId)
-        .eq('user_id', session.user.id)
+      const result = await leaveParty(supabase, partyId, session.user.id)
+      if (result.error) throw new Error(result.error)
 
-      if (error) throw error
       await fetchUserParty()
+      if (result.outcome === "handed-off") {
+        alert("You left the party. The host role passed to the longest-seated member.")
+      }
     } catch (error: any) {
       alert(`Failed to leave party: ${error.message}`)
     } finally {
@@ -440,23 +441,41 @@ export default function PartyManager() {
                       </p>
                       {renderShareRow(party)}
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-9 w-9 text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        handleDelete(party.id)
-                      }}
-                      disabled={isDeleting === party.id}
-                    >
-                      {isDeleting === party.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-4 w-4" />
-                      )}
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      {/* Leaving a party you host passes the host on, so there
+                          is a way out that does not end it for everyone. */}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Leave this party"
+                        className="h-9 w-9 text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          handleLeaveParty(party.id)
+                        }}
+                      >
+                        <LogOut className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Delete this party"
+                        className="h-9 w-9 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          handleDelete(party.id)
+                        }}
+                        disabled={isDeleting === party.id}
+                      >
+                        {isDeleting === party.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 </motion.div>
               ))}
