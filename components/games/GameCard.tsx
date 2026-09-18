@@ -60,12 +60,6 @@ export function GameCard({
           width={400}
           height={250}
           className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement
-            target.onerror = null
-            target.src = `https://via.placeholder.com/400x250/1a1430/ffffff?text=${encodeURIComponent(name)}`
-          }}
-          priority
         />
         <div className="absolute inset-0 bg-gradient-to-t from-card via-card/20 to-transparent" />
 

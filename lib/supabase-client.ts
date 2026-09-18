@@ -6,9 +6,20 @@ const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-ke
 
 export const supabase = createClient(supabaseUrl, supabaseKey)
 
+let browserClient: ReturnType<typeof createClientComponentClient> | null = null
+
 export function getSupabaseBrowserClient() {
-  return createClientComponentClient({
-    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder-project.supabase.co",
-    supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-key",
-  })
+  if (typeof window === "undefined") {
+    return createClientComponentClient({
+      supabaseUrl,
+      supabaseKey,
+    })
+  }
+  if (!browserClient) {
+    browserClient = createClientComponentClient({
+      supabaseUrl,
+      supabaseKey,
+    })
+  }
+  return browserClient
 }

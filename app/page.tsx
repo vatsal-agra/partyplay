@@ -137,35 +137,23 @@ export default function Home() {
             >
               <div className="relative h-[380px] w-full max-w-[480px] mx-auto">
                 <div className="absolute -inset-6 bg-brand opacity-20 blur-3xl rounded-full" />
-                {GAMES_CATALOG.map((game, index) => (
-                  <motion.div
-                    key={game.id}
-                    className="absolute inset-0 rounded-3xl overflow-hidden border border-white/10 shadow-soft"
-                    initial={false}
-                    animate={{
-                      opacity: index === currentImageIndex ? 1 : 0,
-                      scale: index === currentImageIndex ? 1 : 0.92,
-                      zIndex: index === currentImageIndex ? 10 : 0,
-                    }}
-                    transition={{ duration: 0.7, ease: "easeInOut" }}
-                  >
+                <div className="absolute inset-0 rounded-3xl overflow-hidden border border-white/10 shadow-soft">
                     <Image
-                      src={game.image}
-                      alt={game.name}
+                      src={GAMES_CATALOG[currentImageIndex].image}
+                      alt={GAMES_CATALOG[currentImageIndex].name}
                       fill
                       sizes="(max-width: 768px) 90vw, 480px"
                       style={{ objectFit: "cover" }}
-                      priority={index === 0}
+                      priority
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-background/85 via-transparent to-transparent" />
                     <div className="absolute inset-x-0 bottom-0 flex flex-wrap items-center gap-2 p-5">
                       <span className="rounded-full bg-mint-500/25 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-white ring-1 ring-mint-500/50">
                         Playable now
                       </span>
-                      <span className="font-display text-lg font-bold text-white drop-shadow">{game.name}</span>
+                      <span className="font-display text-lg font-bold text-white drop-shadow">{GAMES_CATALOG[currentImageIndex].name}</span>
                     </div>
-                  </motion.div>
-                ))}
+                </div>
 
                 <motion.div
                   className="absolute -bottom-6 -right-4 z-20 grid place-items-center rounded-2xl bg-brand p-5 shadow-glow-grape"

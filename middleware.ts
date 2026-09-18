@@ -14,7 +14,15 @@ export async function middleware(req: NextRequest) {
   if (req.nextUrl.pathname.startsWith("/api/shop/")) return res
   const supabase = createMiddlewareClient({ req, res })
   // Touching the session triggers a refresh + Set-Cookie on the response.
-  await supabase.auth.getSession()
+  // Cap wait so a slow/blocked Supabase never freezes every navigation.
+  try {
+    await Promise.race([
+      supabase.auth.getSession(),
+      new Promise<void>((resolve) => setTimeout(resolve, 400)),
+    ])
+  } catch {
+    // Best-effort refresh. Pages still render without a rotated cookie.
+  }
   return res
 }
 
