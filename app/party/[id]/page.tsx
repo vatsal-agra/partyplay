@@ -25,6 +25,29 @@ declare global {
   }
 }
 
+// Chat stamps: a quiet local time on the line, the full local datetime on hover.
+function chatTime(iso: string) {
+  return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+}
+
+function chatTimeFull(iso: string) {
+  return new Date(iso).toLocaleString()
+}
+
+// Consecutive lines from the same person inside the same minute read cleaner
+// with a single stamp on the first of them.
+function sameMinute(a: string, b: string) {
+  const x = new Date(a)
+  const y = new Date(b)
+  return (
+    x.getFullYear() === y.getFullYear() &&
+    x.getMonth() === y.getMonth() &&
+    x.getDate() === y.getDate() &&
+    x.getHours() === y.getHours() &&
+    x.getMinutes() === y.getMinutes()
+  )
+}
+
 function LoadingSpinner() {
   return (
     <div className="flex items-center justify-center min-h-screen">
@@ -847,22 +870,36 @@ export default function PartyPage() {
               <h2 className="text-2xl font-bold text-white mb-4">Party Chat</h2>
               <div className="space-y-4">
                 <div className="h-64 overflow-y-auto border border-white/20 p-4 rounded-lg bg-white/5">
-                  {messages.map((message) => (
-                    <div key={message.id} className="flex items-start gap-3 mb-4">
-                      <div className="w-8 h-8 rounded-full bg-brand flex items-center justify-center">
-                        <span className="text-white font-bold">
-                          {message.user.email[0].toUpperCase()}
-                        </span>
+                  {messages.map((message, i) => {
+                    const prev = i > 0 ? messages[i - 1] : null
+                    const stacked =
+                      !!prev &&
+                      prev.user_id === message.user_id &&
+                      sameMinute(prev.created_at, message.created_at)
+                    return (
+                      <div key={message.id} className="flex items-start gap-3 mb-4">
+                        <div className="w-8 h-8 rounded-full bg-brand flex items-center justify-center">
+                          <span className="text-white font-bold">
+                            {message.user.email[0].toUpperCase()}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="text-white mb-1 flex items-baseline gap-2">
+                            <span>{message.user.email}</span>
+                            {!stacked && (
+                              <span
+                                className="text-xs text-gray-400"
+                                title={chatTimeFull(message.created_at)}
+                              >
+                                {chatTime(message.created_at)}
+                              </span>
+                            )}
+                          </p>
+                          <p className="text-gray-300">{message.content}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-white mb-1">{message.user.email}</p>
-                        <p className="text-gray-300">{message.content}</p>
-                        <p className="text-xs text-gray-400 mt-1">
-                          {new Date(message.created_at).toLocaleTimeString()}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                   {messages.length === 0 && (
                     <div className="text-gray-300 text-center py-4">
                       No messages yet...
