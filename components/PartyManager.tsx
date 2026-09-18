@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
+import { joinPartyByCode } from "@/lib/join-party"
 import { leaveParty } from "@/lib/partyHost"
 import { Plus, Trash2, Users, Lock, Unlock, RefreshCw, Loader2, Group, LogOut, Copy, Check, Link2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -163,84 +164,15 @@ export default function PartyManager({ showJumpBackIn = false }: { showJumpBackI
   // Join a party using a 6-character code
   const handleJoinParty = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!joinCode.trim() || joinCode.length < 6) {
-      setJoinError("Please enter a valid 6-character party code.")
-      return
-    }
+    if (isJoining) return
 
     try {
       setIsJoining(true)
       setJoinError(null)
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.user?.id) {
-        setJoinError("You must be signed in to join a party.")
-        return
-      }
-
-      const userId = session.user.id
-      const cleanCode = joinCode.trim().toUpperCase()
-
-      // Fetch all parties to find the matching one by checking substring(0, 6)
-      const { data: allActiveParties, error: fetchPartiesError } = await supabase
-        .from('parties')
-        .select('*')
-
-      if (fetchPartiesError) throw fetchPartiesError
-
-      const targetParty = allActiveParties?.find(
-        (p: Party) => p.id.substring(0, 6).toUpperCase() === cleanCode
-      )
-
-      if (!targetParty) {
-        setJoinError("Party not found. Please check the code and try again.")
-        return
-      }
-
-      // Check if user is already a member
-      const { data: existingMember, error: memberCheckError } = await supabase
-        .from('party_members')
-        .select('*')
-        .eq('party_id', targetParty.id)
-        .eq('user_id', userId)
-        .maybeSingle()
-
-      if (memberCheckError) throw memberCheckError
-
-      if (existingMember) {
-        // Already a member, redirect
-        router.push(`/party/${targetParty.id}`)
-        return
-      }
-
-      // Check member count
-      const { count, error: countError } = await supabase
-        .from('party_members')
-        .select('*', { count: 'exact', head: true })
-        .eq('party_id', targetParty.id)
-
-      if (countError) throw countError
-
-      const currentCount = count || 0
-      if (currentCount >= targetParty.max_players) {
-        setJoinError("This party is already full.")
-        return
-      }
-
-      // Join the party
-      const { error: joinError } = await supabase
-        .from('party_members')
-        .insert({
-          party_id: targetParty.id,
-          user_id: userId,
-          role: 'member',
-          joined_at: new Date().toISOString()
-        })
-
-      if (joinError) throw joinError
-
+      const partyId = await joinPartyByCode(supabase, joinCode)
       setJoinCode("")
       await fetchUserParty()
-      router.push(`/party/${targetParty.id}`)
+      router.push(`/party/${partyId}`)
     } catch (error: any) {
       console.error("Error joining party:", error)
       setJoinError(error.message || "Failed to join party. Please try again.")
