@@ -4,6 +4,7 @@ import { Plus_Jakarta_Sans, Playfair_Display } from "next/font/google"
 import "./globals.css"
 import { Providers } from "./providers"
 import { MainNav } from "@/components/MainNav"
+import { LegalFooter } from "@/components/LegalFooter"
 import { FeedbackWidget } from "@/components/FeedbackWidget"
 import { MobileGate } from "@/components/MobileGate"
 import { Toaster } from "sonner"
@@ -87,6 +88,7 @@ export default function RootLayout({
             {children}
             <Toaster position="top-right" richColors theme="dark" />
           </main>
+          <LegalFooter />
           <FeedbackWidget />
           <MobileGate />
         </Providers>

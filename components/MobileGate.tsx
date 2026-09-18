@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { Laptop, TabletSmartphone } from "lucide-react"
 
 // Dice Alley's 3D tables need real screen real-estate + a precise pointer, so
@@ -8,6 +10,7 @@ import { Laptop, TabletSmartphone } from "lucide-react"
 // Detection: a coarse pointer (touch) AND a small shortest-viewport-edge —
 // phones are ~360–430px on their short edge in any orientation, tablets ~768+.
 export function MobileGate() {
+  const pathname = usePathname()
   const [blocked, setBlocked] = useState(false)
 
   useEffect(() => {
@@ -25,7 +28,7 @@ export function MobileGate() {
     }
   }, [])
 
-  if (!blocked) return null
+  if (!blocked || pathname === "/privacy" || pathname === "/terms") return null
 
   return (
     <div className="fixed inset-0 z-[999] flex items-center justify-center bg-[#140d07] p-6 text-center">
@@ -48,6 +51,10 @@ export function MobileGate() {
           screen and your game night&apos;s ready to roll. 🎲
         </p>
         <p className="mt-4 text-[11px] uppercase tracking-widest text-white/35">A mobile app is on the roadmap</p>
+        <nav aria-label="Legal" className="mt-6 flex justify-center gap-6 text-xs text-white/60">
+          <Link href="/privacy" className="underline underline-offset-4 hover:text-white">Privacy</Link>
+          <Link href="/terms" className="underline underline-offset-4 hover:text-white">Terms</Link>
+        </nav>
       </div>
     </div>
   )
