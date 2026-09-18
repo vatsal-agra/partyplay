@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 import { joinPartyByCode } from "@/lib/join-party"
 import { leaveParty } from "@/lib/partyHost"
+import { pickLatestParty } from "@/lib/activeParty"
 import { Plus, Trash2, Users, Lock, Unlock, RefreshCw, Loader2, Group, LogOut, Copy, Check, Link2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -144,15 +145,7 @@ export default function PartyManager({ showJumpBackIn = false }: { showJumpBackI
 
       setParties(hosted || [])
       setJoinedParties(joined)
-      const joinedAt = new Map<string, string>(
-        (membershipData || []).map(m => [m.party_id, m.joined_at])
-      )
-      const candidates = [
-        ...(hosted || []).map(party => ({ party, timestamp: party.created_at })),
-        ...joined.map(party => ({ party, timestamp: joinedAt.get(party.id) || party.created_at }))
-      ]
-      candidates.sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
-      setLastParty(candidates[0]?.party || null)
+      setLastParty(pickLatestParty(hosted || [], joined, membershipData || []))
     } catch (error: any) {
       console.error("Error in fetchUserParty:", error)
       setJoinError(`Failed to load parties: ${error.message}`)

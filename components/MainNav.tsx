@@ -5,9 +5,10 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "./ui/button"
-import { Home, Gamepad2, LogIn, LogOut, UserPlus, Dice5, ShoppingBag, Volume2, VolumeX } from "lucide-react"
+import { Home, Gamepad2, LogIn, LogOut, UserPlus, Dice5, ShoppingBag, Volume2, VolumeX, Users } from "lucide-react"
 import { isSfxMuted, toggleSfxMuted, onSfxMutedChange } from "@/lib/sfx"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
+import { useActiveParty } from "@/lib/activeParty"
 import { InstallPrompt } from "./InstallPrompt"
 import { useRouter } from "next/navigation"
 
@@ -16,6 +17,7 @@ export function MainNav() {
   const supabase = getSupabaseBrowserClient()
   const router = useRouter()
   const [sfxMuted, setSfxMuted] = useState(false)
+  const activeParty = useActiveParty()
 
   useEffect(() => {
     setSfxMuted(isSfxMuted())
@@ -34,6 +36,17 @@ export function MainNav() {
     { href: "/dashboard/shop", label: "Shop", icon: ShoppingBag },
     { href: "/games", label: "Games", icon: Gamepad2 },
   ]
+
+  // The party link only appears once there is one to go back to, and never on
+  // the party page itself, where it would just point at the current page.
+  const onPartyPage = pathname?.startsWith("/party/") ?? false
+  if (activeParty && !onPartyPage) {
+    navLinks.push({
+      href: `/party/${activeParty.id}`,
+      label: activeParty.name || "Party",
+      icon: Users,
+    })
+  }
 
   return (
     <>
@@ -65,7 +78,7 @@ export function MainNav() {
                 )}
               >
                 <Icon className="h-4 w-4" />
-                <span className="hidden sm:inline">{label}</span>
+                <span className="hidden max-w-[10rem] truncate sm:inline">{label}</span>
                 {isActive(href) && (
                   <span className="absolute inset-0 -z-10 rounded-xl bg-white/10 ring-1 ring-white/15" />
                 )}
