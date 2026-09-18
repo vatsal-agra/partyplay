@@ -10,6 +10,7 @@ import { Gamepad2, Users, MessageSquare, Zap, Trophy, Vote, Sparkles, ArrowRight
 import { GAMES_CATALOG, gamePath } from "@/lib/games-catalog"
 import { FloatingPieces } from "@/components/FloatingPieces"
 import { LandingJsonLd } from "@/components/LandingJsonLd"
+import { LandingJoin } from "@/components/LandingJoin"
 
 const fadeIn = {
   hidden: { opacity: 0, y: 24 },
@@ -104,6 +105,8 @@ export default function Home() {
                   <Link href="/auth/sign-in">Play as guest</Link>
                 </Button>
               </motion.div>
+
+              <LandingJoin />
 
               <motion.p className="mt-4 text-sm text-muted-foreground" variants={fadeIn}>
                 Free forever. Guests just pick a name, no account and no card.{" "}
