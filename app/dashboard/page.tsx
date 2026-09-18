@@ -216,7 +216,7 @@ export default function Dashboard() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4, duration: 0.5 }}
           >
-            <PartyManager />
+            <PartyManager showJumpBackIn />
             {session?.user?.id && <OpenPartiesBoard client={supabaseClient} userId={session.user.id} />}
           </motion.div>
           
