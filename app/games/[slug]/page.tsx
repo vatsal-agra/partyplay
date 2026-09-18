@@ -12,8 +12,9 @@ import { evaluateAchievements, recordAchievements } from "@/lib/achievements"
 import { GameOverScreen } from "@/components/GameOverScreen"
 import { VoiceChat } from "@/components/VoiceChat"
 import { playSfx, eventForLogLine, isSfxMuted, toggleSfxMuted, onSfxMutedChange } from "@/lib/sfx"
+import { canAskForTurnNotifications, notifyYourTurn, requestTurnNotifications } from "@/lib/turnNotify"
 import { toast } from "sonner"
-import { Eye, Volume2, VolumeX } from "lucide-react"
+import { Bell, Eye, Volume2, VolumeX } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
@@ -204,6 +205,29 @@ export default function GamePlayPage() {
     document.title = isMyTurn ? TURN_TITLE : base
     return () => { document.title = base }
   }, [isMyTurn])
+
+  // ---- "Your turn" desktop notification ------------------------------------
+  // Same problem as the tab title, one step further out: the player may not be
+  // in this browser at all. Fires once per rising edge of isMyTurn and only
+  // while the tab is hidden — if they're watching the board they can already
+  // see it's their move. Silent unless they opted in via the bell below.
+  const [canOfferNotify, setCanOfferNotify] = useState(false)
+  const wasMyTurnRef = useRef(false)
+  useEffect(() => {
+    const rising = isMyTurn && !wasMyTurnRef.current
+    wasMyTurnRef.current = isMyTurn
+    if (rising && document.hidden) notifyYourTurn(gameData?.name || DEFAULT_TITLE)
+  }, [isMyTurn, gameData?.name])
+
+  // Permission has to be asked for from a user gesture, so the offer is a
+  // button rather than something we spring on the player mid-turn. It only
+  // appears while asking is still possible: not yet granted, not yet denied.
+  useEffect(() => { setCanOfferNotify(canAskForTurnNotifications()) }, [])
+  const enableTurnNotifications = useCallback(async () => {
+    const result = await requestTurnNotifications()
+    setCanOfferNotify(canAskForTurnNotifications())
+    if (result === "granted") toast.success("We'll let you know when it's your turn")
+  }, [])
 
   // ---- Sound effects + floating event animations ---------------------------
   const [sfxMuted, setSfxMutedState] = useState(false)
@@ -1235,6 +1259,17 @@ export default function GamePlayPage() {
                   >
                     {sfxMuted ? <VolumeX className="w-4 h-4 text-white/60" /> : <Volume2 className="w-4 h-4 text-aqua-400" />}
                   </Button>
+                  {canOfferNotify && (
+                    <Button
+                      onClick={enableTurnNotifications}
+                      variant="outline"
+                      title="Notify me when it is my turn"
+                      aria-label="Notify me when it is my turn"
+                      className="text-white border-white/20 hover:bg-white/10 px-2.5"
+                    >
+                      <Bell className="w-4 h-4 text-aqua-400" />
+                    </Button>
+                  )}
                   <Button
                     onClick={() => setShowRules(true)}
                     variant="outline"
