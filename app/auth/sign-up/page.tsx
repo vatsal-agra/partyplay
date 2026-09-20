@@ -2,6 +2,7 @@
 
 import { Button } from "../../../components/ui/button"
 import { Input } from "../../../components/ui/input"
+import { PasswordField } from "../../../components/ui/password-field"
 import { Label } from "../../../components/ui/label"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
@@ -200,7 +201,7 @@ export default function SignUpPage() {
                 </div>
               )}
             </div>
-            <p className="text-xs mt-1 text-muted-foreground">
+            <p role={usernameAvailable === false ? "alert" : undefined} className="text-xs mt-1 text-muted-foreground">
               {usernameAvailable === true ? 'Username is available' : 
                usernameAvailable === false ? 'Username is already taken' : 
                'Choose a unique username'}
@@ -208,9 +209,10 @@ export default function SignUpPage() {
           </div>
           <div>
             <Label htmlFor="password">Password</Label>
-            <Input
+            <PasswordField
               id="password"
-              type="password"
+              label="password"
+              autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -218,16 +220,17 @@ export default function SignUpPage() {
           </div>
           <div>
             <Label htmlFor="confirm-password">Confirm Password</Label>
-            <Input
+            <PasswordField
               id="confirm-password"
-              type="password"
+              label="confirm password"
+              autoComplete="new-password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
             />
           </div>
           {error && (
-            <p className="rounded-lg bg-destructive/15 px-3 py-2 text-sm text-destructive">{error}</p>
+            <p role="alert" className="rounded-lg bg-destructive/15 px-3 py-2 text-sm text-destructive">{error}</p>
           )}
           <Button type="submit" variant="brand" className="w-full" size="lg" disabled={loading}>
             {loading ? "Creating account..." : "Create account"}
@@ -250,9 +253,9 @@ export default function SignUpPage() {
           Continue with Google
         </Button>
 
-        {/* Guest play — no signup needed */}
+        {/* Guest play - no signup needed */}
         <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-          <p className="mb-2 text-xs font-medium text-white/70">Just want to jump in? Play as a guest — pick a name.</p>
+          <p className="mb-2 text-xs font-medium text-white/70">Just want to jump in? Play as a guest - pick a name.</p>
           <div className="flex gap-2">
             <Input
               placeholder="Your name"
