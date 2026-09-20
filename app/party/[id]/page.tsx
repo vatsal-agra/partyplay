@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
-import { Copy, Check, Share2, ArrowLeft, ArrowDown, Crown, Trophy, Vote as VoteIcon, Rocket, LogOut, Keyboard } from "lucide-react"
+import { Copy, Check, Share2, ArrowLeft, ArrowDown, Crown, Trophy, Vote as VoteIcon, Rocket, LogOut, Keyboard, RefreshCw, WifiOff } from "lucide-react"
 import { useRouter, useParams } from "next/navigation"
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Image from "next/image";
@@ -16,6 +16,12 @@ import { touchParty } from "@/lib/partyActivity";
 import { passHost, leaveParty } from "@/lib/partyHost";
 import { partyInitial, partyLabel } from "@/lib/partyLabel";
 import { usePartyPresence } from "@/lib/usePartyPresence";
+import {
+  INITIAL_PARTY_CONNECTION,
+  channelStateFromStatus,
+  partyConnectionStatus,
+  type PartyConnection,
+} from "@/lib/partyConnection";
 import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
 import type { Session } from "@supabase/auth-helpers-nextjs";
 import type { RealtimeChannel } from "@supabase/supabase-js";
@@ -138,6 +144,17 @@ export default function PartyPage() {
   // Last known party status — so only a genuine transition INTO "ready" (a fresh
   // launch) auto-redirects, not an in-progress "playing"/"ready" heartbeat.
   const prevPartyStatusRef = useRef<string | null>(null);
+  // Realtime health for the party channel, shown as a quiet banner only when
+  // something is actually wrong.
+  const [connection, setConnection] = useState<PartyConnection>(INITIAL_PARTY_CONNECTION);
+  const partyChannelRef = useRef<RealtimeChannel | null>(null);
+  // Keeps the manual Retry and the automatic retry-on-online from racing each
+  // other into two channels for one party.
+  const recoveringRef = useRef(false);
+  // The session as of the latest render, for recovery that starts from a
+  // browser event rather than from a render.
+  const sessionRef = useRef<Session | null>(null);
+  sessionRef.current = session;
   const supabase = getSupabaseBrowserClient()
   // Who else has this same party page open right now.
   const onlineUserIds = usePartyPresence(supabase, partyId, session?.user?.id)
@@ -424,9 +441,9 @@ export default function PartyPage() {
     }
   }, [partyId, supabase])
 
-  const getParty = async (session: any) => {
+  const getParty = async (session: any, silent = false) => {
     try {
-      setLoading(true)
+      if (!silent) setLoading(true)
       
       // Fetch party data
       const { data: partyData, error: partyError } = await supabase
@@ -552,8 +569,8 @@ export default function PartyPage() {
       setIsLeader(session?.user?.id === partyData?.created_by)
       
       // Subscribe to real-time updates if not already subscribed
-      if (!window.partyChannel) {
-        window.partyChannel = supabase
+      if (!partyChannelRef.current && !window.partyChannel) {
+        const channel = supabase
           .channel(`party-updates-${partyId}`)
           .on('postgres_changes', {
             event: '*',
@@ -607,7 +624,23 @@ export default function PartyPage() {
             console.log('Received game_launch broadcast:', payload)
             router.push(gamePath(payload.gameId || 'monopoly', `?partyId=${partyId}`))
           })
-          .subscribe()
+
+        // Publish the channel before subscribing, so the very first lifecycle
+        // callback already recognises it as the current one.
+        partyChannelRef.current = channel
+        window.partyChannel = channel
+        setConnection((current) => ({ ...current, channel: 'subscribing' }))
+        channel.subscribe((status) => {
+          // Anything reported by a channel we have already torn down (the
+          // CLOSED that every unsubscribe emits, for one) is not news.
+          if (partyChannelRef.current !== channel) return
+          const next = channelStateFromStatus(status)
+          setConnection((current) => ({
+            ...current,
+            channel: next,
+            lastError: next === 'subscribed' ? null : current.lastError,
+          }))
+        })
       }
 
       // Shared launch channel — same one the games page uses, so a launch from
@@ -621,25 +654,78 @@ export default function PartyPage() {
           .subscribe()
       }
     } catch (err) {
-      setError(err.message)
+      // A failed recovery keeps the lobby on screen and reports itself in the
+      // connection banner, rather than replacing the page with an error.
+      if (silent) {
+        setConnection((current) => ({ ...current, lastError: `Could not refresh the party: ${err.message}.` }))
+      } else {
+        setError(err.message)
+      }
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }
 
-  // Cleanup on unmount
+  // Drop the party channel for good. Supabase keeps its own registry of open
+  // channels, so an unsubscribe alone would leave the old one behind and the
+  // next subscribe would stack a second set of listeners on the same party.
+  const teardownPartyChannel = useCallback(() => {
+    const channel = partyChannelRef.current ?? window.partyChannel ?? null
+    partyChannelRef.current = null
+    if (window.partyChannel) delete window.partyChannel
+    if (channel) supabase.removeChannel(channel)
+  }, [supabase])
+
+  // Re-fetch the lobby and rebuild the subscription from scratch. Used by the
+  // Retry button and by the browser coming back online.
+  const recoverConnection = async () => {
+    const activeSession = sessionRef.current
+    if (recoveringRef.current || !activeSession) return
+    recoveringRef.current = true
+    setConnection((current) => ({ ...current, recovering: true, lastError: null }))
+    teardownPartyChannel()
+    try {
+      await getParty(activeSession, true)
+    } finally {
+      recoveringRef.current = false
+      setConnection((current) => ({ ...current, recovering: false }))
+    }
+  }
+  // The listeners below outlive any one render, so they reach recovery through
+  // a ref rather than closing over a stale copy of it.
+  const recoverRef = useRef(recoverConnection)
+  recoverRef.current = recoverConnection
+
+  // Browser connectivity. Coming back online attempts recovery once.
+  useEffect(() => {
+    const sync = (online: boolean) =>
+      setConnection((current) => (current.online === online ? current : { ...current, online }))
+    sync(navigator.onLine)
+    const handleOnline = () => {
+      sync(true)
+      void recoverRef.current()
+    }
+    const handleOffline = () => sync(false)
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [partyId])
+
+  // Cleanup on unmount, and whenever the page moves to a different party, so
+  // the next party never inherits the previous one's channels.
   useEffect(() => {
     return () => {
-      if (window.partyChannel) {
-        window.partyChannel.unsubscribe()
-        delete window.partyChannel
-      }
+      teardownPartyChannel()
       if (launchChannelRef.current) {
         supabase.removeChannel(launchChannelRef.current)
         launchChannelRef.current = null
       }
+      setConnection(INITIAL_PARTY_CONNECTION)
     }
-  }, [supabase])
+  }, [supabase, partyId, teardownPartyChannel])
 
   // Host launches the winning game (or their chosen game on a tie).
   const launchGame = async (gameId: string) => {
@@ -664,6 +750,8 @@ export default function PartyPage() {
       setLaunching(false)
     }
   }
+
+  const connectionStatus = partyConnectionStatus(connection)
 
   if (loading) {
     return <LoadingSpinner />
@@ -785,6 +873,44 @@ export default function PartyPage() {
         </div>
         {leaveError && (
           <p className="mb-6 text-sm font-medium text-red-300">{leaveError}</p>
+        )}
+
+        {/* Connection banner: silent while the channel is healthy, and never
+            blocking when it is not. */}
+        {connectionStatus && (
+          <div
+            role={connectionStatus.role}
+            aria-live={connectionStatus.role === "alert" ? "assertive" : "polite"}
+            className={`mb-6 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border px-4 py-2.5 text-sm ${
+              connectionStatus.tone === "dropped"
+                ? "border-red-400/30 bg-red-500/10 text-red-100"
+                : "border-white/15 bg-white/5 text-white/75"
+            }`}
+          >
+            {connectionStatus.tone === "offline" ? (
+              <WifiOff className="h-4 w-4 shrink-0" aria-hidden="true" />
+            ) : (
+              <RefreshCw
+                className={`h-4 w-4 shrink-0 ${connectionStatus.tone === "reconnecting" ? "animate-spin" : ""}`}
+                aria-hidden="true"
+              />
+            )}
+            <span>
+              <span className="font-semibold">{connectionStatus.title}.</span>{" "}
+              {connectionStatus.message}
+            </span>
+            {connectionStatus.canRetry && (
+              <Button
+                variant="ghost"
+                size="sm"
+                type="button"
+                className="ml-auto bg-white/10 text-white hover:bg-white/20"
+                onClick={() => { void recoverConnection() }}
+              >
+                Retry
+              </Button>
+            )}
+          </div>
         )}
 
         <div className="flex flex-col md:flex-row gap-8">
