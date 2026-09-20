@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
-import { Copy, Check, Share2, ArrowLeft, ArrowDown, Crown, Trophy, Vote as VoteIcon, Rocket, LogOut } from "lucide-react"
+import { Copy, Check, Share2, ArrowLeft, ArrowDown, Crown, Trophy, Vote as VoteIcon, Rocket, LogOut, Keyboard } from "lucide-react"
 import { useRouter, useParams } from "next/navigation"
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Image from "next/image";
@@ -52,6 +52,17 @@ function sameMinute(a: string, b: string) {
     x.getDate() === y.getDate() &&
     x.getHours() === y.getHours() &&
     x.getMinutes() === y.getMinutes()
+  )
+}
+
+// Page shortcuts stay out of the way of anything that takes typed input, so a
+// stray "c" in the chat box or a confirmation dialog never triggers them.
+function isTypingTarget(target: EventTarget | null) {
+  const el = target as HTMLElement | null
+  if (!el || typeof el.closest !== "function") return false
+  if (el.isContentEditable) return true
+  return !!el.closest(
+    'input, textarea, select, dialog, [role="dialog"], [aria-modal="true"], [contenteditable=""], [contenteditable="true"]'
   )
 }
 
@@ -118,6 +129,9 @@ export default function PartyPage() {
   const chatAtBottomRef = useRef(true);
   const chatSeenCountRef = useRef(0);
   const didInitialChatScrollRef = useRef(false);
+  // Keyboard shortcuts: the chat box to focus, and the hint panel's open state.
+  const chatInputRef = useRef<HTMLInputElement | null>(null);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const launchChannelRef = useRef<RealtimeChannel | null>(null);
   const unreadChatCountRef = useRef(0);
   const originalTitleRef = useRef<string | null>(null);
@@ -127,6 +141,67 @@ export default function PartyPage() {
   const supabase = getSupabaseBrowserClient()
   // Who else has this same party page open right now.
   const onlineUserIds = usePartyPresence(supabase, partyId, session?.user?.id)
+
+  const partyCode = partyId ? partyId.substring(0, 6).toUpperCase() : "------"
+
+  const inviteLink = typeof window !== 'undefined' ? `${window.location.origin}/party/${partyId}` : ''
+  const shareText = `Join my Dice Alley game night! Party code: ${partyCode}`
+
+  const flashCopied = useCallback((what: "code" | "link") => {
+    setCopied(what)
+    setTimeout(() => setCopied((current) => (current === what ? null : current)), 1800)
+  }, [])
+
+  const copyPartyCode = () => {
+    navigator.clipboard.writeText(partyCode).then(() => flashCopied("code")).catch(() => {})
+  }
+
+  const copyInviteLink = useCallback(() => {
+    navigator.clipboard
+      .writeText(`${shareText} ${inviteLink}`)
+      .then(() => flashCopied("link"))
+      .catch(() => {})
+  }, [shareText, inviteLink, flashCopied])
+
+  const shareParty = () => {
+    // Native share sheet where it exists (tablets, some laptops), clipboard
+    // everywhere else so the button always does something useful.
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      navigator.share({
+        title: 'Join my Dice Alley game night!',
+        text: shareText,
+        url: inviteLink,
+      }).catch(() => {})
+    } else {
+      copyInviteLink()
+    }
+  }
+
+  // Party shortcuts: "c" jumps to the chat box, "i" copies the invite link.
+  // A held modifier, a repeat, a typing target or an open confirmation keeps
+  // them quiet, so Enter-to-send and the game hotkeys are untouched.
+  const dialogOpen = memberToPromote !== null || memberToKick !== null || confirmingLeave
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return
+      if (event.defaultPrevented) return
+      if (event.key === "Escape") {
+        setShortcutsOpen(false)
+        return
+      }
+      if (dialogOpen || isTypingTarget(event.target)) return
+      const key = event.key.toLowerCase()
+      if (key === "c") {
+        event.preventDefault()
+        chatInputRef.current?.focus()
+      } else if (key === "i") {
+        event.preventDefault()
+        copyInviteLink()
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [dialogOpen, copyInviteLink])
 
   const handleGuestJoin = async () => {
     setGuestLoading(true);
@@ -631,38 +706,6 @@ export default function PartyPage() {
     return <ErrorMessage message="Party not found" />
   }
 
-  const partyCode = partyId ? partyId.substring(0, 6).toUpperCase() : "------"
-
-  const inviteLink = typeof window !== 'undefined' ? `${window.location.origin}/party/${partyId}` : ''
-  const shareText = `Join my Dice Alley game night! Party code: ${partyCode}`
-
-  const flashCopied = (what: "code" | "link") => {
-    setCopied(what)
-    setTimeout(() => setCopied((current) => (current === what ? null : current)), 1800)
-  }
-
-  const copyPartyCode = () => {
-    navigator.clipboard.writeText(partyCode).then(() => flashCopied("code")).catch(() => {})
-  }
-
-  const copyInviteLink = () => {
-    navigator.clipboard.writeText(`${shareText} ${inviteLink}`).then(() => flashCopied("link")).catch(() => {})
-  }
-
-  const shareParty = () => {
-    // Native share sheet where it exists (tablets, some laptops), clipboard
-    // everywhere else so the button always does something useful.
-    if (typeof navigator !== 'undefined' && navigator.share) {
-      navigator.share({
-        title: 'Join my Dice Alley game night!',
-        text: shareText,
-        url: inviteLink,
-      }).catch(() => {})
-    } else {
-      copyInviteLink()
-    }
-  }
-
   // Only somebody actually seated can leave, and what leaving costs depends on
   // whether they are the host and whether anyone else is left behind.
   const isSeated = members.some((m) => m.user_id === session?.user?.id)
@@ -686,20 +729,59 @@ export default function PartyPage() {
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Dashboard
           </Button>
-          {isSeated && (
-            <Button
-              variant="ghost"
-              disabled={leaving}
-              className="bg-red-500/20 hover:bg-red-500/30 text-red-300 hover:text-white"
-              onClick={() => {
-                setLeaveError(null)
-                setConfirmingLeave(true)
-              }}
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              Leave party
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {/* Shortcuts hint: a plain disclosure, never a blocking modal */}
+            <div className="relative">
+              <Button
+                variant="ghost"
+                size="sm"
+                type="button"
+                className="gap-1.5 bg-white/5 text-white/80 hover:bg-white/15 hover:text-white"
+                onClick={() => setShortcutsOpen((open) => !open)}
+                aria-expanded={shortcutsOpen}
+                aria-controls="party-shortcuts-hint"
+              >
+                <Keyboard className="h-4 w-4" />
+                Shortcuts
+              </Button>
+              <div
+                id="party-shortcuts-hint"
+                hidden={!shortcutsOpen}
+                className="absolute right-0 z-40 mt-2 w-56 rounded-xl border border-white/15 bg-black/80 p-3 text-left shadow-soft backdrop-blur-sm"
+              >
+                <p className="text-xs font-semibold uppercase tracking-widest text-white/50">
+                  Keyboard shortcuts
+                </p>
+                <ul className="mt-2 space-y-1.5 text-sm text-white/80">
+                  <li className="flex items-center gap-2">
+                    <kbd className="rounded border border-white/20 bg-white/10 px-1.5 py-0.5 font-mono text-xs text-white">C</kbd>
+                    Chat
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <kbd className="rounded border border-white/20 bg-white/10 px-1.5 py-0.5 font-mono text-xs text-white">I</kbd>
+                    Copy invite
+                  </li>
+                </ul>
+                <p className="mt-2 text-xs text-white/45">
+                  Not while you are typing.
+                </p>
+              </div>
+            </div>
+            {isSeated && (
+              <Button
+                variant="ghost"
+                disabled={leaving}
+                className="bg-red-500/20 hover:bg-red-500/30 text-red-300 hover:text-white"
+                onClick={() => {
+                  setLeaveError(null)
+                  setConfirmingLeave(true)
+                }}
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Leave party
+              </Button>
+            )}
+          </div>
         </div>
         {leaveError && (
           <p className="mb-6 text-sm font-medium text-red-300">{leaveError}</p>
@@ -767,10 +849,12 @@ export default function PartyPage() {
                         Telegram
                       </a>
                     </div>
-                    <p className="mt-2 text-xs text-white/60">
+                    <p className="mt-2 text-xs text-white/60" role="status" aria-live="polite">
                       {copied === "code"
                         ? "Code copied. Paste it in the group chat."
-                        : "Friends can join as guests, no account needed."}
+                        : copied === "link"
+                          ? "Invite link copied. Paste it in the group chat."
+                          : "Friends can join as guests, no account needed."}
                     </p>
                   </div>
                 </div>
@@ -1061,6 +1145,7 @@ export default function PartyPage() {
                 </div>
                 <div className="flex gap-2">
                   <Input
+                    ref={chatInputRef}
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     onKeyDown={(e) => {
