@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
-import { Search, Filter, Gamepad2, Vote as VoteIcon, ArrowRight, Rocket } from "lucide-react"
+import { Search, Filter, Gamepad2, Vote as VoteIcon, ArrowRight, Rocket, Star } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 
 import { GameCard } from "@/components/games/GameCard"
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { PartiesSidebar } from "@/components/PartiesSidebar"
 import { GAMES_CATALOG, gamePath } from "@/lib/games-catalog"
+import { filterGames, readFavorites, saveFavorites, toggleFavorite } from "@/lib/game-favorites"
 import { PartyInactivityWarning } from "@/components/PartyInactivityWarning"
 import { touchParty, cleanupStaleParties } from "@/lib/partyActivity"
 
@@ -41,6 +42,18 @@ export default function GamesPage() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [showFilters, setShowFilters] = useState(false)
+  const [favorites, setFavorites] = useState<Set<string>>(new Set())
+  const [favoritesLoaded, setFavoritesLoaded] = useState(false)
+  const [favoritesOnly, setFavoritesOnly] = useState(false)
+
+  useEffect(() => {
+    setFavorites(readFavorites())
+    setFavoritesLoaded(true)
+  }, [])
+
+  useEffect(() => {
+    if (favoritesLoaded) saveFavorites(favorites)
+  }, [favorites, favoritesLoaded])
   const [games] = useState<Game[]>(GAMES_CATALOG)
   const [activeParty, setActiveParty] = useState<ActiveParty | null>(null)
   const [votes, setVotes] = useState<VoteRow[]>([])
@@ -60,30 +73,11 @@ export default function GamesPage() {
     )
   }, [session])
 
-  // Filter games based on search and filters
-  const filteredGames = useMemo(() => {
-    return games.filter((game) => {
-      const matchesSearch =
-        game.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        game.description.toLowerCase().includes(searchQuery.toLowerCase())
-
-      const matchesPlayers =
-        !filters.players ||
-        (game.minPlayers <= parseInt(filters.players) && game.maxPlayers >= parseInt(filters.players))
-
-      const matchesComplexity = !filters.complexity || game.complexity === filters.complexity
-
-      const matchesDuration =
-        !filters.duration ||
-        (() => {
-          const maxDuration = parseInt(filters.duration) * 30
-          const [minDuration] = game.duration.split("-").map((s) => parseInt(s.trim()))
-          return minDuration <= maxDuration
-        })()
-
-      return matchesSearch && matchesPlayers && matchesComplexity && matchesDuration
-    })
-  }, [games, searchQuery, filters])
+  const filteredGames = useMemo(
+    () => filterGames(games, searchQuery, filters, favorites, favoritesOnly),
+    [games, searchQuery, filters, favorites, favoritesOnly]
+  )
+  const hasFavorites = games.some((game) => favorites.has(game.id))
 
   // ----- Vote tallies -------------------------------------------------------
   const tally = useMemo(() => {
@@ -450,8 +444,8 @@ export default function GamesPage() {
                       : "Browse our collection of board games and start playing with friends"}
                   </p>
                 </div>
-                <div className="flex gap-2 w-full md:w-auto">
-                  <div className="relative flex-1 md:w-64">
+                <div className="flex flex-wrap gap-2 w-full md:w-auto">
+                  <div className="relative flex-1 min-w-40 md:w-64">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <Input
                       type="text"
@@ -468,6 +462,16 @@ export default function GamesPage() {
                   >
                     <Filter className="h-4 w-4" />
                     Filters
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    aria-pressed={favoritesOnly}
+                    onClick={() => setFavoritesOnly((previous) => !previous)}
+                    className={`flex items-center gap-2 border-white/20 text-white ${favoritesOnly ? "bg-grape-500/30 hover:bg-grape-500/40" : "bg-white/10 hover:bg-white/20"}`}
+                  >
+                    <Star aria-hidden="true" className={`h-4 w-4 ${favoritesOnly ? "fill-current" : ""}`} />
+                    Favorites
                   </Button>
                 </div>
               </div>
@@ -531,6 +535,7 @@ export default function GamesPage() {
                           onClick={() => {
                             setFilters({ players: "", complexity: "", duration: "" })
                             setSearchQuery("")
+                            setFavoritesOnly(false)
                           }}
                           className="text-white border-white/50 hover:bg-white/10"
                         >
@@ -545,8 +550,23 @@ export default function GamesPage() {
               {filteredGames.length === 0 ? (
                 <div className="text-center py-12">
                   <Gamepad2 className="mx-auto h-12 w-12 text-gray-300" />
-                  <h3 className="mt-2 text-lg font-medium text-white">No games found</h3>
-                  <p className="mt-1 text-gray-300">Try adjusting your search or filter criteria</p>
+                  <h3 className="mt-2 text-lg font-medium text-white">
+                    {favoritesOnly && !hasFavorites ? "No favorites yet" : "No games found"}
+                  </h3>
+                  <p className="mt-1 text-gray-300">
+                    {favoritesOnly && !hasFavorites
+                      ? "Select the star on a game to add it to your favorites."
+                      : "Try adjusting your search or filter criteria"}
+                  </p>
+                  {favoritesOnly && !hasFavorites && (
+                    <Button className="mt-4" onClick={() => {
+                      setFavoritesOnly(false)
+                      setSearchQuery("")
+                      setFilters({ players: "", complexity: "", duration: "" })
+                    }}>
+                      Browse games
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -557,6 +577,8 @@ export default function GamesPage() {
                       <GameCard
                         key={game.id}
                         game={game}
+                        isFavorite={favorites.has(game.id)}
+                        onToggleFavorite={favoritesLoaded ? () => setFavorites((previous) => toggleFavorite(previous, game.id)) : undefined}
                         onPlay={() => router.push(gamePath(game.id))}
                         isInParty={activeParty?.game_id === game.id}
                         isCreatingParty={false}

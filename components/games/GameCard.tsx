@@ -2,13 +2,15 @@
 
 import { motion, AnimatePresence } from "framer-motion"
 import Image from "next/image"
-import { Crown, Check, ThumbsUp, Users, Clock, Play } from "lucide-react"
+import { Crown, Check, ThumbsUp, Users, Clock, Play, Star } from "lucide-react"
 
 import { Game } from "@/app/types"
 
 type GameCardProps = {
   game: Game
   onPlay: () => void
+  isFavorite?: boolean
+  onToggleFavorite?: () => void
   isInParty: boolean
   isCreatingParty: boolean
   // Voting mode (only active when the viewer is in a party)
@@ -29,6 +31,8 @@ const complexityColor: Record<string, string> = {
 export function GameCard({
   game,
   onPlay,
+  isFavorite = false,
+  onToggleFavorite,
   isInParty,
   isCreatingParty,
   votingEnabled = false,
@@ -103,6 +107,21 @@ export function GameCard({
       </div>
 
       <div className="flex flex-1 flex-col p-4">
+        {onToggleFavorite && (
+          <button
+            type="button"
+            aria-label={`${isFavorite ? "Remove" : "Add"} ${name} ${isFavorite ? "from" : "to"} favorites`}
+            aria-pressed={isFavorite}
+            onClick={(event) => {
+              event.stopPropagation()
+              onToggleFavorite()
+            }}
+            className={`mb-3 inline-flex min-h-10 items-center justify-center gap-2 self-start rounded-lg border border-white/15 px-3 py-2 text-sm transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-grape-300 ${isFavorite ? "text-sunny-400" : "text-white/80"}`}
+          >
+            <Star aria-hidden="true" className={`h-4 w-4 ${isFavorite ? "fill-current" : ""}`} />
+            {isFavorite ? "Favorited" : "Favorite"}
+          </button>
+        )}
         <div className="mb-3 flex flex-wrap items-center gap-2 text-xs font-medium">
           <span className="inline-flex items-center gap-1 rounded-full bg-white/8 px-2.5 py-1 text-white/90">
             <Users className="h-3.5 w-3.5 text-aqua-400" />
