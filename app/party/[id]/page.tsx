@@ -15,6 +15,7 @@ import { playAsGuest } from "@/lib/guest";
 import { touchParty } from "@/lib/partyActivity";
 import { passHost, leaveParty } from "@/lib/partyHost";
 import { partyInitial, partyLabel } from "@/lib/partyLabel";
+import { usePartyPresence } from "@/lib/usePartyPresence";
 import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
 import type { Session } from "@supabase/auth-helpers-nextjs";
 import type { RealtimeChannel } from "@supabase/supabase-js";
@@ -124,6 +125,8 @@ export default function PartyPage() {
   // launch) auto-redirects, not an in-progress "playing"/"ready" heartbeat.
   const prevPartyStatusRef = useRef<string | null>(null);
   const supabase = getSupabaseBrowserClient()
+  // Who else has this same party page open right now.
+  const onlineUserIds = usePartyPresence(supabase, partyId, session?.user?.id)
 
   const handleGuestJoin = async () => {
     setGuestLoading(true);
@@ -1090,6 +1093,10 @@ export default function PartyPage() {
               <div className="space-y-4">
                 {members.map((member) => {
                   const isHostMember = member.user_id === party?.created_by
+                  // Only ever a positive claim. Members we cannot see get no
+                  // badge at all, because a throttled or sleeping tab stops
+                  // heartbeating long before the person actually leaves.
+                  const isOnline = onlineUserIds.has(member.user_id)
                   return (
                   <div
                     key={member.id}
@@ -1102,8 +1109,20 @@ export default function PartyPage() {
                         </span>
                       </div>
                       <div>
-                        <h3 className="font-medium text-white">
+                        <h3 className="flex items-center gap-2 font-medium text-white">
                           {partyLabel(member.user)}
+                          {isOnline && (
+                            <span
+                              className="inline-flex items-center gap-1 rounded-full bg-emerald-400/15 px-2 py-0.5 text-[11px] font-semibold text-emerald-300"
+                              title={`${partyLabel(member.user)} has the party page open`}
+                            >
+                              <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                              Online
+                              <span className="sr-only">
+                                {`, ${partyLabel(member.user)} has the party page open`}
+                              </span>
+                            </span>
+                          )}
                         </h3>
                         <p className="text-sm text-gray-300">
                           {isHostMember ? 'Party Leader' : 'Member'}
