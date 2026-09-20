@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
-import { Copy, Check, Share2, ArrowLeft, Crown, Trophy, Vote as VoteIcon, Rocket, LogOut } from "lucide-react"
+import { Copy, Check, Share2, ArrowLeft, ArrowDown, Crown, Trophy, Vote as VoteIcon, Rocket, LogOut } from "lucide-react"
 import { useRouter, useParams } from "next/navigation"
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Image from "next/image";
@@ -25,6 +25,11 @@ declare global {
     partyChannel?: RealtimeChannel;
   }
 }
+
+// How close to the bottom of the chat scroller still counts as "following
+// along", in pixels. A little slack keeps the pin from breaking on a partly
+// visible last line.
+const CHAT_BOTTOM_SLACK = 64
 
 // Chat stamps: a quiet local time on the line, the full local datetime on hover.
 function chatTime(iso: string) {
@@ -105,6 +110,13 @@ export default function PartyPage() {
   const [confirmingLeave, setConfirmingLeave] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [leaveError, setLeaveError] = useState<string | null>(null);
+  // Chat follow: pinned to the newest message while the reader is at the
+  // bottom, and a quiet chip instead of a yank once they scroll up.
+  const [hasNewMessages, setHasNewMessages] = useState(false);
+  const chatScrollRef = useRef<HTMLDivElement | null>(null);
+  const chatAtBottomRef = useRef(true);
+  const chatSeenCountRef = useRef(0);
+  const didInitialChatScrollRef = useRef(false);
   const launchChannelRef = useRef<RealtimeChannel | null>(null);
   const unreadChatCountRef = useRef(0);
   const originalTitleRef = useRef<string | null>(null);
@@ -135,6 +147,47 @@ export default function PartyPage() {
     touchParty(supabase, partyId)
     setNewMessage("")
   }
+
+  const scrollChatToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+    const el = chatScrollRef.current
+    if (!el) return
+    el.scrollTo({ top: el.scrollHeight, behavior })
+    chatAtBottomRef.current = true
+    setHasNewMessages(false)
+  }, [])
+
+  const handleChatScroll = useCallback(() => {
+    const el = chatScrollRef.current
+    if (!el) return
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= CHAT_BOTTOM_SLACK
+    chatAtBottomRef.current = nearBottom
+    if (nearBottom) setHasNewMessages(false)
+  }, [])
+
+  // Follow new chat lines only when the reader is already at the bottom (or
+  // when the new line is their own). Otherwise leave their scroll position
+  // alone and let the "New messages" chip offer the trip down.
+  useEffect(() => {
+    if (!chatScrollRef.current) return
+    const count = messages.length
+    const previousCount = chatSeenCountRef.current
+    chatSeenCountRef.current = count
+
+    if (!didInitialChatScrollRef.current) {
+      if (count === 0) return
+      didInitialChatScrollRef.current = true
+      scrollChatToBottom("auto")
+      return
+    }
+
+    if (count <= previousCount) return
+    const mine = messages[count - 1]?.user_id === session?.user?.id
+    if (chatAtBottomRef.current || mine) {
+      scrollChatToBottom("smooth")
+    } else {
+      setHasNewMessages(true)
+    }
+  }, [messages, session?.user?.id, scrollChatToBottom])
 
   // Hand the host role to another seated member. The old host stays in the
   // party as an ordinary member until they leave on their own.
@@ -944,41 +997,63 @@ export default function PartyPage() {
             <Card className="bg-white/5 backdrop-blur-md border border-white/20 hover:border-purple-300 transition-all duration-300 p-6 rounded-xl shadow-lg">
               <h2 className="text-2xl font-bold text-white mb-4">Party Chat</h2>
               <div className="space-y-4">
-                <div className="h-64 overflow-y-auto border border-white/20 p-4 rounded-lg bg-white/5">
-                  {messages.map((message, i) => {
-                    const prev = i > 0 ? messages[i - 1] : null
-                    const stacked =
-                      !!prev &&
-                      prev.user_id === message.user_id &&
-                      sameMinute(prev.created_at, message.created_at)
-                    return (
-                      <div key={message.id} className="flex items-start gap-3 mb-4">
-                        <div className="w-8 h-8 rounded-full bg-brand flex items-center justify-center">
-                          <span className="text-white font-bold">
-                            {partyInitial(message.user)}
-                          </span>
+                <div className="relative">
+                  <div
+                    ref={chatScrollRef}
+                    onScroll={handleChatScroll}
+                    role="log"
+                    aria-label="Party chat messages"
+                    aria-live="polite"
+                    aria-relevant="additions"
+                    aria-atomic="false"
+                    tabIndex={0}
+                    className="h-64 overflow-y-auto border border-white/20 p-4 rounded-lg bg-white/5"
+                  >
+                    {messages.map((message, i) => {
+                      const prev = i > 0 ? messages[i - 1] : null
+                      const stacked =
+                        !!prev &&
+                        prev.user_id === message.user_id &&
+                        sameMinute(prev.created_at, message.created_at)
+                      return (
+                        <div key={message.id} className="flex items-start gap-3 mb-4">
+                          <div className="w-8 h-8 rounded-full bg-brand flex items-center justify-center">
+                            <span className="text-white font-bold">
+                              {partyInitial(message.user)}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="text-white mb-1 flex items-baseline gap-2">
+                              <span>{partyLabel(message.user)}</span>
+                              {!stacked && (
+                                <span
+                                  className="text-xs text-gray-400"
+                                  title={chatTimeFull(message.created_at)}
+                                >
+                                  {chatTime(message.created_at)}
+                                </span>
+                              )}
+                            </p>
+                            <p className="text-gray-300">{message.content}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-white mb-1 flex items-baseline gap-2">
-                            <span>{partyLabel(message.user)}</span>
-                            {!stacked && (
-                              <span
-                                className="text-xs text-gray-400"
-                                title={chatTimeFull(message.created_at)}
-                              >
-                                {chatTime(message.created_at)}
-                              </span>
-                            )}
-                          </p>
-                          <p className="text-gray-300">{message.content}</p>
-                        </div>
+                      )
+                    })}
+                    {messages.length === 0 && (
+                      <div className="text-gray-300 text-center py-4">
+                        No messages yet...
                       </div>
-                    )
-                  })}
-                  {messages.length === 0 && (
-                    <div className="text-gray-300 text-center py-4">
-                      No messages yet...
-                    </div>
+                    )}
+                  </div>
+                  {hasNewMessages && (
+                    <button
+                      type="button"
+                      onClick={() => scrollChatToBottom("smooth")}
+                      className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full bg-brand px-3 py-1.5 text-xs font-semibold text-white shadow-lg hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-purple-300"
+                    >
+                      <ArrowDown className="h-3.5 w-3.5" />
+                      New messages
+                    </button>
                   )}
                 </div>
                 <div className="flex gap-2">
