@@ -14,6 +14,7 @@ import { VoiceChat } from "@/components/VoiceChat";
 import { playAsGuest } from "@/lib/guest";
 import { touchParty } from "@/lib/partyActivity";
 import { passHost, leaveParty } from "@/lib/partyHost";
+import { partyInitial, partyLabel } from "@/lib/partyLabel";
 import { ConfirmationModal } from "@/components/ui/ConfirmationModal";
 import type { Session } from "@supabase/auth-helpers-nextjs";
 import type { RealtimeChannel } from "@supabase/supabase-js";
@@ -351,6 +352,7 @@ export default function PartyPage() {
                 id: user.id,
                 email: user.email || `user_${userId.slice(0, 6)}`,
                 username: user.username || `User ${userId.slice(0, 6)}`,
+                display_name: user.display_name || undefined,
                 avatar_url: user.avatar_url
               }
             }
@@ -953,12 +955,12 @@ export default function PartyPage() {
                       <div key={message.id} className="flex items-start gap-3 mb-4">
                         <div className="w-8 h-8 rounded-full bg-brand flex items-center justify-center">
                           <span className="text-white font-bold">
-                            {message.user.email[0].toUpperCase()}
+                            {partyInitial(message.user)}
                           </span>
                         </div>
                         <div>
                           <p className="text-white mb-1 flex items-baseline gap-2">
-                            <span>{message.user.email}</span>
+                            <span>{partyLabel(message.user)}</span>
                             {!stacked && (
                               <span
                                 className="text-xs text-gray-400"
@@ -1021,12 +1023,12 @@ export default function PartyPage() {
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 rounded-full bg-brand flex items-center justify-center">
                         <span className="text-white font-bold">
-                          {member.user?.email?.[0]?.toUpperCase() || '?'}
+                          {partyInitial(member.user)}
                         </span>
                       </div>
                       <div>
                         <h3 className="font-medium text-white">
-                          {member.user?.username || member.user?.email || 'Unknown User'}
+                          {partyLabel(member.user)}
                         </h3>
                         <p className="text-sm text-gray-300">
                           {isHostMember ? 'Party Leader' : 'Member'}
