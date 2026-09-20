@@ -1,8 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 import { joinPartyByCode } from "@/lib/join-party"
+import { parsePartyInvite } from "@/lib/parse-party-invite"
+import { SITE_URL } from "@/lib/site"
 import { leaveParty } from "@/lib/partyHost"
 import { pickLatestParty } from "@/lib/activeParty"
 import { Plus, Trash2, Users, Lock, Unlock, RefreshCw, Loader2, Group, LogOut, Copy, Check, Link2 } from "lucide-react"
@@ -28,6 +30,7 @@ export default function PartyManager({ showJumpBackIn = false }: { showJumpBackI
   const [isLoading, setIsLoading] = useState(true)
   const [isDeleting, setIsDeleting] = useState<string | null>(null)
   const [isJoining, setIsJoining] = useState(false)
+  const joinPending = useRef(false)
   const [joinCode, setJoinCode] = useState("")
   const [joinError, setJoinError] = useState<string | null>(null)
   // Which share button last fired, keyed "<partyId>:code" / "<partyId>:link",
@@ -154,15 +157,23 @@ export default function PartyManager({ showJumpBackIn = false }: { showJumpBackI
     }
   }
 
-  // Join a party using a 6-character code
+  // Join using a code, direct invite, or share message.
   const handleJoinParty = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (isJoining) return
+    if (joinPending.current) return
+    joinPending.current = true
 
     try {
       setIsJoining(true)
       setJoinError(null)
-      const partyId = await joinPartyByCode(supabase, joinCode)
+      const invite = parsePartyInvite(joinCode, [SITE_URL, window.location.origin])
+      if (!invite) throw new Error("Paste a valid party code, invite link, or share message.")
+      if (invite.kind === "party") {
+        const { data: { session }, error } = await supabase.auth.getSession()
+        if (error) throw error
+        if (!session?.user?.id) throw new Error("You must be signed in to join a party.")
+      }
+      const partyId = invite.kind === "party" ? invite.partyId : await joinPartyByCode(supabase, invite.code)
       setJoinCode("")
       await fetchUserParty()
       router.push(`/party/${partyId}`)
@@ -170,6 +181,7 @@ export default function PartyManager({ showJumpBackIn = false }: { showJumpBackI
       console.error("Error joining party:", error)
       setJoinError(error.message || "Failed to join party. Please try again.")
     } finally {
+      joinPending.current = false
       setIsJoining(false)
     }
   }
@@ -271,26 +283,25 @@ export default function PartyManager({ showJumpBackIn = false }: { showJumpBackI
       >
         <h2 className="font-display text-xl font-bold text-white mb-1 flex items-center gap-2">
           <Users className="h-5 w-5 text-aqua-400" />
-          Join Party via Code
+          Join a Party
         </h2>
         <p className="mb-4 text-sm text-white/60">
-          Got a code from a friend? Paste the code or the whole invite link, either one works.
+          Paste a party code, invite link, or share message.
         </p>
         <form onSubmit={handleJoinParty} className="flex flex-col sm:flex-row gap-3">
           <Input
             type="text"
-            placeholder="Enter party code (e.g. A1B2C3)"
+            placeholder="Party code or invite link"
+            aria-label="Party code or invite link"
+            autoCapitalize="none"
+            autoComplete="off"
+            spellCheck={false}
             value={joinCode}
             onChange={(e) => {
-              // Friends paste all sorts of things: a bare code, a code with
-              // spaces, or the full /party/<uuid> invite link. Take the code
-              // out of whatever arrives.
-              const raw = e.target.value.trim()
-              const fromLink = raw.match(/\/party\/([0-9a-f-]{6,})/i)
-              const value = fromLink ? fromLink[1] : raw
-              setJoinCode(value.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().slice(0, 6))
+              setJoinCode(e.target.value)
+              setJoinError(null)
             }}
-            className="flex-1 uppercase font-mono tracking-[0.3em] text-center text-lg"
+            className="flex-1"
             disabled={isJoining}
           />
           <Button
