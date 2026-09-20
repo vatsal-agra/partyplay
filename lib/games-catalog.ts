@@ -135,3 +135,14 @@ export const PUBLIC_SLUG: Record<string, string> = {
 export function gamePath(id: string, query = ''): string {
   return `/games/${PUBLIC_SLUG[id] || id}${query}`
 }
+
+// Resolves a stored game reference (an internal id, or the display name we save
+// alongside a finished game) to a currently listed catalog entry. Matching is
+// trimmed and case-insensitive on both sides. Values that no longer match a
+// listed game (a delisted id like 'manhunt', an old name, junk) return
+// undefined, so callers never link to a route that isn't in the store.
+export function resolveCatalogGame(value: string | null | undefined): Game | undefined {
+  const needle = typeof value === 'string' ? value.trim().toLowerCase() : ''
+  if (!needle) return undefined
+  return GAMES_CATALOG.find((g) => g.id.toLowerCase() === needle || g.name.toLowerCase() === needle)
+}

@@ -3,7 +3,8 @@
 import { Button } from "@/components/ui/button"
 import { getSupabaseBrowserClient } from "@/lib/supabase-client"
 import { cleanupStaleParties } from "@/lib/partyActivity"
-import { fetchLeaderboard, fetchUserStats, type LeaderboardRow } from "@/lib/gameStats"
+import { fetchLeaderboard, fetchUserStats, type LeaderboardRow, type UserStats } from "@/lib/gameStats"
+import { gamePath, resolveCatalogGame } from "@/lib/games-catalog"
 import { ACHIEVEMENTS, fetchUserAchievements, isKnownAchievement } from "@/lib/achievements"
 import { levelFromXp } from "@/lib/progression"
 import { randomLoading } from "@/lib/copy"
@@ -11,7 +12,7 @@ import { isGuestSession } from "@/lib/guest"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
-import { Plus, RefreshCw, Trophy, Medal, Award, Sparkles, ShieldCheck } from "lucide-react"
+import { Plus, RefreshCw, Trophy, Medal, Award, Sparkles, ShieldCheck, RotateCcw } from "lucide-react"
 import PartyManager from "@/components/PartyManager"
 import { motion } from "framer-motion"
 import { Card } from "@/components/ui/card"
@@ -41,7 +42,7 @@ export default function Dashboard() {
   const [loadingLine] = useState(randomLoading())
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardEntry[]>([])
   const [myBadges, setMyBadges] = useState<string[]>([])
-  const [stats, setStats] = useState({ wins: 0, gamesPlayed: 0, xp: 0, streak: 0 })
+  const [stats, setStats] = useState<UserStats>({ wins: 0, gamesPlayed: 0, xp: 0, streak: 0 })
   const [flair, setFlair] = useState<Flair>({ emoji: null, color: null, badge: null })
   const [displayName, setDisplayName] = useState("Player")
   const [showFlair, setShowFlair] = useState(false)
@@ -83,6 +84,10 @@ export default function Dashboard() {
     const rows = await fetchLeaderboard(supabaseClient, 10)
     setLeaderboardData(rows)
   }
+
+  // The stored value is the last completed game's name (legacy column name),
+  // which may be stale or delisted, so only a live catalog match gets a link.
+  const lastGame = resolveCatalogGame(stats.favoriteGame)
 
   if (loading) {
     return (
@@ -229,6 +234,24 @@ export default function Dashboard() {
             {session?.user?.id && <DeleteAccount />}
           </div>
         </motion.div>
+
+        {/* One tap back into the last game they finished. Only rendered when the
+            stored name still matches a listed game, so it never links nowhere. */}
+        {lastGame && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4, duration: 0.4 }}
+            className="mb-6 flex justify-start"
+          >
+            <Button asChild variant="outline" size="sm" className="gap-1.5">
+              <Link href={gamePath(lastGame.id)}>
+                <RotateCcw className="h-3.5 w-3.5 text-aqua-400" />
+                Play {lastGame.name} again
+              </Link>
+            </Button>
+          </motion.div>
+        )}
 
         {/* Main content area with Party Manager and Leaderboard */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

@@ -21,26 +21,45 @@ export async function recordGameResult(
   }
 }
 
+export interface UserStats {
+  wins: number
+  gamesPlayed: number
+  xp: number
+  streak: number
+  // Despite the legacy column name, this holds the most recently completed
+  // game (by name) rather than a tally-based favorite. Undefined when the
+  // column, row or table isn't there.
+  favoriteGame?: string
+}
+
+const EMPTY_STATS: UserStats = { wins: 0, gamesPlayed: 0, xp: 0, streak: 0 }
+
 // The signed-in user's running totals (used for milestone badges, XP/level, and
 // the daily streak). Returns zeros if the row/table doesn't exist yet.
 export async function fetchUserStats(
   client: SupabaseClient,
   userId: string
-): Promise<{ wins: number; gamesPlayed: number; xp: number; streak: number }> {
+): Promise<UserStats> {
   try {
-    const { data } = await client
-      .from("game_stats")
-      .select("wins, games_played, xp, streak")
-      .eq("user_id", userId)
-      .single()
+    const read = (columns: string) =>
+      client.from("game_stats").select(columns).eq("user_id", userId).single()
+
+    // Older databases predate favorite_game; asking for a missing column fails
+    // the whole select (PostgREST 42703), so fall back to the columns that have
+    // always existed rather than losing wins/XP/streak too.
+    let { data, error } = await read("wins, games_played, xp, streak, favorite_game")
+    if (error?.code === "42703") ({ data } = await read("wins, games_played, xp, streak"))
+
+    const row = data as any
     return {
-      wins: data?.wins ?? 0,
-      gamesPlayed: data?.games_played ?? 0,
-      xp: data?.xp ?? 0,
-      streak: data?.streak ?? 0,
+      wins: row?.wins ?? 0,
+      gamesPlayed: row?.games_played ?? 0,
+      xp: row?.xp ?? 0,
+      streak: row?.streak ?? 0,
+      favoriteGame: row?.favorite_game || undefined,
     }
   } catch {
-    return { wins: 0, gamesPlayed: 0, xp: 0, streak: 0 }
+    return { ...EMPTY_STATS }
   }
 }
 
