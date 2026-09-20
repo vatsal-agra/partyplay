@@ -22,6 +22,7 @@ import { Avatar } from "@/components/Avatar"
 import { OpenPartiesBoard } from "@/components/OpenPartiesBoard"
 import { FlairPicker, type Flair } from "@/components/FlairPicker"
 import { DisplayNamePrompt } from "@/components/DisplayNamePrompt"
+import { DeleteAccount } from "@/components/DeleteAccount"
 
 type LeaderboardEntry = LeaderboardRow
 
@@ -225,6 +226,7 @@ export default function Dashboard() {
             <Button variant="outline" size="sm" onClick={() => setShowFlair(true)} className="gap-1.5">
               <Sparkles className="h-3.5 w-3.5 text-aqua-400" /> Customize
             </Button>
+            {session?.user?.id && <DeleteAccount />}
           </div>
         </motion.div>
 
